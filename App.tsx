@@ -4,6 +4,7 @@ import {
   TextInput, ScrollView, KeyboardAvoidingView,
   Platform, Animated, Image, ImageBackground
 } from 'react-native'
+import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath } from 'react-native-svg'
 
 // ════════════════════════════════════════════════════════════
 //  SOMA — Life OS built on self-knowledge
@@ -1133,6 +1134,45 @@ function WheelSegment({ domain, profile, angle, index, score }: { domain: typeof
   )
 }
 
+// A real Wheel of Life: radial chart with a spoke per domain, scores plotted as
+// dots and connected into a polygon. Balanced life = smooth circle; imbalanced = jagged.
+function WheelOfLifeChart({ domains, scoreOf, size = 300 }: { domains: typeof DOMAINS; scoreOf: (k: DomainKey) => number; size?: number }) {
+  const C = size / 2
+  const R = size / 2 - 56 // room for labels
+  const N = domains.length
+  const ang = (i: number) => (-90 + (360 / N) * i) * Math.PI / 180
+  const pt = (i: number, r: number) => ({ x: C + r * Math.cos(ang(i)), y: C + r * Math.sin(ang(i)) })
+  const scores = domains.map(d => Math.max(0, Math.min(100, scoreOf(d.key))))
+  const dataPts = scores.map((s, i) => pt(i, (s / 100) * R))
+  const polygon = dataPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  return (
+    <View style={{ width: size, height: size, alignSelf: 'center' }}>
+      <Svg width={size} height={size}>
+        {[0.25, 0.5, 0.75, 1].map((r, i) => (
+          <SvgCircle key={i} cx={C} cy={C} r={R * r} fill={i === 3 ? 'rgba(123,110,246,0.04)' : 'none'} stroke="#E5E2F0" strokeWidth={1} />
+        ))}
+        {domains.map((d, i) => { const e = pt(i, R); return (
+          <SvgLine key={d.key} x1={C} y1={C} x2={e.x} y2={e.y} stroke="#E5E2F0" strokeWidth={1} />
+        ) })}
+        <SvgPolygon points={polygon} fill="rgba(123,110,246,0.20)" stroke="#7B6EF6" strokeWidth={2.5} strokeLinejoin="round" />
+        {dataPts.map((p, i) => (
+          <SvgCircle key={i} cx={p.x} cy={p.y} r={4.5} fill={domains[i].color} stroke="#fff" strokeWidth={1.5} />
+        ))}
+      </Svg>
+      {domains.map((d, i) => {
+        const lp = pt(i, R + 32)
+        return (
+          <View key={d.key} style={{ position: 'absolute', width: 76, alignItems: 'center', left: lp.x - 38, top: lp.y - 20 }}>
+            <Text style={{ fontSize: 16 }}>{d.icon}</Text>
+            <Text style={{ fontSize: 9, fontWeight: '700', color: '#222540' }} numberOfLines={1}>{d.label}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: d.color }}>{Math.round(scores[i] / 10)}/10</Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
 function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => void }) {
   const [selectedDomain, setSelectedDomain] = useState<DomainKey | null>(null)
   const [wheel, setWheel] = useState<WheelAssessment | undefined>(profile.wheel)
@@ -1154,7 +1194,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
   return (
     <ScrollView style={g.screen} contentContainerStyle={{ minHeight: '100%', paddingBottom: 60 }}>
-      <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Back</Text></TouchableOpacity></View>
+      <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>{t('back')}</Text></TouchableOpacity></View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
         <Text style={g.greeting}>{t('wheelTitle')}</Text>
@@ -1163,42 +1203,20 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
         </Text>
       </View>
 
-      {/* Wheel Container */}
-      <View style={{ alignItems: 'center', marginVertical: 40 }}>
-        <View style={{
-          width: 320,
-          height: 320,
-          borderRadius: 160,
-          backgroundColor: 'rgba(123, 110, 246, 0.08)',
-          borderWidth: 2,
-          borderColor: '#7B6EF640',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          ...shadowSm,
-        }}>
-          {/* Center Circle */}
-          <View style={{
-            position: 'absolute',
-            width: 120,
-            height: 120,
-            borderRadius: 60,
-            backgroundColor: '#FFFFFF',
-            borderWidth: 3,
-            borderColor: '#7B6EF6',
-            alignItems: 'center',
-            justifyContent: 'center',
-            ...shadowMd,
-          }}>
-            <Text style={{ fontSize: 36 }}>✦</Text>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', marginTop: 6 }}>MY LIFE</Text>
-          </View>
-
-          {/* Segments */}
-          {DOMAINS.map((domain, i) => (
-            <WheelSegment key={domain.key} domain={domain} profile={profile} angle={(360 / DOMAINS.length) * i} index={i} score={domScore(domain.key)} />
-          ))}
-        </View>
+      {/* Wheel of Life — real radial chart */}
+      <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 12 }}>
+        <WheelOfLifeChart domains={DOMAINS} scoreOf={domScore} size={300} />
+        {(() => {
+          const sc = DOMAINS.map(d => domScore(d.key))
+          const spread = Math.max(...sc) - Math.min(...sc)
+          const smooth = spread <= 25 && Math.min(...sc) >= 40
+          return (
+            <Text style={{ marginTop: 10, fontSize: 13, color: '#6E7191', textAlign: 'center', paddingHorizontal: 34, lineHeight: 19 }}>
+              {smooth ? 'A smooth, rounded wheel — your life feels well balanced right now. 🌿'
+                : 'A jagged wheel — the dips are where life feels bumpy. Focus on your lowest 1–2 areas to round it out.'}
+            </Text>
+          )
+        })()}
       </View>
 
       {/* Domain Details */}
