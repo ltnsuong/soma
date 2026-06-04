@@ -1008,7 +1008,26 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
         <TouchableOpacity onPress={() => go('settings')} onLongPress={onReset}><Text style={g.logoSm}>⚙</Text></TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={g.auraMain} onPress={() => go('aura')}>
+      {/* Circle of Life — the hero of the home screen */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Text style={g.secLabel}>CIRCLE OF LIFE</Text>
+        <TouchableOpacity onPress={() => go('lifebalance')}><Text style={[g.secLabel, { color: '#7B6EF6' }]}>Details →</Text></TouchableOpacity>
+      </View>
+      <View style={g.domainGrid}>
+        {DOMAINS.map(d => {
+          const n = scoreByDomain(d.key)
+          return (
+            <TouchableOpacity key={d.key} style={g.domainCard} onPress={() => go('lifebalance')}>
+              <Text style={{ fontSize: 24 }}>{d.icon}</Text>
+              <Text style={g.domainLabel}>{d.label}</Text>
+              <View style={g.domainBarBg}><View style={[g.domainBarFill, { width: `${profile.wheel?.scores[d.key]?.score ?? domainWellbeing(profile.memories, d.key)}%`, backgroundColor: d.color }]} /></View>
+              <Text style={[g.domainCount, { color: d.color }]}>{n} insight{n !== 1 ? 's' : ''}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+
+      <TouchableOpacity style={[g.auraMain, { marginTop: 20 }]} onPress={() => go('aura')}>
         <View style={g.orbSm}><Text style={{ color: '#fff', fontSize: 13 }}>✦</Text></View>
         <View style={{ flex: 1 }}>
           <Text style={g.cardTag}>AURA · YOUR AI PARTNER</Text>
@@ -1038,24 +1057,6 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       {profile.diary.length > 0 && (
         <TouchableOpacity onPress={() => go('diaryhistory')}><Text style={[g.secLabel, { color: '#7B6EF6', marginBottom: 12 }]}>View diary history →</Text></TouchableOpacity>
       )}
-
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 12 }}>
-        <Text style={g.secLabel}>CIRCLE OF LIFE</Text>
-        <TouchableOpacity onPress={() => go('lifebalance')}><Text style={[g.secLabel, { color: '#7B6EF6' }]}>Details →</Text></TouchableOpacity>
-      </View>
-      <View style={g.domainGrid}>
-        {DOMAINS.map(d => {
-          const n = scoreByDomain(d.key)
-          return (
-            <TouchableOpacity key={d.key} style={g.domainCard} onPress={() => go('lifebalance')}>
-              <Text style={{ fontSize: 24 }}>{d.icon}</Text>
-              <Text style={g.domainLabel}>{d.label}</Text>
-              <View style={g.domainBarBg}><View style={[g.domainBarFill, { width: `${profile.wheel?.scores[d.key]?.score ?? domainWellbeing(profile.memories, d.key)}%`, backgroundColor: d.color }]} /></View>
-              <Text style={[g.domainCount, { color: d.color }]}>{n} insight{n !== 1 ? 's' : ''}</Text>
-            </TouchableOpacity>
-          )
-        })}
-      </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 12 }}>
         <Text style={g.secLabel}>MY CIRCLE</Text>
