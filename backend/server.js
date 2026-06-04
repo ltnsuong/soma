@@ -27,9 +27,6 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 
-// Health check (uptime monitors / Railway healthcheck)
-app.get(['/', '/health'], (req, res) => res.json({ status: 'ok', service: 'soma-backend' }))
-
 // Supabase (with ws transport for Node.js 20)
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
   realtime: { transport: WebSocket }
@@ -370,8 +367,8 @@ app.get('/matches', auth, async (req, res) => {
   }
 })
 
-// HEALTH
-app.get('/health', (req, res) => res.json({ status: 'ok' }))
+// HEALTH (also serves "/" for Railway/uptime root checks)
+app.get(['/', '/health'], (req, res) => res.json({ status: 'ok', service: 'soma-backend' }))
 
 // START
 const PORT = process.env.PORT || 3000
