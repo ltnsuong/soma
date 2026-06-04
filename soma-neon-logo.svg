@@ -1,0 +1,44 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Glow Filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Enhanced Glow Filter -->
+    <filter id="glow-intense" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Outer glow for dramatic effect -->
+    <filter id="outer-glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="200" height="200" fill="#0C0C0F"/>
+
+  <!-- Outer glow ring (subtle) -->
+  <circle cx="100" cy="100" r="82" fill="none" stroke="#7B6EF6" stroke-width="8.5" opacity="0.2" filter="url(#outer-glow)"/>
+  
+  <!-- Main circle with glow -->
+  <circle cx="100" cy="100" r="82" fill="none" stroke="#7B6EF6" stroke-width="8.5" filter="url(#glow-intense)"/>
+  
+  <!-- S curves with enhanced glow -->
+  <path d="M 90 52 C 105 50, 120 58, 122 72 C 123 80, 118 86, 108 88" fill="none" stroke="#7B6EF6" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow-intense)"/>
+  <path d="M 92 112 C 82 114, 78 120, 78 130 C 78 142, 88 150, 105 150 C 118 150, 128 144, 130 135" fill="none" stroke="#7B6EF6" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow-intense)"/>
+</svg>

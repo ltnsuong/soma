@@ -1,0 +1,17 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- SOMA Premium Logo: Icon Version -->
+  <!-- Ultra-clean geometric monogram -->
+  <!-- The S flows seamlessly inside the O -->
+
+  <!-- Perfect outer circle (O) -->
+  <circle cx="100" cy="100" r="85" fill="none" stroke="currentColor" stroke-width="9"/>
+
+  <!-- Integrated S curve (perfectly balanced inside O) -->
+  <!-- Top-right curve of S -->
+  <path d="M 85 58 Q 110 58, 115 75 Q 115 85, 105 90"
+        fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Bottom-left curve of S -->
+  <path d="M 95 110 Q 85 115, 85 125 Q 80 140, 100 145 Q 125 150, 130 135"
+        fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

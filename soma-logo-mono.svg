@@ -1,0 +1,10 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <path id="sPath" d="M 306 166 L 184 166 C 163 166 156 190 184 199 C 210 207 248 208 248 235 L 152 235"/>
+  </defs>
+  <g transform="translate(512,512) scale(2.05) translate(-200,-200)" fill="none" stroke="#FFFFFF"
+     stroke-linecap="square" stroke-linejoin="miter">
+    <circle cx="200" cy="200" r="122" stroke-width="14"/>
+    <use href="#sPath" stroke-width="24"/>
+  </g>
+</svg>

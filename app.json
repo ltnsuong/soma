@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "soma",
+    "slug": "soma",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.soma"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0E0820",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.soma"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

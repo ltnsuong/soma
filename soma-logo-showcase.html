@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOMA Premium Logo - Complete System</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+      background: #F8F9FA;
+      color: #1F2937;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 60px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 80px;
+    }
+
+    h1 {
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #000;
+      letter-spacing: -1px;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: #6B7280;
+      margin-bottom: 8px;
+    }
+
+    .tagline {
+      font-size: 14px;
+      color: #9CA3AF;
+      letter-spacing: 0.5px;
+    }
+
+    section {
+      margin-bottom: 100px;
+    }
+
+    section h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #000;
+    }
+
+    .section-subtitle {
+      font-size: 15px;
+      color: #6B7280;
+      margin-bottom: 40px;
+    }
+
+    /* Grid layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    /* Card styles */
+    .card {
+      background: white;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: #D1D5DB;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #6B7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 20px;
+    }
+
+    .logo-display {
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      background: #FAFAFA;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .logo-display svg {
+      max-width: 160px;
+      max-height: 160px;
+      width: 100%;
+      height: auto;
+    }
+
+    .logo-label {
+      font-size: 13px;
+      color: #9CA3AF;
+      font-weight: 500;
+    }
+
+    /* Size comparison */
+    .sizes {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #F3F4F6;
+      flex-wrap: wrap;
+    }
+
+    .size-demo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .size-box {
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      color: #4B5563;
+    }
+
+    .size-32 { width: 32px; height: 32px; font-size: 9px; }
+    .size-64 { width: 64px; height: 64px; font-size: 11px; }
+    .size-128 { width: 128px; height: 128px; font-size: 13px; }
+
+    .size-label {
+      font-size: 11px;
+      color: #9CA3AF;
+      text-align: center;
+    }
+
+    /* Background variations */
+    .background-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    .bg-white {
+      background: white;
+      border: 1px solid #E5E7EB;
+      padding: 60px 30px;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .bg-black {
+      background: black;
+      padding: 60px 30px;
+      border-radius: 12px;
+      text-align: center;
+      color: white;
+    }
+
+    .bg-demo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      min-height: 200px;
+    }
+
+    .bg-demo svg {
+      max-width: 140px;
+      max-height: 140px;
+      width: 100%;
+      height: auto;
+    }
+
+    .bg-label {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+
+    /* Specs */
+    .specs {
+      background: white;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      padding: 40px;
+      margin-bottom: 40px;
+    }
+
+    .spec-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+
+    .spec-item {
+      margin-bottom: 30px;
+    }
+
+    .spec-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #6B7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .spec-value {
+      font-size: 15px;
+      color: #1F2937;
+      font-weight: 500;
+    }
+
+    /* Typography showcase */
+    .lockup-demo {
+      background: white;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      padding: 40px 30px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 150px;
+      gap: 20px;
+    }
+
+    .lockup-demo svg {
+      max-width: 100px;
+      height: auto;
+    }
+
+    .lockup-text {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      font-size: 48px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      color: #000;
+    }
+
+    /* Features */
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .feature {
+      padding: 16px;
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+    }
+
+    .feature-icon {
+      font-size: 18px;
+      margin-right: 8px;
+    }
+
+    .feature-text {
+      font-size: 14px;
+      color: #1F2937;
+    }
+
+    @media (max-width: 768px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .background-grid { grid-template-columns: 1fr; }
+      .spec-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 36px; }
+      section h2 { font-size: 24px; }
+    }
+
+    footer {
+      text-align: center;
+      padding-top: 60px;
+      border-top: 1px solid #E5E7EB;
+      margin-top: 100px;
+      color: #9CA3AF;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>SOMA Premium Logo</h1>
+      <p class="subtitle">World-class design system for an AI-first technology company</p>
+      <p class="tagline">Minimalist. Iconic. Instantly recognizable. Swiss design excellence.</p>
+    </header>
+
+    <!-- Main Icon -->
+    <section>
+      <h2>Primary Icon</h2>
+      <p class="section-subtitle">The core monogram: S integrated inside O. Perfect for all applications.</p>
+      <div class="card" style="max-width: 400px; margin: 0 auto;">
+        <div class="logo-display" style="background: white; border: 1px solid #E5E7EB;">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="82" fill="none" stroke="black" stroke-width="8.5"/>
+            <path d="M 90 52 C 105 50, 120 58, 122 72 C 123 80, 118 86, 108 88" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 92 112 C 82 114, 78 120, 78 130 C 78 142, 88 150, 105 150 C 118 150, 128 144, 130 135" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="card-title">Icon Version</div>
+        <div class="logo-label">Use for app icons, favicons, and small applications</div>
+        <div class="sizes">
+          <div class="size-demo">
+            <div class="size-box size-32">
+              <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="100" cy="100" r="82" fill="none" stroke="black" stroke-width="8.5"/>
+                <path d="M 90 52 C 105 50, 120 58, 122 72 C 123 80, 118 86, 108 88" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 92 112 C 82 114, 78 120, 78 130 C 78 142, 88 150, 105 150 C 118 150, 128 144, 130 135" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="size-label">32px</span>
+          </div>
+          <div class="size-demo">
+            <div class="size-box size-64">
+              <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="100" cy="100" r="82" fill="none" stroke="black" stroke-width="8.5"/>
+                <path d="M 90 52 C 105 50, 120 58, 122 72 C 123 80, 118 86, 108 88" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 92 112 C 82 114, 78 120, 78 130 C 78 142, 88 150, 105 150 C 118 150, 128 144, 130 135" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="size-label">64px</span>
+          </div>
+          <div class="size-demo">
+            <div class="size-box size-128">
+              <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="100" cy="100" r="82" fill="none" stroke="black" stroke-width="8.5"/>
+                <path d="M 90 52 C 105 50, 120 58, 122 72 C 123 80, 118 86, 108 88" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M 92 112 C 82 114, 78 120, 78 130 C 78 142, 88 150, 105 150 C 118 150, 128 144, 130 135" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="size-label">128px</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lockups -->
+    <section>
+      <h2>Logo Lockups</h2>
+      <p class="section-subtitle">Icon combined with typography for branding applications</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Horizontal Lockup</div>
+          <div class="lockup-demo" style="flex-direction: row;">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width: 60px;">
+              <circle cx="50" cy="50" r="41" fill="none" stroke="black" stroke-width="4.5"/>
+              <path d="M 45 26 C 52.5 25, 60 29, 61 36 C 61.5 40, 59 43, 54 44" fill="none" stroke="black" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 46 56 C 41 57, 39 60, 39 65 C 39 71, 44 75, 52.5 75 C 59 75, 64 72, 65 67.5" fill="none" stroke="black" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="lockup-text">SOMA</div>
+          </div>
+          <div class="logo-label">For website headers, email signatures</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Vertical Lockup</div>
+          <div style="text-align: center;">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width: 60px; margin: 0 auto 15px;">
+              <circle cx="50" cy="50" r="41" fill="none" stroke="black" stroke-width="4.5"/>
+              <path d="M 45 26 C 52.5 25, 60 29, 61 36 C 61.5 40, 59 43, 54 44" fill="none" stroke="black" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 46 56 C 41 57, 39 60, 39 65 C 39 71, 44 75, 52.5 75 C 59 75, 64 72, 65 67.5" fill="none" stroke="black" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="lockup-text" style="font-size: 36px;">SOMA</div>
+          </div>
+          <div class="logo-label">For vertical spaces, mobile layouts</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Background Variations -->
+    <section>
+      <h2>Background Variations</h2>
+      <p class="section-subtitle">Logo works perfectly on any background</p>
+      <div class="background-grid">
+        <div class="bg-white">
+          <div class="bg-demo">
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="max-width: 140px;">
+              <circle cx="100" cy="100" r="82" fill="none" stroke="black" stroke-width="8.5"/>
+              <path d="M 90 52 C 105 50, 120 58, 122 72 C 123 80, 118 86, 108 88" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 92 112 C 82 114, 78 120, 78 130 C 78 142, 88 150, 105 150 C 118 150, 128 144, 130 135" fill="none" stroke="black" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="bg-label">White Background (Standard)</div>
+        </div>
+
+        <div class="bg-black">
+          <div class="bg-demo">
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="max-width: 140px;">
+              <circle cx="100" cy="100" r="82" fill="none" stroke="white" stroke-width="8.5"/>
+              <path d="M 90 52 C 105 50, 120 58, 122 72 C 123 80, 118 86, 108 88" fill="none" stroke="white" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 92 112 C 82 114, 78 120, 78 130 C 78 142, 88 150, 105 150 C 118 150, 128 144, 130 135" fill="none" stroke="white" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="bg-label">Black Background (Dark Mode)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Technical Specs -->
+    <section>
+      <h2>Technical Specifications</h2>
+      <p class="section-subtitle">Precise measurements for perfect implementation</p>
+      <div class="specs">
+        <div class="spec-grid">
+          <div class="spec-item">
+            <div class="spec-label">Aspect Ratio</div>
+            <div class="spec-value">1:1 (Perfect Square)</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Stroke Width</div>
+            <div class="spec-value">8.5 units (200×200 viewBox)</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Circle Radius</div>
+            <div class="spec-value">82 units</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Line Caps</div>
+            <div class="spec-value">Round (premium, smooth)</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Minimum Size</div>
+            <div class="spec-value">32px (favicon)</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Maximum Size</div>
+            <div class="spec-value">Unlimited (vector scaling)</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">Color Model</div>
+            <div class="spec-value">Black & White (RGB/CMYK)</div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-label">File Format</div>
+            <div class="spec-value">SVG (infinitely scalable)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Key Features -->
+    <section>
+      <h2>Design Features</h2>
+      <p class="section-subtitle">Why this logo works as a world-class brand</p>
+      <div class="features">
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>Ultra-minimalist</strong> — No unnecessary details</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>Perfectly balanced</strong> — Mathematical symmetry</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>Instantly recognizable</strong> — 1-second memorability</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>Premium quality</strong> — Swiss design excellence</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>No gradients/effects</strong> — Pure geometry</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>Scalable to any size</strong> — Favicon to billboard</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>Timeless design</strong> — Not trendy, never dated</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">✓</span>
+          <span class="feature-text"><strong>AI-forward positioning</strong> — Tech, consciousness, trust</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p><strong>SOMA Premium Logo System</strong> | Designed for world-class brand recognition</p>
+      <p style="margin-top: 12px;">Files: SVG (vector) | High-resolution PNG exports available | Complete brand guidelines included</p>
+    </footer>
+  </div>
+</body>
+</html>

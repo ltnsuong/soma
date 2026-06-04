@@ -1,0 +1,63 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle (optional - remove if you want transparent) -->
+  <!-- <circle cx="100" cy="100" r="100" fill="#0C0C0F"/> -->
+
+  <!-- Outer ring - gradient border -->
+  <defs>
+    <linearGradient id="somaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9B8FFE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B6EF6;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Glow effect -->
+    <filter id="somaGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer decorative circle -->
+  <circle cx="100" cy="100" r="95" fill="none" stroke="url(#somaGradient)" stroke-width="2" opacity="0.6"/>
+  <circle cx="100" cy="100" r="88" fill="none" stroke="url(#somaGradient)" stroke-width="1" opacity="0.3"/>
+
+  <!-- Inner geometric shapes forming the letters -->
+  <g filter="url(#somaGlow)">
+
+    <!-- S - Top Left -->
+    <text x="60" y="95" font-family="Arial, sans-serif" font-size="56" font-weight="700" fill="url(#somaGradient)" text-anchor="middle" dominant-baseline="middle" letter-spacing="-2">S</text>
+
+    <!-- O - Top Right -->
+    <text x="140" y="95" font-family="Arial, sans-serif" font-size="56" font-weight="700" fill="url(#somaGradient)" text-anchor="middle" dominant-baseline="middle">O</text>
+
+    <!-- M - Bottom Left -->
+    <text x="60" y="120" font-family="Arial, sans-serif" font-size="56" font-weight="700" fill="url(#somaGradient)" text-anchor="middle" dominant-baseline="middle">M</text>
+
+    <!-- A - Bottom Right -->
+    <text x="140" y="120" font-family="Arial, sans-serif" font-size="56" font-weight="700" fill="url(#somaGradient)" text-anchor="middle" dominant-baseline="middle">A</text>
+
+  </g>
+
+  <!-- Center dot - connects all letters -->
+  <circle cx="100" cy="107" r="8" fill="url(#somaGradient)" opacity="0.8"/>
+  <circle cx="100" cy="107" r="5" fill="url(#somaGradient)"/>
+
+  <!-- Connecting lines between letters (subtle geometry) -->
+  <g stroke="url(#somaGradient)" stroke-width="1.5" fill="none" opacity="0.4">
+    <line x1="60" y1="90" x2="100" y2="100" /> <!-- S to center -->
+    <line x1="140" y1="90" x2="100" y2="100" /> <!-- O to center -->
+    <line x1="60" y1="125" x2="100" y2="115" /> <!-- M to center -->
+    <line x1="140" y1="125" x2="100" y2="115" /> <!-- A to center -->
+  </g>
+
+  <!-- Outer accent points (4 dots for the 4 letters) -->
+  <g fill="url(#somaGradient)" opacity="0.5">
+    <circle cx="100" cy="20" r="3" /> <!-- Top -->
+    <circle cx="180" cy="100" r="3" /> <!-- Right -->
+    <circle cx="100" cy="180" r="3" /> <!-- Bottom -->
+    <circle cx="20" cy="100" r="3" /> <!-- Left -->
+  </g>
+
+</svg>
