@@ -352,16 +352,25 @@ function PressButton({ onPress, style, children, disabled }: { onPress?: () => v
 
 // ── GROQ ───────────────────────────────────────────────────
 async function groq(messages: any[], system: string, maxTokens = 200): Promise<string> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 20000) // never hang forever
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AI_KEY}` },
       body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: maxTokens, temperature: 0.85,
         messages: [{ role: 'system', content: system }, ...messages] }),
+      signal: ctrl.signal,
     })
+    if (!res.ok) { console.warn('[groq] HTTP', res.status, await res.text().catch(() => '')); return '' }
     const d = await res.json()
     return d.choices?.[0]?.message?.content ?? ''
-  } catch { return '' }
+  } catch (e) {
+    console.warn('[groq] request failed:', e instanceof Error ? e.message : e)
+    return ''
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function auraSystem(p: UserProfile, mode: 'try' | 'full' | 'diary'): string {
@@ -730,21 +739,26 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
       return
     }
     const p = DB.get()
-    const [reply, intel] = await Promise.all([
-      groq(updated, auraSystem(p, mode), 180),
-      mode !== 'try' ? extract(text.trim()) : Promise.resolve({ memories: [], people: [] } as any),
-    ])
-    if (mode !== 'try') {
-      if (intel.name) DB.setName(intel.name)
-      intel.memories.forEach((m: any) => DB.addMemory(m.domain, m.content))
-      intel.people.forEach((pe: any) => DB.upsertPerson(pe.name, pe.relationship, pe.context, pe.interests || []))
-      DB.syncDatingInterests()   // daily talk auto-updates dating profile interests
-      onRefresh()
+    try {
+      const [reply, intel] = await Promise.all([
+        groq(updated, auraSystem(p, mode), 180),
+        mode !== 'try' ? extract(text.trim()) : Promise.resolve({ memories: [], people: [] } as any),
+      ])
+      if (mode !== 'try') {
+        if (intel.name) DB.setName(intel.name)
+        intel.memories.forEach((m: any) => DB.addMemory(m.domain, m.content))
+        intel.people.forEach((pe: any) => DB.upsertPerson(pe.name, pe.relationship, pe.context, pe.interests || []))
+        DB.syncDatingInterests()   // daily talk auto-updates dating profile interests
+        onRefresh()
+      }
+      const content = reply || "I'm here with you — but I'm having trouble reaching my thoughts right now (connection issue). Give me a moment and try again?"
+      const final = [...updated, { role: 'assistant' as const, content }]
+      setMsgs(final); scroll()
+      setSpeaking(true); speak(content)
+      setTimeout(() => setSpeaking(false), content.length * 60)
+    } finally {
+      setLoading(false)   // always clear "Thinking…", even on failure
     }
-    const final = [...updated, { role: 'assistant' as const, content: reply || 'I am here with you.' }]
-    setMsgs(final); setLoading(false); scroll()
-    setSpeaking(true); speak(final[final.length - 1].content)
-    setTimeout(() => setSpeaking(false), final[final.length - 1].content.length * 60)
   }
 
   const start = async () => {
