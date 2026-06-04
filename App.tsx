@@ -5,6 +5,10 @@ import {
   Platform, Animated, Image, ImageBackground
 } from 'react-native'
 import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline } from 'react-native-svg'
+import * as WebBrowser from 'expo-web-browser'
+import * as Google from 'expo-auth-session/providers/google'
+
+WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app reopens
 
 // ════════════════════════════════════════════════════════════
 //  SOMA — Life OS built on self-knowledge
@@ -12,6 +16,11 @@ import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path 
 // ════════════════════════════════════════════════════════════
 
 const AI_KEY      = process.env.EXPO_PUBLIC_AI_KEY ?? ''
+// Google OAuth client IDs (create in Google Cloud Console; leave blank to disable)
+const GOOGLE_WEB_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? ''
+const GOOGLE_IOS_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? ''
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? ''
+const GOOGLE_ENABLED = !!(GOOGLE_WEB_CLIENT_ID || GOOGLE_IOS_CLIENT_ID || GOOGLE_ANDROID_CLIENT_ID)
 const STORAGE_KEY = 'soma_v3'
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:3000'
 const TOKEN_KEY   = 'soma_auth_token'
@@ -764,8 +773,35 @@ function Register({ onDone }: { onDone: (name: string) => void }) {
   const [loading, setLoading] = useState(false)
   const [verifyToken, setVerifyToken] = useState('')
 
+  // ── Real Google OAuth (expo-auth-session) ──
+  const [gRequest, gResponse, gPromptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
+  })
+  useEffect(() => {
+    if (gResponse?.type !== 'success') return
+    const token = gResponse.authentication?.accessToken
+    if (!token) return
+    setLoading(true)
+    fetch('https://www.googleapis.com/userinfo/v2/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then((info: any) => {
+        const userName = info.name || info.given_name || (info.email ? String(info.email).split('@')[0] : 'Friend')
+        DB.register(userName)
+        onDone(userName)
+      })
+      .catch(() => alert('Google sign-in failed while fetching your profile. Please try again.'))
+      .finally(() => setLoading(false))
+  }, [gResponse])
+
   const handleSocial = (provider: string) => {
-    alert(`${provider} login not yet configured.\n\nTo integrate:\n1. Get OAuth credentials from ${provider}\n2. Add to .env\n3. Use their SDK\n\nFor now, use email signup.`)
+    if (provider === 'Google') {
+      if (GOOGLE_ENABLED && gRequest) { gPromptAsync(); return }
+      alert('Google sign-in isn\'t configured yet.\n\nAdd EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (and iOS/Android IDs) to your .env from Google Cloud Console, then restart. For now, use email signup.')
+      return
+    }
+    alert(`${provider} sign-in isn't wired up yet (Apple needs a paid Apple Developer account; Facebook needs a Facebook app). Use Google or email signup for now.`)
   }
 
   const handleEmailSignup = async () => {

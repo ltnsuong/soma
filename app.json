@@ -2,6 +2,7 @@
   "expo": {
     "name": "soma",
     "slug": "soma",
+    "scheme": "soma",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -28,6 +29,9 @@
         "projectId": "c293f20f-f4a1-4779-9b31-2024df021e33"
       }
     },
-    "owner": "sofiale"
+    "owner": "sofiale",
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }
