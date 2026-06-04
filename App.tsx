@@ -28,6 +28,62 @@ const DOMAINS = [
 type DomainKey = typeof DOMAINS[number]['key']
 type Sentiment = 'positive' | 'neutral' | 'negative'
 
+// ── i18n ───────────────────────────────────────────────────
+const LANGS = [
+  { code: 'en', name: 'English',    label: 'English' },
+  { code: 'ru', name: 'Russian',    label: 'Русский' },
+  { code: 'es', name: 'Spanish',    label: 'Español' },
+  { code: 'fr', name: 'French',     label: 'Français' },
+  { code: 'de', name: 'German',     label: 'Deutsch' },
+  { code: 'pt', name: 'Portuguese', label: 'Português' },
+  { code: 'vi', name: 'Vietnamese', label: 'Tiếng Việt' },
+  { code: 'zh', name: 'Chinese',    label: '中文' },
+  { code: 'ja', name: 'Japanese',   label: '日本語' },
+  { code: 'ar', name: 'Arabic',     label: 'العربية' },
+] as const
+
+function detectLang(): string {
+  try {
+    const n = (typeof navigator !== 'undefined' && (navigator as any).language) ? (navigator as any).language.slice(0, 2).toLowerCase() : 'en'
+    return LANGS.some(l => l.code === n) ? n : 'en'
+  } catch { return 'en' }
+}
+function currentLangCode(): string { try { return DB.get().language || 'en' } catch { return 'en' } }
+function currentLangName(): string { return LANGS.find(l => l.code === currentLangCode())?.name || 'English' }
+// Appended to conversational AI prompts so Soma replies in the user's language.
+function langDirective(): string {
+  return currentLangCode() === 'en' ? '' : `\n\nIMPORTANT: Write your entire response in ${currentLangName()} — the user's language — naturally and fluently.`
+}
+
+// UI strings. t(key) returns the current language's string, falling back to English.
+const STRINGS: Record<string, Record<string, string>> = {
+  en: {
+    hello: 'Hello', feeling: 'How are you feeling today?', circleOfLife: 'Circle of Life', details: 'Details →',
+    yourInsights: 'Your Insights', wheelTitle: 'Wheel of Life', back: '← Back', settings: 'Settings',
+    language: 'Language', save: 'Save', talkToSoma: 'Talk with Soma', overallBalance: 'OVERALL LIFE BALANCE',
+    reflecting: '🧠 Soma is reflecting on everything you\'ve shared…',
+    wheelSub: 'Assessed by Soma, weighing everything you\'ve shared — like a thoughtful psychologist.',
+  },
+  ru: {
+    hello: 'Привет', feeling: 'Как вы себя чувствуете сегодня?', circleOfLife: 'Круг жизни', details: 'Подробнее →',
+    yourInsights: 'Ваши наблюдения', wheelTitle: 'Колесо жизни', back: '← Назад', settings: 'Настройки',
+    language: 'Язык', save: 'Сохранить', talkToSoma: 'Поговорите с Сомой', overallBalance: 'ОБЩИЙ БАЛАНС ЖИЗНИ',
+    reflecting: '🧠 Сома обдумывает всё, чем вы поделились…',
+    wheelSub: 'Оценка Сомы — она взвешивает всё, чем вы поделились, как внимательный психолог.',
+  },
+  es: {
+    hello: 'Hola', feeling: '¿Cómo te sientes hoy?', circleOfLife: 'Círculo de la vida', details: 'Detalles →',
+    yourInsights: 'Tus reflexiones', wheelTitle: 'Rueda de la vida', back: '← Atrás', settings: 'Ajustes',
+    language: 'Idioma', save: 'Guardar', talkToSoma: 'Habla con Soma', overallBalance: 'EQUILIBRIO DE VIDA',
+    reflecting: '🧠 Soma está reflexionando sobre todo lo que compartiste…',
+    wheelSub: 'Evaluado por Soma, sopesando todo lo que compartiste, como un psicólogo atento.',
+  },
+}
+function t(key: string): string {
+  const c = currentLangCode()
+  return (STRINGS[c] && STRINGS[c][key]) || STRINGS.en[key] || key
+}
+
 // Fallback sentiment for older memories saved before sentiment was tracked.
 function inferSentiment(text: string): Sentiment {
   const t = text.toLowerCase()
@@ -69,7 +125,7 @@ ${byDomain}
 For EACH domain give a wellbeing score (0-100) and a brief insight (<=12 words, warm and clinical).
 JSON shape exactly:
 {"health":{"score":0,"note":""},"finance":{"score":0,"note":""},"hobby":{"score":0,"note":""},"relationship":{"score":0,"note":""},"purpose":{"score":0,"note":""},"mind":{"score":0,"note":""}}
-JSON only:`
+${currentLangCode() === 'en' ? '' : `Write every "note" in ${currentLangName()}, but keep the JSON keys exactly as shown (English).\n`}JSON only:`
   const scores: Partial<Record<DomainKey, WheelDomain>> = {}
   try {
     const res = await groq([{ role: 'user', content: prompt }], sys, 600, 0.3)
@@ -151,6 +207,7 @@ interface UserProfile {
   aiPhoto: string             // user-chosen photo for their companion (data URL)
   trustedContact: { name: string; phone: string }  // who to reach in a hard moment
   wheel?: WheelAssessment                            // psychologist's wheel-of-life assessment (cached)
+  language?: string                                  // UI + AI language code (e.g. 'en','ru','es')
 }
 
 const FREE_DAILY_LIKES = 10
@@ -178,6 +235,7 @@ const DB = {
         if (p.aiName === undefined) p.aiName = 'Soma'
         if (p.aiPhoto === undefined) p.aiPhoto = ''
         if (!p.trustedContact) p.trustedContact = { name: '', phone: '' }
+        if (p.language === undefined) p.language = detectLang()
         return p
       }
     } catch {}
@@ -289,6 +347,7 @@ const DB = {
   setAiPhoto: (url: string) => { const p = DB.get(); p.aiPhoto = url; DB.save(p) },
   setTrustedContact: (name: string, phone: string) => { const p = DB.get(); p.trustedContact = { name, phone }; DB.save(p) },
   setWheel: (wheel: WheelAssessment) => { const p = DB.get(); p.wheel = wheel; DB.save(p) },
+  setLanguage: (code: string) => { const p = DB.get(); p.language = code; p.wheel = undefined; DB.save(p) },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
 
@@ -451,7 +510,7 @@ Core beliefs you live by:
 - Most relationships break from misunderstanding, not from lack of love.
 - Big decisions made in strong emotion (a breakup, quitting a job, a money move) are often regretted. When you sense someone is about to make one while hurting, gently encourage them to pause, sleep on it, and think it through with you first — never push them toward action.
 - You give honest, caring guidance across their whole life: health, finance, relationships, purpose. You help them avoid decisions they'd regret.
-- If someone sounds hopeless or mentions not wanting to live, you stay warm, take it seriously, never minimize, and always steer them toward a real human and crisis support.`
+- If someone sounds hopeless or mentions not wanting to live, you stay warm, take it seriously, never minimize, and always steer them toward a real human and crisis support.${langDirective()}`
   if (mode === 'try') return `${base}
 This person is trying SOMA for the first time. Make them feel deeply heard. Be their friend right now. 2-3 sentences. One warm question. After 3-4 exchanges, gently mention they can keep this forever by joining SOMA.`
   if (mode === 'diary') return `${base}
@@ -493,7 +552,7 @@ Message: "${msg}"
 }
 Rules: Skip vague or incomplete fragments (e.g. "I want to", "maybe"). Only store clear, self-contained facts.
 sentiment = how this is going for them: "negative" for a struggle/loss/regret/worry, "positive" for a win/joy/progress, "neutral" for a plain fact.
-Max 3 memories, 2 people. JSON only:` }],
+${currentLangCode() === 'en' ? '' : `Write the "content" and "context" text in ${currentLangName()}, but keep "domain" and "sentiment" exactly as the English keyword options above.\n`}Max 3 memories, 2 people. JSON only:` }],
       'You are a precise JSON extractor. Return only valid JSON.', 400, 0.2)
     const m = res.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0])
   } catch {}
@@ -848,7 +907,7 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
   const finishDiary = async () => {
     if (msgs.length < 2) { onDone(); return }
     const convo = msgs.map(m => `${m.role}: ${m.content}`).join('\n')
-    const summary = await groq([{ role: 'user', content: `Summarize this diary chat in ONE warm sentence from the user perspective:\n${convo}` }], 'You write brief diary summaries.', 60)
+    const summary = await groq([{ role: 'user', content: `Summarize this diary chat in ONE warm sentence from the user perspective:\n${convo}` }], 'You write brief diary summaries.' + langDirective(), 60)
     DB.addDiary('reflective', summary || 'A day of reflection.')
     onDone()
   }
@@ -1098,9 +1157,9 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
       <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Back</Text></TouchableOpacity></View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
-        <Text style={g.greeting}>Wheel of Life</Text>
+        <Text style={g.greeting}>{t('wheelTitle')}</Text>
         <Text style={g.auraSub} style={{ marginTop: 6, fontSize: 13, color: '#6E7191' }}>
-          {assessing ? '🧠 Soma is reflecting on everything you\'ve shared…' : 'Assessed by Soma, weighing everything you\'ve shared — like a thoughtful psychologist.'}
+          {assessing ? t('reflecting') : t('wheelSub')}
         </Text>
       </View>
 
@@ -1144,7 +1203,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
       {/* Domain Details */}
       <View style={{ paddingHorizontal: 24 }}>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: '#222540', marginBottom: 16 }}>Your Insights</Text>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: '#222540', marginBottom: 16 }}>{t('yourInsights')}</Text>
 
         {DOMAINS.map(d => {
           const items = profile.memories.filter(m => m.domain === d.key)
@@ -1190,7 +1249,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
       {/* Overall Balance Score */}
       <View style={{ paddingHorizontal: 24, marginTop: 20, marginBottom: 40 }}>
         <View style={[g.matchCard, { marginBottom: 0 }]}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', letterSpacing: 1, marginBottom: 8 }}>OVERALL LIFE BALANCE</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', letterSpacing: 1, marginBottom: 8 }}>{t('overallBalance')}</Text>
           {(() => { return (
             <>
               <Text style={{ fontSize: 48, fontWeight: '800', color: '#7B6EF6' }}>{ob}</Text>
@@ -1230,7 +1289,7 @@ function CircleScreen({ profile, onBack }: { profile: UserProfile; onBack: () =>
     if (!p) return
     const updated = [...msgs, { role: 'user' as const, content: text.trim() }]
     setMsgs(updated); setInput(''); setLoading(true); DB.messageCircle(openChat, text.trim(), true)
-    const context = somaCircleContext(p.type as any, p.name)
+    const context = somaCircleContext(p.type as any, p.name) + langDirective()
     const reply = await groq(updated.map(m => ({ role: m.role, content: m.content })), context, 100)
     const final = [...updated, { role: 'assistant' as const, content: reply || 'I hear you. Tell me more.' }]
     setMsgs(final); setLoading(false); DB.messageCircle(openChat, reply || 'I hear you. Tell me more.', false)
@@ -2617,8 +2676,8 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
   }
   return (
     <ScrollView style={g.screen} contentContainerStyle={g.homePad}>
-      <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Back</Text></TouchableOpacity></View>
-      <Text style={g.logo}>Settings</Text>
+      <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>{t('back')}</Text></TouchableOpacity></View>
+      <Text style={g.logo}>{t('settings')}</Text>
       <Text style={g.logoSub}>{profile.name} · {profile.premium ? '★ Premium' : 'Free plan'}</Text>
       <View style={{ height: 20 }} />
 
@@ -2641,6 +2700,20 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
       <TouchableOpacity style={g.setRow} onPress={exportData}>
         <Text style={g.setIcon}>📦</Text><Text style={g.setLabel}>Export my data</Text><Text style={g.setArrow}>→</Text>
       </TouchableOpacity>
+
+      {/* Language */}
+      <Text style={[g.secLabel, { marginTop: 20 }]}>{t('language').toUpperCase()} · 🌍</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+        {LANGS.map(l => {
+          const active = (profile.language || 'en') === l.code
+          return (
+            <TouchableOpacity key={l.code} onPress={() => { DB.setLanguage(l.code); onRefresh() }}
+              style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, borderColor: active ? '#7B6EF6' : '#E9E6F2', backgroundColor: active ? '#7B6EF6' : '#FFFFFF' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : '#222540' }}>{l.label}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
 
       {/* Customize companion */}
       <Text style={[g.secLabel, { marginTop: 20 }]}>YOUR COMPANION · 🐧</Text>
