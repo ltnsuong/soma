@@ -52,8 +52,49 @@ function overallBalance(memories: Memory[]): number {
   return Math.round(DOMAINS.reduce((sum, d) => sum + domainWellbeing(memories, d.key), 0) / DOMAINS.length)
 }
 
+// The app's "psychologist": weigh EVERYTHING shared in each domain and assign a
+// considered Wheel-of-Life score (0-100) + a brief insight. One LLM call, cached.
+async function assessWheel(p: UserProfile): Promise<WheelAssessment> {
+  const basis = p.memories.length
+  const byDomain = DOMAINS.map(d => {
+    const lines = p.memories.filter(m => m.domain === d.key).map(m => `- ${m.content}`).join('\n')
+    return `${d.label} [${d.key}]:\n${lines || '(nothing shared yet)'}`
+  }).join('\n\n')
+  const sys = `You are an experienced, compassionate clinical psychologist completing a Wheel of Life assessment. For each life domain, weigh EVERYTHING the client shared holistically: severity and recency of struggles, whether difficulties are being actively worked through, sources of meaning and fulfilment, and overall satisfaction. Be realistic and honest, not flattering — a domain where they only voiced a serious struggle scores LOW; genuine fulfilment scores HIGH; nothing shared = 0 (unexplored). Return ONLY JSON.`
+  const prompt = `CLIENT: ${p.name || 'the user'}
+
+WHAT THEY HAVE SHARED, BY LIFE DOMAIN:
+${byDomain}
+
+For EACH domain give a wellbeing score (0-100) and a brief insight (<=12 words, warm and clinical).
+JSON shape exactly:
+{"health":{"score":0,"note":""},"finance":{"score":0,"note":""},"hobby":{"score":0,"note":""},"relationship":{"score":0,"note":""},"purpose":{"score":0,"note":""},"mind":{"score":0,"note":""}}
+JSON only:`
+  const scores: Partial<Record<DomainKey, WheelDomain>> = {}
+  try {
+    const res = await groq([{ role: 'user', content: prompt }], sys, 600, 0.3)
+    const m = res.match(/\{[\s\S]*\}/)
+    if (m) {
+      const parsed = JSON.parse(m[0])
+      for (const d of DOMAINS) {
+        const hasData = p.memories.some(mm => mm.domain === d.key)
+        if (!hasData) { scores[d.key] = { score: 0, note: '' }; continue }
+        const v = parsed[d.key]
+        if (v && typeof v.score === 'number') scores[d.key] = { score: Math.max(0, Math.min(100, Math.round(v.score))), note: String(v.note || '').slice(0, 90) }
+      }
+    }
+  } catch {}
+  // Heuristic fallback for any domain the model didn't return
+  for (const d of DOMAINS) if (!scores[d.key]) scores[d.key] = { score: domainWellbeing(p.memories, d.key), note: '' }
+  const vals = DOMAINS.map(d => scores[d.key]!.score)
+  const overall = Math.round(vals.reduce((a, b) => a + b, 0) / DOMAINS.length)
+  return { scores, overall, basis, at: new Date().toISOString() }
+}
+
 // ── DATA TYPES ─────────────────────────────────────────────
 interface Memory { id: string; domain: DomainKey; content: string; createdAt: string; sentiment?: Sentiment }
+type WheelDomain = { score: number; note: string }
+interface WheelAssessment { scores: Partial<Record<DomainKey, WheelDomain>>; overall: number; basis: number; at: string }
 interface CirclePerson {
   id: string
   name: string
@@ -109,6 +150,7 @@ interface UserProfile {
   aiName: string              // user's chosen name for their companion (e.g. Soma, Maya, Abuelo)
   aiPhoto: string             // user-chosen photo for their companion (data URL)
   trustedContact: { name: string; phone: string }  // who to reach in a hard moment
+  wheel?: WheelAssessment                            // psychologist's wheel-of-life assessment (cached)
 }
 
 const FREE_DAILY_LIKES = 10
@@ -246,6 +288,7 @@ const DB = {
   setAiName: (name: string) => { const p = DB.get(); p.aiName = name.trim() || 'Soma'; DB.save(p) },
   setAiPhoto: (url: string) => { const p = DB.get(); p.aiPhoto = url; DB.save(p) },
   setTrustedContact: (name: string, phone: string) => { const p = DB.get(); p.trustedContact = { name, phone }; DB.save(p) },
+  setWheel: (wheel: WheelAssessment) => { const p = DB.get(); p.wheel = wheel; DB.save(p) },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
 
@@ -376,14 +419,14 @@ function PressButton({ onPress, style, children, disabled }: { onPress?: () => v
 }
 
 // ── GROQ ───────────────────────────────────────────────────
-async function groq(messages: any[], system: string, maxTokens = 200): Promise<string> {
+async function groq(messages: any[], system: string, maxTokens = 200, temperature = 0.85): Promise<string> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 20000) // never hang forever
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AI_KEY}` },
-      body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: maxTokens, temperature: 0.85,
+      body: JSON.stringify({ model: 'llama-3.1-8b-instant', max_tokens: maxTokens, temperature,
         messages: [{ role: 'system', content: system }, ...messages] }),
       signal: ctrl.signal,
     })
@@ -451,7 +494,7 @@ Message: "${msg}"
 Rules: Skip vague or incomplete fragments (e.g. "I want to", "maybe"). Only store clear, self-contained facts.
 sentiment = how this is going for them: "negative" for a struggle/loss/regret/worry, "positive" for a win/joy/progress, "neutral" for a plain fact.
 Max 3 memories, 2 people. JSON only:` }],
-      'You are a precise JSON extractor. Return only valid JSON.', 400)
+      'You are a precise JSON extractor. Return only valid JSON.', 400, 0.2)
     const m = res.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0])
   } catch {}
   return { memories: [], people: [] }
@@ -929,7 +972,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
             <TouchableOpacity key={d.key} style={g.domainCard} onPress={() => go('lifebalance')}>
               <Text style={{ fontSize: 24 }}>{d.icon}</Text>
               <Text style={g.domainLabel}>{d.label}</Text>
-              <View style={g.domainBarBg}><View style={[g.domainBarFill, { width: `${domainWellbeing(profile.memories, d.key)}%`, backgroundColor: d.color }]} /></View>
+              <View style={g.domainBarBg}><View style={[g.domainBarFill, { width: `${profile.wheel?.scores[d.key]?.score ?? domainWellbeing(profile.memories, d.key)}%`, backgroundColor: d.color }]} /></View>
               <Text style={[g.domainCount, { color: d.color }]}>{n} insight{n !== 1 ? 's' : ''}</Text>
             </TouchableOpacity>
           )
@@ -989,7 +1032,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
 
 // ── LIFE BALANCE ───────────────────────────────────────────
 // ── WHEEL OF LIFE ─────────────────────────────────────────
-function WheelSegment({ domain, profile, angle, index }: { domain: typeof DOMAINS[0]; profile: UserProfile; angle: number; index: number }) {
+function WheelSegment({ domain, profile, angle, index, score }: { domain: typeof DOMAINS[0]; profile: UserProfile; angle: number; index: number; score: number }) {
   const items = profile.memories.filter(m => m.domain === domain.key)
   const rotation = (angle - 90) // rotate so segment is readable
 
@@ -1014,7 +1057,7 @@ function WheelSegment({ domain, profile, angle, index }: { domain: typeof DOMAIN
           height: 120,
           borderRadius: 60,
           backgroundColor: domain.color,
-          opacity: 0.85,
+          opacity: 0.2 + 0.7 * (score / 100),  // brighter = healthier area
           alignItems: 'center',
           justifyContent: 'center',
           ...shadowMd,
@@ -1024,7 +1067,7 @@ function WheelSegment({ domain, profile, angle, index }: { domain: typeof DOMAIN
         <View style={{ transform: [{ rotate: `${-rotation}deg` }] }}>
           <Text style={{ fontSize: 28, marginBottom: 4 }}>{domain.icon}</Text>
           <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff', textAlign: 'center' }}>{domain.label}</Text>
-          <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff', marginTop: 4 }}>{items.length}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff', marginTop: 4 }}>{items.length ? score : '–'}</Text>
         </View>
       </View>
     </View>
@@ -1033,6 +1076,22 @@ function WheelSegment({ domain, profile, angle, index }: { domain: typeof DOMAIN
 
 function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => void }) {
   const [selectedDomain, setSelectedDomain] = useState<DomainKey | null>(null)
+  const [wheel, setWheel] = useState<WheelAssessment | undefined>(profile.wheel)
+  const [assessing, setAssessing] = useState(false)
+
+  const runAssessment = () => {
+    if (assessing || profile.memories.length === 0) return
+    setAssessing(true)
+    assessWheel(profile).then(w => { DB.setWheel(w); setWheel(w) }).catch(() => {}).then(() => setAssessing(false))
+  }
+  // Re-assess whenever new things have been shared since the last assessment.
+  useEffect(() => {
+    if (profile.memories.length > 0 && (!wheel || wheel.basis !== profile.memories.length)) runAssessment()
+  }, [])
+
+  const domScore = (k: DomainKey) => wheel?.scores[k]?.score ?? domainWellbeing(profile.memories, k)
+  const domNote = (k: DomainKey) => wheel?.scores[k]?.note || ''
+  const ob = wheel?.overall ?? overallBalance(profile.memories)
 
   return (
     <ScrollView style={g.screen} contentContainerStyle={{ minHeight: '100%', paddingBottom: 60 }}>
@@ -1040,7 +1099,9 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
         <Text style={g.greeting}>Wheel of Life</Text>
-        <Text style={g.auraSub} style={{ marginTop: 6, fontSize: 13, color: '#9B9AA6' }}>Your balance across all life domains. Build each through conversations with Soma.</Text>
+        <Text style={g.auraSub} style={{ marginTop: 6, fontSize: 13, color: '#9B9AA6' }}>
+          {assessing ? '🧠 Soma is reflecting on everything you\'ve shared…' : 'Assessed by Soma, weighing everything you\'ve shared — like a thoughtful psychologist.'}
+        </Text>
       </View>
 
       {/* Wheel Container */}
@@ -1076,7 +1137,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
           {/* Segments */}
           {DOMAINS.map((domain, i) => (
-            <WheelSegment key={domain.key} domain={domain} profile={profile} angle={(360 / DOMAINS.length) * i} index={i} />
+            <WheelSegment key={domain.key} domain={domain} profile={profile} angle={(360 / DOMAINS.length) * i} index={i} score={domScore(domain.key)} />
           ))}
         </View>
       </View>
@@ -1087,7 +1148,8 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
         {DOMAINS.map(d => {
           const items = profile.memories.filter(m => m.domain === d.key)
-          const score = domainWellbeing(profile.memories, d.key)
+          const score = domScore(d.key)
+          const note = domNote(d.key)
 
           return (
             <View key={d.key} style={[g.lbCard, { borderLeftColor: d.color, marginBottom: 12 }]}>
@@ -1099,8 +1161,9 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                     <View style={{ flex: 1, height: 4, backgroundColor: '#2A2A35', borderRadius: 2, overflow: 'hidden' }}>
                       <View style={{ width: `${Math.min(score, 100)}%`, height: '100%', backgroundColor: d.color, borderRadius: 2 }} />
                     </View>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: d.color }}>{items.length}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: d.color }}>{items.length ? score : '–'}</Text>
                   </View>
+                  {!!note && <Text style={{ fontSize: 12, color: '#9B9AA6', marginTop: 6, fontStyle: 'italic' }}>“{note}”</Text>}
                 </View>
               </View>
 
@@ -1128,7 +1191,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
       <View style={{ paddingHorizontal: 24, marginTop: 20, marginBottom: 40 }}>
         <View style={[g.matchCard, { marginBottom: 0 }]}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: '#9B9AA6', letterSpacing: 1, marginBottom: 8 }}>OVERALL LIFE BALANCE</Text>
-          {(() => { const ob = overallBalance(profile.memories); return (
+          {(() => { return (
             <>
               <Text style={{ fontSize: 48, fontWeight: '800', color: '#7B6EF6' }}>{ob}</Text>
               <Text style={{ fontSize: 14, color: '#9B9AA6', marginTop: 8 }}>
