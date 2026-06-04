@@ -26,9 +26,34 @@ const DOMAINS = [
   { key: 'mind',         label: 'Mind',         icon: '🧘', color: '#A89BFA' },
 ] as const
 type DomainKey = typeof DOMAINS[number]['key']
+type Sentiment = 'positive' | 'neutral' | 'negative'
+
+// Fallback sentiment for older memories saved before sentiment was tracked.
+function inferSentiment(text: string): Sentiment {
+  const t = text.toLowerCase()
+  if (/(wrong|regret|lost|losing|fail|quit|can.?t|cannot|difficult|struggl|worri|anxious|stress|debt|broke|sad|lonely|hurt|sick|tired|overwhelm|mistake|fired|breakup|broke up|argument|conflict|afraid|scared|depress)/.test(t)) return 'negative'
+  if (/(love|happy|joy|proud|grateful|win|won|achiev|progress|excited|great|better|healthy|saved|promotion|success|hope|grow|accomplish)/.test(t)) return 'positive'
+  return 'neutral'
+}
+// Wellbeing of a single life domain (0-100), based on the SENTIMENT of what was
+// shared — not just how much. Struggles pull it down; wins lift it up. Empty = 0.
+function domainWellbeing(memories: Memory[], d: DomainKey): number {
+  const items = memories.filter(m => m.domain === d)
+  if (!items.length) return 0
+  let s = 45 // having opened up about an area is a small positive start
+  for (const m of items) {
+    const sent = m.sentiment || inferSentiment(m.content)
+    s += sent === 'positive' ? 16 : sent === 'negative' ? -18 : 5
+  }
+  return Math.max(8, Math.min(100, s))
+}
+// Overall life balance = average wellbeing across all domains (empty domains drag it down).
+function overallBalance(memories: Memory[]): number {
+  return Math.round(DOMAINS.reduce((sum, d) => sum + domainWellbeing(memories, d.key), 0) / DOMAINS.length)
+}
 
 // ── DATA TYPES ─────────────────────────────────────────────
-interface Memory { id: string; domain: DomainKey; content: string; createdAt: string }
+interface Memory { id: string; domain: DomainKey; content: string; createdAt: string; sentiment?: Sentiment }
 interface CirclePerson {
   id: string
   name: string
@@ -117,10 +142,10 @@ const DB = {
     return { name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }
   },
   save: (p: UserProfile) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {} },
-  addMemory: (domain: DomainKey, content: string) => {
+  addMemory: (domain: DomainKey, content: string, sentiment: Sentiment = 'neutral') => {
     const p = DB.get()
     if (p.memories.some(m => m.content.toLowerCase() === content.toLowerCase())) return
-    p.memories.unshift({ id: Date.now() + '' + Math.random(), domain, content, createdAt: new Date().toLocaleDateString() })
+    p.memories.unshift({ id: Date.now() + '' + Math.random(), domain, content, sentiment, createdAt: new Date().toLocaleDateString() })
     p.memories = p.memories.slice(0, 150); DB.save(p)
   },
   upsertPerson: (name: string, relationship: string, context: string, interests: string[]) => {
@@ -413,17 +438,19 @@ function somaCircleContext(type: 'therapy' | 'family' | 'friend' | 'work' | 'rom
   }
 }
 
-async function extract(msg: string): Promise<{ memories: { domain: DomainKey; content: string }[]; people: { name: string; relationship: string; context: string; interests: string[] }[]; name?: string }> {
+async function extract(msg: string): Promise<{ memories: { domain: DomainKey; content: string; sentiment?: Sentiment }[]; people: { name: string; relationship: string; context: string; interests: string[] }[]; name?: string }> {
   try {
     const res = await groq([{ role: 'user', content:
 `Extract facts from this message. Return ONLY JSON.
 Message: "${msg}"
 {
  "name": "their first name if they introduce themselves else null",
- "memories": [{"domain":"health|finance|hobby|relationship|purpose|mind","content":"fact under 12 words"}],
+ "memories": [{"domain":"health|finance|hobby|relationship|purpose|mind","content":"fact under 12 words","sentiment":"positive|neutral|negative"}],
  "people": [{"name":"name","relationship":"mom|friend|partner|etc","context":"brief","interests":["shared interest"]}]
 }
-Max 3 memories 2 people. Only clear facts. JSON only:` }],
+Rules: Skip vague or incomplete fragments (e.g. "I want to", "maybe"). Only store clear, self-contained facts.
+sentiment = how this is going for them: "negative" for a struggle/loss/regret/worry, "positive" for a win/joy/progress, "neutral" for a plain fact.
+Max 3 memories, 2 people. JSON only:` }],
       'You are a precise JSON extractor. Return only valid JSON.', 400)
     const m = res.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0])
   } catch {}
@@ -746,7 +773,7 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
       ])
       if (mode !== 'try') {
         if (intel.name) DB.setName(intel.name)
-        intel.memories.forEach((m: any) => DB.addMemory(m.domain, m.content))
+        intel.memories.forEach((m: any) => DB.addMemory(m.domain, m.content, m.sentiment))
         intel.people.forEach((pe: any) => DB.upsertPerson(pe.name, pe.relationship, pe.context, pe.interests || []))
         DB.syncDatingInterests()   // daily talk auto-updates dating profile interests
         onRefresh()
@@ -902,7 +929,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
             <TouchableOpacity key={d.key} style={g.domainCard} onPress={() => go('lifebalance')}>
               <Text style={{ fontSize: 24 }}>{d.icon}</Text>
               <Text style={g.domainLabel}>{d.label}</Text>
-              <View style={g.domainBarBg}><View style={[g.domainBarFill, { width: `${Math.min(100, n * 20)}%`, backgroundColor: d.color }]} /></View>
+              <View style={g.domainBarBg}><View style={[g.domainBarFill, { width: `${domainWellbeing(profile.memories, d.key)}%`, backgroundColor: d.color }]} /></View>
               <Text style={[g.domainCount, { color: d.color }]}>{n} insight{n !== 1 ? 's' : ''}</Text>
             </TouchableOpacity>
           )
@@ -1060,7 +1087,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
         {DOMAINS.map(d => {
           const items = profile.memories.filter(m => m.domain === d.key)
-          const score = Math.min(100, items.length * 20)
+          const score = domainWellbeing(profile.memories, d.key)
 
           return (
             <View key={d.key} style={[g.lbCard, { borderLeftColor: d.color, marginBottom: 12 }]}>
@@ -1101,8 +1128,16 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
       <View style={{ paddingHorizontal: 24, marginTop: 20, marginBottom: 40 }}>
         <View style={[g.matchCard, { marginBottom: 0 }]}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: '#9B9AA6', letterSpacing: 1, marginBottom: 8 }}>OVERALL LIFE BALANCE</Text>
-          <Text style={{ fontSize: 48, fontWeight: '800', color: '#7B6EF6' }}>{Math.round((profile.memories.length / (DOMAINS.length * 5)) * 100)}</Text>
-          <Text style={{ fontSize: 14, color: '#9B9AA6', marginTop: 8 }}>Keep building across all domains for a balanced life.</Text>
+          {(() => { const ob = overallBalance(profile.memories); return (
+            <>
+              <Text style={{ fontSize: 48, fontWeight: '800', color: '#7B6EF6' }}>{ob}</Text>
+              <Text style={{ fontSize: 14, color: '#9B9AA6', marginTop: 8 }}>
+                {ob < 35 ? 'Some areas are weighing on you. Talk it through with Soma — one step at a time.'
+                  : ob < 65 ? 'Finding your balance. Keep sharing the wins and the struggles.'
+                  : 'You\'re in a good place across your life right now. 🌱'}
+              </Text>
+            </>
+          ) })()}
         </View>
       </View>
     </ScrollView>
