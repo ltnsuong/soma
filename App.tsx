@@ -4,7 +4,7 @@ import {
   TextInput, ScrollView, KeyboardAvoidingView,
   Platform, Animated, Image, ImageBackground
 } from 'react-native'
-import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath } from 'react-native-svg'
+import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline } from 'react-native-svg'
 
 // ════════════════════════════════════════════════════════════
 //  SOMA — Life OS built on self-knowledge
@@ -214,7 +214,9 @@ interface UserProfile {
   wheel?: WheelAssessment                            // psychologist's wheel-of-life assessment (cached)
   language?: string                                  // UI + AI language code (e.g. 'en','ru','es')
   manualScores?: Partial<Record<DomainKey, number>>  // user's own 1-10 self-rating per domain (overrides AI)
+  wheelHistory?: WheelSnapshot[]                     // dated snapshots of the wheel for the progress view
 }
+type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
 const FREE_DAILY_LIKES = 10
 const PREMIUM_DAILY_LIKES = 100
@@ -358,6 +360,12 @@ const DB = {
     const p = DB.get(); const ms: any = { ...(p.manualScores || {}) }
     if (value === undefined) delete ms[domain]; else ms[domain] = value
     p.manualScores = ms; DB.save(p)
+  },
+  recordWheelSnapshot: (overall: number, scores: Partial<Record<DomainKey, number>>) => {
+    const p = DB.get(); const today = new Date().toISOString().slice(0, 10)
+    const hist = (p.wheelHistory || []).filter(h => h.date !== today) // one snapshot per day (latest wins)
+    hist.push({ date: today, overall, scores })
+    p.wheelHistory = hist.slice(-60); DB.save(p)
   },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
@@ -1191,11 +1199,61 @@ function WheelOfLifeChart({ domains, scoreOf, size = 340 }: { domains: typeof DO
   )
 }
 
+// Progress over time: a sparkline of overall balance + biggest mover since the first snapshot.
+function WheelHistory({ history }: { history: WheelSnapshot[] }) {
+  if (!history || history.length < 2) {
+    return (
+      <View style={{ paddingHorizontal: 24, marginTop: 16 }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', letterSpacing: 1, marginBottom: 8 }}>PROGRESS OVER TIME</Text>
+        <View style={[g.matchCard, { marginBottom: 0 }]}>
+          <Text style={{ fontSize: 13, color: '#6E7191' }}>Check in over the next days — your balance trend will appear here. 📈</Text>
+        </View>
+      </View>
+    )
+  }
+  const W = 280, H = 84, pad = 8
+  const vals = history.map(h => h.overall)
+  const n = vals.length
+  const x = (i: number) => pad + (i / (n - 1)) * (W - pad * 2)
+  const y = (v: number) => H - pad - (v / 100) * (H - pad * 2)
+  const line = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
+  const first = history[0], last = history[n - 1]
+  const delta = last.overall - first.overall
+  let moverKey: DomainKey | null = null, moverDelta = 0
+  DOMAINS.forEach(d => {
+    const a = first.scores[d.key] ?? 0, b = last.scores[d.key] ?? 0
+    if (Math.abs(b - a) > Math.abs(moverDelta)) { moverDelta = b - a; moverKey = d.key }
+  })
+  const mover = moverKey ? DOMAINS.find(d => d.key === moverKey) : null
+  return (
+    <View style={{ paddingHorizontal: 24, marginTop: 16 }}>
+      <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', letterSpacing: 1, marginBottom: 8 }}>PROGRESS OVER TIME</Text>
+      <View style={[g.matchCard, { marginBottom: 0 }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+          <Text style={{ fontSize: 30, fontWeight: '800', color: '#7B6EF6' }}>{last.overall}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: delta >= 0 ? '#1FB57A' : '#E8636F' }}>{delta >= 0 ? '▲ +' : '▼ '}{Math.abs(delta)} · since {first.date.slice(5)}</Text>
+        </View>
+        <Svg width={W} height={H}>
+          <SvgLine x1={pad} y1={y(50)} x2={W - pad} y2={y(50)} stroke="#E5E2F0" strokeWidth={1} />
+          <SvgPolyline points={line} fill="none" stroke="#7B6EF6" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+          {vals.map((v, i) => <SvgCircle key={i} cx={x(i)} cy={y(v)} r={3} fill="#7B6EF6" />)}
+        </Svg>
+        {mover && moverDelta !== 0 ? (
+          <Text style={{ fontSize: 12, color: '#6E7191', marginTop: 8 }}>
+            Biggest change: {mover.icon} {mover.label} {moverDelta > 0 ? '▲' : '▼'} {Math.abs(Math.round(moverDelta / 10))} pts
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  )
+}
+
 function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => void }) {
   const [selectedDomain, setSelectedDomain] = useState<DomainKey | null>(null)
   const [wheel, setWheel] = useState<WheelAssessment | undefined>(profile.wheel)
   const [assessing, setAssessing] = useState(false)
   const [manual, setManual] = useState<Partial<Record<DomainKey, number>>>(profile.manualScores || {})
+  const [hist, setHist] = useState<WheelSnapshot[]>(profile.wheelHistory || [])
   // Tap a pip to set your own 1-10 rating; tap the same value again to clear it.
   const setRating = (k: DomainKey, n: number) => {
     const next = { ...manual }
@@ -1216,7 +1274,16 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
   // Your own rating wins; otherwise Soma's assessment; otherwise the quick heuristic.
   const domScore = (k: DomainKey) => (typeof manual[k] === 'number' ? manual[k]! * 10 : (wheel?.scores[k]?.score ?? domainWellbeing(profile.memories, k)))
   const domNote = (k: DomainKey) => (typeof manual[k] === 'number' ? '' : (wheel?.scores[k]?.note || ''))
-  const ob = wheel?.overall ?? overallBalance(profile.memories)
+  // Overall reflects manual ratings + assessment, averaged across all domains.
+  const ob = Math.round(DOMAINS.reduce((s, d) => s + domScore(d.key), 0) / DOMAINS.length)
+
+  // Record a daily snapshot of the wheel so the History view can show progress.
+  useEffect(() => {
+    const scores: Partial<Record<DomainKey, number>> = {}
+    DOMAINS.forEach(d => { scores[d.key] = domScore(d.key) })
+    DB.recordWheelSnapshot(ob, scores)
+    setHist(DB.get().wheelHistory || [])
+  }, [wheel, manual])
 
   return (
     <ScrollView style={g.screen} contentContainerStyle={{ minHeight: '100%', paddingBottom: 60 }}>
@@ -1305,7 +1372,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
       </View>
 
       {/* Overall Balance Score */}
-      <View style={{ paddingHorizontal: 24, marginTop: 20, marginBottom: 40 }}>
+      <View style={{ paddingHorizontal: 24, marginTop: 20, marginBottom: 0 }}>
         <View style={[g.matchCard, { marginBottom: 0 }]}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', letterSpacing: 1, marginBottom: 8 }}>{t('overallBalance')}</Text>
           {(() => { return (
@@ -1320,6 +1387,9 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
           ) })()}
         </View>
       </View>
+
+      <WheelHistory history={hist} />
+      <View style={{ height: 40 }} />
     </ScrollView>
   )
 }
