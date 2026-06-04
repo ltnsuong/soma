@@ -213,6 +213,7 @@ interface UserProfile {
   trustedContact: { name: string; phone: string }  // who to reach in a hard moment
   wheel?: WheelAssessment                            // psychologist's wheel-of-life assessment (cached)
   language?: string                                  // UI + AI language code (e.g. 'en','ru','es')
+  languageChosen?: boolean                           // true once the user explicitly picked a language
   manualScores?: Partial<Record<DomainKey, number>>  // user's own 1-10 self-rating per domain (overrides AI)
   wheelHistory?: WheelSnapshot[]                     // dated snapshots of the wheel for the progress view
 }
@@ -355,7 +356,7 @@ const DB = {
   setAiPhoto: (url: string) => { const p = DB.get(); p.aiPhoto = url; DB.save(p) },
   setTrustedContact: (name: string, phone: string) => { const p = DB.get(); p.trustedContact = { name, phone }; DB.save(p) },
   setWheel: (wheel: WheelAssessment) => { const p = DB.get(); p.wheel = wheel; DB.save(p) },
-  setLanguage: (code: string) => { const p = DB.get(); p.language = code; p.wheel = undefined; DB.save(p) },
+  setLanguage: (code: string) => { const p = DB.get(); p.language = code; p.languageChosen = true; p.wheel = undefined; DB.save(p) },
   setManualScore: (domain: DomainKey, value: number | undefined) => {
     const p = DB.get(); const ms: any = { ...(p.manualScores || {}) }
     if (value === undefined) delete ms[domain]; else ms[domain] = value
@@ -643,7 +644,7 @@ function pickPhoto(onPicked: (dataUrl: string) => void) {
 }
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-type Screen = 'splash' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login'
+type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login'
 
 // ════════════════════════════════════════════════════════════
 //  ROOT
@@ -654,7 +655,7 @@ export default function App() {
   const refresh = () => setProfile(DB.get())
 
   useEffect(() => {
-    const t = setTimeout(() => { const p = DB.get(); setScreen(p.registered ? 'home' : 'try') }, 1900)
+    const t = setTimeout(() => { const p = DB.get(); setScreen(p.registered ? 'home' : (p.languageChosen ? 'try' : 'language')) }, 1900)
     return () => clearTimeout(t)
   }, [])
 
@@ -670,6 +671,7 @@ export default function App() {
   const go = (s: Screen) => { refresh(); setScreen(s) }
 
   if (screen === 'splash')      return <Splash />
+  if (screen === 'language')    return <LanguageSelect onDone={() => go('try')} />
   if (screen === 'try')         return <AuraChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" />
   if (screen === 'register')    return <Register onDone={(name) => { DB.register(name); go('home') }} />
   if (screen === 'aura')        return <AuraChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" />
@@ -683,11 +685,31 @@ export default function App() {
   if (screen === 'likedyou')    return <LikedYou profile={profile} onBack={() => go('home')} onUpgrade={() => { DB.goPremium(); refresh() }} />
   if (screen === 'diaryhistory')return <DiaryHistory profile={profile} onBack={() => go('home')} />
   if (screen === 'insights')    return <Insights profile={profile} onBack={() => go('home')} />
-  if (screen === 'settings')    return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('try') }} />
-  return <Home profile={profile} go={go} onReset={() => { DB.reset(); go('try') }} />
+  if (screen === 'settings')    return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('language') }} />
+  return <Home profile={profile} go={go} onReset={() => { DB.reset(); go('language') }} />
 }
 
 // ── SPLASH ─────────────────────────────────────────────────
+// First-run language picker — choose before talking with Soma.
+function LanguageSelect({ onDone }: { onDone: () => void }) {
+  return (
+    <View style={[g.screen, { paddingHorizontal: 28, paddingTop: 84 }]}>
+      <Text style={{ fontSize: 44, textAlign: 'center' }}>🌍</Text>
+      <Text style={{ fontSize: 25, fontWeight: '800', color: '#222540', textAlign: 'center', marginTop: 14 }}>Choose your language</Text>
+      <Text style={{ fontSize: 14, color: '#6E7191', textAlign: 'center', marginTop: 8, marginBottom: 26 }}>Soma will talk with you in this language. You can change it anytime in Settings.</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 50 }}>
+        {LANGS.map(l => (
+          <TouchableOpacity key={l.code} activeOpacity={0.85} onPress={() => { DB.setLanguage(l.code); onDone() }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 17, borderWidth: 1.5, borderColor: '#E9E6F2', ...shadowSm }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: '#222540' }}>{l.label}</Text>
+            <Text style={{ fontSize: 13, color: '#8A8FA8' }}>{l.name} →</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  )
+}
+
 function Splash() {
   const fade = useRef(new Animated.Value(0)).current
   const rise = useRef(new Animated.Value(20)).current
