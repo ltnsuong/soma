@@ -12,10 +12,13 @@ dotenv.config()
 const app = express()
 app.use(express.json())
 
-// CORS - allow frontend on any localhost port during development
+// CORS - localhost in dev; production origins via CORS_ORIGINS (comma-separated) or APP_URL.
+// Requests with no Origin header (native apps, curl) are always allowed.
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.APP_URL || '')
+  .split(',').map(o => o.trim()).filter(Boolean)
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
       callback(new Error('CORS not allowed'))
@@ -23,6 +26,9 @@ const corsOptions = {
   }
 }
 app.use(cors(corsOptions))
+
+// Health check (uptime monitors / Railway healthcheck)
+app.get(['/', '/health'], (req, res) => res.json({ status: 'ok', service: 'soma-backend' }))
 
 // Supabase (with ws transport for Node.js 20)
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
