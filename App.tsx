@@ -725,13 +725,13 @@ function Register({ onDone }: { onDone: (name: string) => void }) {
 
       <View style={{ marginTop: 28 }}>
         <Text style={g.inputLabel}>Your name</Text>
-        <TextInput style={g.authInput} value={name} onChangeText={setName} placeholder="e.g. Alex" placeholderTextColor="#4A4A56" />
+        <TextInput style={g.authInput} value={name} onChangeText={setName} placeholder="e.g. Alex" placeholderTextColor="#9A9DB2" />
 
         <Text style={[g.inputLabel, { marginTop: 16 }]}>Email</Text>
-        <TextInput style={g.authInput} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#4A4A56" keyboardType="email-address" autoCapitalize="none" />
+        <TextInput style={g.authInput} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9A9DB2" keyboardType="email-address" autoCapitalize="none" />
 
         <Text style={[g.inputLabel, { marginTop: 16 }]}>Password</Text>
-        <TextInput style={g.authInput} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor="#4A4A56" secureTextEntry />
+        <TextInput style={g.authInput} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor="#9A9DB2" secureTextEntry />
 
         <TouchableOpacity style={[g.primaryBtn, { marginTop: 28 }, loading && g.off]} disabled={loading} onPress={handleEmailSignup}>
           <Text style={g.primaryBtnTxt}>{loading ? '⏳ Creating...' : '✦  Create account'}</Text>
@@ -746,8 +746,8 @@ function Register({ onDone }: { onDone: (name: string) => void }) {
         <Text style={g.logo}>Verify your email</Text>
         <Text style={g.logoSub}>We sent you a confirmation link. Click it to activate your account.</Text>
 
-        <View style={{ marginTop: 28, backgroundColor: '#141418', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2A2A35' }}>
-          <Text style={{ color: '#F5F4F0', fontSize: 13, lineHeight: 20 }}>
+        <View style={{ marginTop: 28, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E9E6F2' }}>
+          <Text style={{ color: '#222540', fontSize: 13, lineHeight: 20 }}>
             📧 Check {email} for the verification link.{'\n\n'}
             Link expires in 24 hours.{'\n\n'}
             Once verified, you'll be all set!
@@ -905,7 +905,7 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
               )}
             </ScrollView>
             <View style={g.inputBar}>
-              <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#4A4A56" multiline />
+              <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#9A9DB2" multiline />
               <TouchableOpacity style={[g.iconBtn, listening && g.iconOn]} onPress={onMic} disabled={loading}><Text style={{ fontSize: 20 }}>{listening ? '⏹' : '🎙'}</Text></TouchableOpacity>
               <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
             </View>
@@ -1099,7 +1099,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
         <Text style={g.greeting}>Wheel of Life</Text>
-        <Text style={g.auraSub} style={{ marginTop: 6, fontSize: 13, color: '#9B9AA6' }}>
+        <Text style={g.auraSub} style={{ marginTop: 6, fontSize: 13, color: '#6E7191' }}>
           {assessing ? '🧠 Soma is reflecting on everything you\'ve shared…' : 'Assessed by Soma, weighing everything you\'ve shared — like a thoughtful psychologist.'}
         </Text>
       </View>
@@ -1124,7 +1124,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
             width: 120,
             height: 120,
             borderRadius: 60,
-            backgroundColor: '#141418',
+            backgroundColor: '#FFFFFF',
             borderWidth: 3,
             borderColor: '#7B6EF6',
             alignItems: 'center',
@@ -1132,7 +1132,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
             ...shadowMd,
           }}>
             <Text style={{ fontSize: 36 }}>✦</Text>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#9B9AA6', marginTop: 6 }}>MY LIFE</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', marginTop: 6 }}>MY LIFE</Text>
           </View>
 
           {/* Segments */}
@@ -1144,7 +1144,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
       {/* Domain Details */}
       <View style={{ paddingHorizontal: 24 }}>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: '#F5F4F0', marginBottom: 16 }}>Your Insights</Text>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: '#222540', marginBottom: 16 }}>Your Insights</Text>
 
         {DOMAINS.map(d => {
           const items = profile.memories.filter(m => m.domain === d.key)
@@ -1158,12 +1158,12 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                 <View style={{ flex: 1 }}>
                   <Text style={g.lbTitle}>{d.label}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                    <View style={{ flex: 1, height: 4, backgroundColor: '#2A2A35', borderRadius: 2, overflow: 'hidden' }}>
+                    <View style={{ flex: 1, height: 4, backgroundColor: '#E9E6F2', borderRadius: 2, overflow: 'hidden' }}>
                       <View style={{ width: `${Math.min(score, 100)}%`, height: '100%', backgroundColor: d.color, borderRadius: 2 }} />
                     </View>
                     <Text style={{ fontSize: 12, fontWeight: '800', color: d.color }}>{items.length ? score : '–'}</Text>
                   </View>
-                  {!!note && <Text style={{ fontSize: 12, color: '#9B9AA6', marginTop: 6, fontStyle: 'italic' }}>“{note}”</Text>}
+                  {!!note && <Text style={{ fontSize: 12, color: '#6E7191', marginTop: 6, fontStyle: 'italic' }}>“{note}”</Text>}
                 </View>
               </View>
 
@@ -1190,11 +1190,11 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
       {/* Overall Balance Score */}
       <View style={{ paddingHorizontal: 24, marginTop: 20, marginBottom: 40 }}>
         <View style={[g.matchCard, { marginBottom: 0 }]}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#9B9AA6', letterSpacing: 1, marginBottom: 8 }}>OVERALL LIFE BALANCE</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', letterSpacing: 1, marginBottom: 8 }}>OVERALL LIFE BALANCE</Text>
           {(() => { return (
             <>
               <Text style={{ fontSize: 48, fontWeight: '800', color: '#7B6EF6' }}>{ob}</Text>
-              <Text style={{ fontSize: 14, color: '#9B9AA6', marginTop: 8 }}>
+              <Text style={{ fontSize: 14, color: '#6E7191', marginTop: 8 }}>
                 {ob < 35 ? 'Some areas are weighing on you. Talk it through with Soma — one step at a time.'
                   : ob < 65 ? 'Finding your balance. Keep sharing the wins and the struggles.'
                   : 'You\'re in a good place across your life right now. 🌱'}
@@ -1254,7 +1254,7 @@ function CircleScreen({ profile, onBack }: { profile: UserProfile; onBack: () =>
           {loading && <Typing />}
         </ScrollView>
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor="#4A4A56" multiline />
+          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor="#9A9DB2" multiline />
           <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -1436,7 +1436,7 @@ function ProfileBuilder({ profile, onDone }: { profile: UserProfile; onDone: () 
         </View>
 
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Speak or type your answer..." placeholderTextColor="#4A4A56" multiline />
+          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Speak or type your answer..." placeholderTextColor="#9A9DB2" multiline />
           <TouchableOpacity style={[g.iconBtn, listening && g.iconOn]} onPress={onMic}><Text style={{ fontSize: 20 }}>{listening ? '⏹' : '🎙'}</Text></TouchableOpacity>
           <TouchableOpacity style={[g.sendBtn, !input.trim() && g.off]} onPress={() => submitAnswer(input)} disabled={!input.trim()}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
@@ -1856,11 +1856,11 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
 
         {/* Profile Summary - Built from conversations */}
         <View style={[g.matchCard, { marginBottom: 24 }]}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#9B9AA6', letterSpacing: 1, marginBottom: 12 }}>ABOUT YOU</Text>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#F5F4F0', marginBottom: 12 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#6E7191', letterSpacing: 1, marginBottom: 12 }}>ABOUT YOU</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#222540', marginBottom: 12 }}>
             {profile.name || 'Your Dating Profile'}
           </Text>
-          <Text style={{ fontSize: 14, color: '#9B9AA6', lineHeight: 22 }}>
+          <Text style={{ fontSize: 14, color: '#6E7191', lineHeight: 22 }}>
             {extractedValues.length > 0
               ? `Looking for: ${extractedValues.slice(0, 2).join(' • ')}`
               : '💭 Talk to Soma about what you\'re looking for'}
@@ -1870,7 +1870,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
         {/* Values from conversations */}
         {extractedValues.length > 0 && (
           <View style={{ marginBottom: 24 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#F5F4F0', marginBottom: 12 }}>💭 Your Values</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540', marginBottom: 12 }}>💭 Your Values</Text>
             <View style={{ gap: 10 }}>
               {extractedValues.map((v, i) => (
                 <View key={i} style={[g.lbCard, { borderLeftColor: '#7B6EF6' }]}>
@@ -1887,7 +1887,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
         {/* Interests from conversations */}
         {extractedInterests.length > 0 && (
           <View style={{ marginBottom: 24 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#F5F4F0', marginBottom: 12 }}>🎨 Your Interests</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540', marginBottom: 12 }}>🎨 Your Interests</Text>
             <View style={{ gap: 10 }}>
               {extractedInterests.map((interest, i) => (
                 <View key={i} style={[g.dTag, { borderColor: '#7B6EF650' }]}>
@@ -1901,9 +1901,9 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
         {/* Purpose/Goals */}
         {extractedPurpose.length > 0 && (
           <View style={{ marginBottom: 24 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#F5F4F0', marginBottom: 12 }}>🎯 Your Purpose</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540', marginBottom: 12 }}>🎯 Your Purpose</Text>
             <View style={[g.matchCard]}>
-              <Text style={{ fontSize: 14, color: '#9B9AA6', lineHeight: 22 }}>
+              <Text style={{ fontSize: 14, color: '#6E7191', lineHeight: 22 }}>
                 {extractedPurpose.slice(0, 2).join(' • ')}
               </Text>
             </View>
@@ -1979,7 +1979,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
         </PressButton>
 
         {/* Other Categories Grid */}
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#9B9AA6', marginBottom: 12, marginTop: 8 }}>More ways to connect</Text>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#6E7191', marginBottom: 12, marginTop: 8 }}>More ways to connect</Text>
 
         <View style={{ gap: 12 }}>
           {MEET_CATEGORIES.slice(1).map(cat => (
@@ -2000,8 +2000,8 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
             >
               <Text style={{ fontSize: 40 }}>{cat.icon}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: '#F5F4F0' }}>{cat.title}</Text>
-                <Text style={{ fontSize: 13, color: '#9B9AA6', marginTop: 2 }}>{cat.subtitle}</Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#222540' }}>{cat.title}</Text>
+                <Text style={{ fontSize: 13, color: '#6E7191', marginTop: 2 }}>{cat.subtitle}</Text>
               </View>
               <View style={{ backgroundColor: cat.color + '30', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: cat.color }}>{cat.count}</Text>
@@ -2226,7 +2226,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           {chatLoading && <Typing />}
         </ScrollView>
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={chatInput} onChangeText={setChatInput} placeholder={`Message ${candidate.name}...`} placeholderTextColor="#4A4A56" multiline />
+          <TextInput style={g.input} value={chatInput} onChangeText={setChatInput} placeholder={`Message ${candidate.name}...`} placeholderTextColor="#9A9DB2" multiline />
           <TouchableOpacity style={[g.sendBtn, (!chatInput.trim() || chatLoading) && g.off]} onPress={() => sendChat(chatInput)} disabled={!chatInput.trim() || chatLoading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -2434,7 +2434,7 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
           {loading && <Typing />}
         </ScrollView>
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${conn.name}...`} placeholderTextColor="#4A4A56" multiline />
+          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${conn.name}...`} placeholderTextColor="#9A9DB2" multiline />
           <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -2646,7 +2646,7 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
       <Text style={[g.secLabel, { marginTop: 20 }]}>YOUR COMPANION · 🐧</Text>
       <View style={g.contactSetup}>
         <Text style={g.contactSetupTxt}>Give your companion a name that feels close to you. Upload a photo that makes you feel connected.</Text>
-        <TextInput style={g.contactInput} value={aiName} onChangeText={setAiName} placeholder="Name (e.g. Soma, Maya, Abuelo)" placeholderTextColor="#4A4A56" />
+        <TextInput style={g.contactInput} value={aiName} onChangeText={setAiName} placeholder="Name (e.g. Soma, Maya, Abuelo)" placeholderTextColor="#9A9DB2" />
         <TouchableOpacity style={[g.contactSave, !aiName.trim() && g.off]} onPress={saveAiName} disabled={!aiName.trim()}>
           <Text style={g.contactSaveTxt}>{aiName !== profile.aiName ? '✓ Save name' : `${profile.aiName}'s name is set`}</Text>
         </TouchableOpacity>
@@ -2661,8 +2661,8 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
       <Text style={[g.secLabel, { marginTop: 20 }]}>SAFETY · TRUSTED CONTACT 💜</Text>
       <View style={g.contactSetup}>
         <Text style={g.contactSetupTxt}>If you ever have a really hard moment, {profile.aiName} can help you reach this person in one tap.</Text>
-        <TextInput style={g.contactInput} value={tcName} onChangeText={setTcName} placeholder="Their name (e.g. Mom, best friend)" placeholderTextColor="#4A4A56" />
-        <TextInput style={g.contactInput} value={tcPhone} onChangeText={setTcPhone} placeholder="Their phone number" placeholderTextColor="#4A4A56" keyboardType="phone-pad" />
+        <TextInput style={g.contactInput} value={tcName} onChangeText={setTcName} placeholder="Their name (e.g. Mom, best friend)" placeholderTextColor="#9A9DB2" />
+        <TextInput style={g.contactInput} value={tcPhone} onChangeText={setTcPhone} placeholder="Their phone number" placeholderTextColor="#9A9DB2" keyboardType="phone-pad" />
         <TouchableOpacity style={[g.contactSave, !(tcName.trim() && tcPhone.trim()) && g.off]} onPress={saveContact} disabled={!(tcName.trim() && tcPhone.trim())}>
           <Text style={g.contactSaveTxt}>{profile.trustedContact?.phone ? '✓ Update trusted contact' : 'Save trusted contact'}</Text>
         </TouchableOpacity>
@@ -2811,33 +2811,33 @@ const cs = StyleSheet.create({
   wrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0A0A0F', zIndex: 100 },
   scroll: { padding: 24, paddingTop: 64, alignItems: 'center' },
   heart: { fontSize: 48, marginBottom: 12 },
-  title: { color: '#F5F4F0', fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
-  lead: { color: '#C8C6D0', fontSize: 15, lineHeight: 24, textAlign: 'center', marginBottom: 24 },
+  title: { color: '#222540', fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
+  lead: { color: '#9CA0B5', fontSize: 15, lineHeight: 24, textAlign: 'center', marginBottom: 24 },
   breatheBox: { width: 200, height: 200, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   breatheCircle: { position: 'absolute', width: 90, height: 90, borderRadius: 45, backgroundColor: '#7B6EF6', opacity: 0.35 },
   breathePhase: { color: '#A89BFA', fontSize: 18, fontWeight: '700' },
-  breatheHint: { color: '#9B9AA6', fontSize: 13, textAlign: 'center', marginBottom: 28 },
-  sectionLbl: { color: '#9B9AA6', fontSize: 11, fontWeight: '800', letterSpacing: 1.4, alignSelf: 'flex-start', marginTop: 20, marginBottom: 10 },
-  helpBtn: { width: '100%', backgroundColor: '#141418', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#6EF6A840' },
-  helpBtnTitle: { color: '#F5F4F0', fontSize: 16, fontWeight: '700' },
-  helpBtnSub: { color: '#9B9AA6', fontSize: 12, marginTop: 4 },
-  contactBtn: { width: '100%', backgroundColor: '#1A1428', borderRadius: 16, padding: 16, marginTop: 6, borderWidth: 1, borderColor: '#7B6EF660' },
-  contactTitle: { color: '#F5F4F0', fontSize: 16, fontWeight: '700' },
-  contactSub: { color: '#9B9AA6', fontSize: 12, marginTop: 4 },
-  contactEmpty: { width: '100%', backgroundColor: '#141418', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#2A2A35' },
-  contactEmptyTxt: { color: '#9B9AA6', fontSize: 13, lineHeight: 20 },
-  groundCard: { width: '100%', backgroundColor: '#141418', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2A2A35' },
+  breatheHint: { color: '#6E7191', fontSize: 13, textAlign: 'center', marginBottom: 28 },
+  sectionLbl: { color: '#6E7191', fontSize: 11, fontWeight: '800', letterSpacing: 1.4, alignSelf: 'flex-start', marginTop: 20, marginBottom: 10 },
+  helpBtn: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#6EF6A840' },
+  helpBtnTitle: { color: '#222540', fontSize: 16, fontWeight: '700' },
+  helpBtnSub: { color: '#6E7191', fontSize: 12, marginTop: 4 },
+  contactBtn: { width: '100%', backgroundColor: '#F3F0FB', borderRadius: 16, padding: 16, marginTop: 6, borderWidth: 1, borderColor: '#7B6EF660' },
+  contactTitle: { color: '#222540', fontSize: 16, fontWeight: '700' },
+  contactSub: { color: '#6E7191', fontSize: 12, marginTop: 4 },
+  contactEmpty: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E9E6F2' },
+  contactEmptyTxt: { color: '#6E7191', fontSize: 13, lineHeight: 20 },
+  groundCard: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E9E6F2' },
   groundRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 6 },
   groundNum: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   groundNumTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  groundTxt: { color: '#F5F4F0', fontSize: 15 },
+  groundTxt: { color: '#222540', fontSize: 15 },
   moveRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%' },
-  moveChip: { backgroundColor: '#141418', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#2A2A35' },
-  moveTxt: { color: '#F5F4F0', fontSize: 13, fontWeight: '600' },
+  moveChip: { backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#E9E6F2' },
+  moveTxt: { color: '#222540', fontSize: 13, fontWeight: '600' },
   hope: { color: '#E8E6F0', fontSize: 15, lineHeight: 25, textAlign: 'center', marginTop: 26, fontStyle: 'italic' },
   closeBtn: { backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 40, marginTop: 24 },
   closeTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  disclaimer: { color: '#6A6A76', fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 18 },
+  disclaimer: { color: '#9A9DB2', fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 18 },
 })
 
 // ── STYLES ─────────────────────────────────────────────────
@@ -2891,25 +2891,25 @@ const animations = {
 
 const g = StyleSheet.create({
   // ════ CORE THEME ════
-  screen: { flex: 1, backgroundColor: '#0C0C0F' },
+  screen: { flex: 1, backgroundColor: '#FBFAF8' },
   logo: { fontSize: 32, fontWeight: '700', color: '#7B6EF6', letterSpacing: 0 },
   logoSm: { fontSize: 26, fontWeight: '700', color: '#7B6EF6' },
-  logoSub: { fontSize: 14, color: '#9B9AA6', fontStyle: 'italic', marginTop: 6 },
+  logoSub: { fontSize: 14, color: '#6E7191', fontStyle: 'italic', marginTop: 6 },
   centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 14 },
   orbMd: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   orbSm: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   orbIcon: { fontSize: 17, color: '#fff' },
-  auraTitle: { color: '#F5F4F0', fontSize: 16, fontWeight: '700' },
-  auraSub: { color: '#A5A3B0', fontSize: 12, marginTop: 2, fontWeight: '400' },
-  divider: { height: 1, backgroundColor: '#1A1A22' },
+  auraTitle: { color: '#222540', fontSize: 16, fontWeight: '700' },
+  auraSub: { color: '#8A8FA8', fontSize: 12, marginTop: 2, fontWeight: '400' },
+  divider: { height: 1, backgroundColor: '#EFEDF6' },
   smallBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: '#7B6EF640' },
   smallBtnTxt: { color: '#7B6EF6', fontSize: 12, fontWeight: '700' },
   bigOrb: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#7B6EF615', borderWidth: 1.5, borderColor: '#7B6EF650', alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
   bigOrbIcon: { fontSize: 36, color: '#7B6EF6' },
   miniOrb: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  startTitle: { fontSize: 28, fontWeight: '700', color: '#F5F4F0', marginBottom: 12, textAlign: 'center', letterSpacing: 0.5 },
-  startSub: { fontSize: 15, color: '#9B9AA6', textAlign: 'center', lineHeight: 26, marginBottom: 40, fontWeight: '400' },
+  startTitle: { fontSize: 28, fontWeight: '700', color: '#222540', marginBottom: 12, textAlign: 'center', letterSpacing: 0.5 },
+  startSub: { fontSize: 15, color: '#6E7191', textAlign: 'center', lineHeight: 26, marginBottom: 40, fontWeight: '400' },
   // ══ PREMIUM BUTTONS WITH ANIMATIONS ══
   primaryBtn: {
     backgroundColor: '#7B6EF6',
@@ -2926,7 +2926,7 @@ const g = StyleSheet.create({
   },
   primaryBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
   secondaryBtn: {
-    backgroundColor: '#141418',
+    backgroundColor: '#FFFFFF',
     width: '100%',
     height: 54,
     borderRadius: 16,
@@ -2937,39 +2937,39 @@ const g = StyleSheet.create({
     borderColor: '#7B6EF640'
   },
   secondaryBtnTxt: { color: '#7B6EF6', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-  ghostTxt: { color: '#4A4A56', fontSize: 14, textAlign: 'center' },
+  ghostTxt: { color: '#9A9DB2', fontSize: 14, textAlign: 'center' },
   off: { opacity: 0.35 },
-  nameInput: { width: '100%', backgroundColor: '#141418', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, color: '#F5F4F0', fontSize: 16, fontWeight: '500', borderWidth: 1.5, borderColor: '#2A2A35', marginBottom: 18, textAlign: 'center', ...shadowSm },
+  nameInput: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, color: '#222540', fontSize: 16, fontWeight: '500', borderWidth: 1.5, borderColor: '#E9E6F2', marginBottom: 18, textAlign: 'center', ...shadowSm },
   msgList: { padding: 18, paddingBottom: 12, gap: 14 },
   bRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, width: '100%' },
   bLeft: { justifyContent: 'flex-start' },
   bRight: { justifyContent: 'flex-end' },
   bubble: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, maxWidth: '74%' },
-  aBubble: { backgroundColor: '#141418', borderWidth: 1.5, borderColor: '#7B6EF650', borderTopLeftRadius: 4, ...shadowSm },
-  uBubble: { backgroundColor: '#2A2060', borderWidth: 1.5, borderColor: '#7B6EF650', borderTopRightRadius: 4, ...shadowSm },
-  bTxt: { color: '#F5F4F0', fontSize: 15, lineHeight: 26, flexWrap: 'wrap', fontWeight: '400' },
+  aBubble: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#7B6EF650', borderTopLeftRadius: 4, ...shadowSm },
+  uBubble: { backgroundColor: '#EDE7FE', borderWidth: 1.5, borderColor: '#7B6EF650', borderTopRightRadius: 4, ...shadowSm },
+  bTxt: { color: '#222540', fontSize: 15, lineHeight: 26, flexWrap: 'wrap', fontWeight: '400' },
   tdot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7B6EF6' },
-  joinCard: { backgroundColor: '#141418', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', marginTop: 4 },
+  joinCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', marginTop: 4 },
   joinTitle: { color: '#7B6EF6', fontSize: 14, fontWeight: '700', marginBottom: 8 },
-  joinSub: { color: '#F5F4F0', fontSize: 14, lineHeight: 22, marginBottom: 14 },
+  joinSub: { color: '#222540', fontSize: 14, lineHeight: 22, marginBottom: 14 },
   joinBtn: { backgroundColor: '#7B6EF6', borderRadius: 12, padding: 12, alignItems: 'center' },
   joinBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, paddingBottom: 30, borderTopWidth: 1, borderTopColor: '#1A1A22' },
-  input: { flex: 1, backgroundColor: '#141418', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, color: '#F5F4F0', fontSize: 15, borderWidth: 1.5, borderColor: '#2A2A35', maxHeight: 100, ...shadowSm },
-  iconBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#141418', borderWidth: 1, borderColor: '#2A2A35', alignItems: 'center', justifyContent: 'center' },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, paddingBottom: 30, borderTopWidth: 1, borderTopColor: '#EFEDF6' },
+  input: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', maxHeight: 100, ...shadowSm },
+  iconBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9E6F2', alignItems: 'center', justifyContent: 'center' },
   iconOn: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
   sendBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   sendIcon: { color: '#fff', fontSize: 20, fontWeight: '700' },
   homePad: { padding: 24, paddingTop: 58 },
   homeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
-  greeting: { fontSize: 28, fontWeight: '700', color: '#F5F4F0', letterSpacing: 0.3 },
-  greetDate: { fontSize: 12, color: '#9B9AA6', marginTop: 3, fontWeight: '500' },
+  greeting: { fontSize: 28, fontWeight: '700', color: '#222540', letterSpacing: 0.3 },
+  greetDate: { fontSize: 12, color: '#6E7191', marginTop: 3, fontWeight: '500' },
   // ══ PREMIUM CARDS ══
   auraMain: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: '#141418',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 18,
     marginBottom: 28,
@@ -2981,47 +2981,47 @@ const g = StyleSheet.create({
     // Premium gradient overlay (subtle)
     backgroundImage: 'linear-gradient(135deg, rgba(123,110,246,0.05) 0%, rgba(123,110,246,0) 100%)'
   },
-  auraMainTitle: { color: '#F5F4F0', fontSize: 16, fontWeight: '700', marginTop: 4, letterSpacing: 0.3 },
-  auraMainSub: { color: '#A5A3B0', fontSize: 12, marginTop: 2, fontWeight: '400' },
+  auraMainTitle: { color: '#222540', fontSize: 16, fontWeight: '700', marginTop: 4, letterSpacing: 0.3 },
+  auraMainSub: { color: '#8A8FA8', fontSize: 12, marginTop: 2, fontWeight: '400' },
   cardTag: { color: '#7B6EF6', fontSize: 10, fontWeight: '700', letterSpacing: 1.8 },
   arrow: { color: '#7B6EF6', fontSize: 20, fontWeight: '700' },
-  diaryCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#141418', borderRadius: 18, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#2A2A35', ...shadowSm },
-  diaryTitle: { color: '#F5F4F0', fontSize: 15, fontWeight: '700' },
-  diarySub: { color: '#9B9AA6', fontSize: 12, marginTop: 2 },
-  secLabel: { color: '#9B9AA6', fontSize: 10, fontWeight: '700', letterSpacing: 1.8 },
+  diaryCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
+  diaryTitle: { color: '#222540', fontSize: 15, fontWeight: '700' },
+  diarySub: { color: '#6E7191', fontSize: 12, marginTop: 2 },
+  secLabel: { color: '#6E7191', fontSize: 10, fontWeight: '700', letterSpacing: 1.8 },
   domainGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 32 },
-  domainCard: { width: '31%', backgroundColor: '#141418', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#2A2A35', marginBottom: 8, ...shadowSm },
-  domainLabel: { color: '#F5F4F0', fontSize: 12, fontWeight: '600', marginTop: 6 },
-  domainBarBg: { width: '100%', height: 4, backgroundColor: '#2A2A35', borderRadius: 2, marginTop: 8, overflow: 'hidden' },
+  domainCard: { width: '31%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E9E6F2', marginBottom: 8, ...shadowSm },
+  domainLabel: { color: '#222540', fontSize: 12, fontWeight: '600', marginTop: 6 },
+  domainBarBg: { width: '100%', height: 4, backgroundColor: '#E9E6F2', borderRadius: 2, marginTop: 8, overflow: 'hidden' },
   domainBarFill: { height: 4, borderRadius: 2 },
   domainCount: { fontSize: 10, marginTop: 5, fontWeight: '600' },
   avatarCol: { alignItems: 'center', gap: 6, marginRight: 14 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#7B6EF6', ...shadowSm },
   avatarTxt: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  avatarName: { color: '#9B9AA6', fontSize: 11 },
-  emptyCircle: { backgroundColor: '#141418', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#2A2A35', borderStyle: 'dashed', marginBottom: 16 },
-  emptyCircleTxt: { color: '#9B9AA6', fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  datingCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#1A1428', borderRadius: 20, padding: 18, marginTop: 4, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#9B6EF6' },
-  datingTitle: { color: '#F5F4F0', fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
-  datingSub: { color: '#9B9AA6', fontSize: 12, marginTop: 3, lineHeight: 18 },
+  avatarName: { color: '#6E7191', fontSize: 11 },
+  emptyCircle: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#E9E6F2', borderStyle: 'dashed', marginBottom: 16 },
+  emptyCircleTxt: { color: '#6E7191', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  datingCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#F3F0FB', borderRadius: 20, padding: 18, marginTop: 4, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#9B6EF6' },
+  datingTitle: { color: '#222540', fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
+  datingSub: { color: '#6E7191', fontSize: 12, marginTop: 3, lineHeight: 18 },
   backLink: { color: '#7B6EF6', fontSize: 15, fontWeight: '600' },
-  lbCard: { backgroundColor: '#141418', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#2A2A35', borderLeftWidth: 3, ...shadowSm },
-  lbTitle: { color: '#F5F4F0', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
+  lbCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E9E6F2', borderLeftWidth: 3, ...shadowSm },
+  lbTitle: { color: '#222540', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
   lbCount: { fontSize: 18, fontWeight: '700' },
-  lbEmpty: { color: '#9B9AA6', fontSize: 13, fontStyle: 'italic' },
+  lbEmpty: { color: '#6E7191', fontSize: 13, fontStyle: 'italic' },
   lbItem: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   lbDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
-  lbItemTxt: { color: '#F5F4F0', fontSize: 14, lineHeight: 21, flex: 1 },
-  suggestCard: { backgroundColor: '#141418', borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowMd },
-  suggestTxt: { color: '#F5F4F0', fontSize: 15, lineHeight: 23, marginTop: 8, fontStyle: 'italic' },
-  circleCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#141418', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#2A2A35', ...shadowSm },
-  personName: { color: '#F5F4F0', fontSize: 16, fontWeight: '700' },
-  personRel: { color: '#9B9AA6', fontSize: 12, marginTop: 2 },
+  lbItemTxt: { color: '#222540', fontSize: 14, lineHeight: 21, flex: 1 },
+  suggestCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowMd },
+  suggestTxt: { color: '#222540', fontSize: 15, lineHeight: 23, marginTop: 8, fontStyle: 'italic' },
+  circleCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
+  personName: { color: '#222540', fontSize: 16, fontWeight: '700' },
+  personRel: { color: '#6E7191', fontSize: 12, marginTop: 2 },
   personInt: { color: '#7B6EF6', fontSize: 12, marginTop: 4 },
   suggestBtn: { backgroundColor: '#7B6EF620', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#7B6EF650' },
   suggestBtnTxt: { color: '#7B6EF6', fontSize: 12, fontWeight: '700' },
   matchCard: {
-    backgroundColor: '#141418',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
@@ -3043,209 +3043,209 @@ const g = StyleSheet.create({
     ...shadowMd
   },
   matchAvatarTxt: { color: '#fff', fontSize: 34, fontWeight: '700' },
-  matchName: { color: '#F5F4F0', fontSize: 22, fontWeight: '700', letterSpacing: 0.3 },
-  matchBio: { color: '#9B9AA6', fontSize: 14, textAlign: 'center', lineHeight: 22, marginTop: 8 },
+  matchName: { color: '#222540', fontSize: 22, fontWeight: '700', letterSpacing: 0.3 },
+  matchBio: { color: '#6E7191', fontSize: 14, textAlign: 'center', lineHeight: 22, marginTop: 8 },
   valuesRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
   valueChip: { backgroundColor: '#7B6EF620', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#7B6EF650' },
   valueChipTxt: { color: '#7B6EF6', fontSize: 12, fontWeight: '600' },
-  howCard: { backgroundColor: '#141418', borderRadius: 18, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#2A2A35', ...shadowMd },
+  howCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#E9E6F2', ...shadowMd },
   howRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14 },
   howNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   howNumTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  howTxt: { color: '#F5F4F0', fontSize: 14, flex: 1 },
-  scoreCard: { backgroundColor: '#141418', borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 14, borderWidth: 1, borderColor: '#7B6EF650', ...shadowMd },
-  scoreLabel: { color: '#9B9AA6', fontSize: 11, fontWeight: '700', letterSpacing: 1.8 },
+  howTxt: { color: '#222540', fontSize: 14, flex: 1 },
+  scoreCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 14, borderWidth: 1, borderColor: '#7B6EF650', ...shadowMd },
+  scoreLabel: { color: '#6E7191', fontSize: 11, fontWeight: '700', letterSpacing: 1.8 },
   scoreNum: { color: '#7B6EF6', fontSize: 56, fontWeight: '700', marginVertical: 6 },
-  scoreWhy: { color: '#F5F4F0', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  reportCard: { backgroundColor: '#141418', borderRadius: 16, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: '#7B6EF640', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowSm },
-  reportDate: { color: '#F5F4F0', fontSize: 16, lineHeight: 25, marginTop: 8 },
-  reportAct: { color: '#F5F4F0', fontSize: 15, lineHeight: 24, marginTop: 8 },
-  agentsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 20, backgroundColor: '#141418', borderRadius: 16, paddingVertical: 16, borderWidth: 1, borderColor: '#2A2A35', ...shadowMd },
+  scoreWhy: { color: '#222540', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  reportCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: '#7B6EF640', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowSm },
+  reportDate: { color: '#222540', fontSize: 16, lineHeight: 25, marginTop: 8 },
+  reportAct: { color: '#222540', fontSize: 15, lineHeight: 24, marginTop: 8 },
+  agentsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 20, backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 16, borderWidth: 1, borderColor: '#E9E6F2', ...shadowMd },
   agentAv: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   agentAvTxt: { color: '#fff', fontSize: 18 },
-  agentName: { color: '#F5F4F0', fontSize: 13, fontWeight: '700' },
-  agentFor: { color: '#9B9AA6', fontSize: 10 },
+  agentName: { color: '#222540', fontSize: 13, fontWeight: '700' },
+  agentFor: { color: '#6E7191', fontSize: 10 },
   agentVs: { color: '#7B6EF6', fontSize: 22, fontWeight: '700' },
   agentRow: { flexDirection: 'row', marginBottom: 10, width: '100%' },
   agentBubble: { borderRadius: 16, padding: 14, maxWidth: '82%' },
-  agentBubbleA: { backgroundColor: '#141418', borderWidth: 1, borderColor: '#7B6EF640', borderTopLeftRadius: 4 },
+  agentBubbleA: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#7B6EF640', borderTopLeftRadius: 4 },
   agentBubbleB: { backgroundColor: '#1A1612', borderWidth: 1, borderColor: '#F6A86E40', borderTopRightRadius: 4 },
   agentLabel: { fontSize: 11, fontWeight: '700', marginBottom: 4, letterSpacing: 0.5 },
-  agentText: { color: '#F5F4F0', fontSize: 14, lineHeight: 22 },
-  agentTyping: { color: '#9B9AA6', fontSize: 16, letterSpacing: 2 },
-  deckCounter: { color: '#9B9AA6', fontSize: 12, textAlign: 'center', marginBottom: 12, fontWeight: '600', letterSpacing: 0.5 },
-  deckCard: { backgroundColor: '#141418', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#2A2A35', marginBottom: 18, ...shadowMd },
+  agentText: { color: '#222540', fontSize: 14, lineHeight: 22 },
+  agentTyping: { color: '#6E7191', fontSize: 16, letterSpacing: 2 },
+  deckCounter: { color: '#6E7191', fontSize: 12, textAlign: 'center', marginBottom: 12, fontWeight: '600', letterSpacing: 0.5 },
+  deckCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#E9E6F2', marginBottom: 18, ...shadowMd },
   deckPhoto: { width: '100%', height: 180, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  deckName: { color: '#F5F4F0', fontSize: 22, fontWeight: '700' },
-  deckBio: { color: '#9B9AA6', fontSize: 14, textAlign: 'center', lineHeight: 22, marginTop: 8, marginBottom: 14 },
+  deckName: { color: '#222540', fontSize: 22, fontWeight: '700' },
+  deckBio: { color: '#6E7191', fontSize: 14, textAlign: 'center', lineHeight: 22, marginTop: 8, marginBottom: 14 },
   interestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 12 },
   interestTag: { color: '#7B6EF6', fontSize: 12, fontWeight: '500' },
   swipeRow: { flexDirection: 'row', gap: 12 },
-  passBtn: { flex: 1, height: 56, borderRadius: 16, backgroundColor: '#141418', borderWidth: 1, borderColor: '#2A2A35', alignItems: 'center', justifyContent: 'center', ...shadowSm },
-  passTxt: { color: '#9B9AA6', fontSize: 16, fontWeight: '700' },
+  passBtn: { flex: 1, height: 56, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9E6F2', alignItems: 'center', justifyContent: 'center', ...shadowSm },
+  passTxt: { color: '#6E7191', fontSize: 16, fontWeight: '700' },
   likeBtn: { flex: 1, height: 56, borderRadius: 16, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', ...shadowMd },
   likeTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  deckHint: { color: '#9B9AA6', fontSize: 12, textAlign: 'center', marginTop: 14 },
-  matchedBanner: { alignItems: 'center', backgroundColor: '#1A1428', borderRadius: 20, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: '#7B6EF650', ...shadowMd },
-  matchedTitle: { color: '#F5F4F0', fontSize: 26, fontWeight: '700', marginTop: 8, letterSpacing: 0.3 },
-  matchedSub: { color: '#9B9AA6', fontSize: 14, textAlign: 'center', lineHeight: 22, marginTop: 8 },
-  alignBadge: { position: 'absolute', top: 16, right: 16, alignItems: 'center', backgroundColor: '#0C0C0F', borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 6, zIndex: 2 },
+  deckHint: { color: '#6E7191', fontSize: 12, textAlign: 'center', marginTop: 14 },
+  matchedBanner: { alignItems: 'center', backgroundColor: '#F3F0FB', borderRadius: 20, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: '#7B6EF650', ...shadowMd },
+  matchedTitle: { color: '#222540', fontSize: 26, fontWeight: '700', marginTop: 8, letterSpacing: 0.3 },
+  matchedSub: { color: '#6E7191', fontSize: 14, textAlign: 'center', lineHeight: 22, marginTop: 8 },
+  alignBadge: { position: 'absolute', top: 16, right: 16, alignItems: 'center', backgroundColor: '#FBFAF8', borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 6, zIndex: 2 },
   alignNum: { fontSize: 18, fontWeight: '700' },
-  alignLbl: { color: '#9B9AA6', fontSize: 9, marginTop: -2 },
-  whyMatch: { backgroundColor: '#0C0C0F', borderRadius: 14, padding: 14, marginTop: 16, borderWidth: 1, borderColor: '#7B6EF640', width: '100%' },
+  alignLbl: { color: '#6E7191', fontSize: 9, marginTop: -2 },
+  whyMatch: { backgroundColor: '#FBFAF8', borderRadius: 14, padding: 14, marginTop: 16, borderWidth: 1, borderColor: '#7B6EF640', width: '100%' },
   whyMatchLbl: { color: '#7B6EF6', fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 6 },
-  whyMatchTxt: { color: '#F5F4F0', fontSize: 13, lineHeight: 20 },
+  whyMatchTxt: { color: '#222540', fontSize: 13, lineHeight: 20 },
   // Cinematic dating profile
   dTop: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   dBack: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(20,20,24,0.7)', alignItems: 'center', justifyContent: 'center' },
   dBackTxt: { color: '#fff', fontSize: 24, marginTop: -2 },
   dToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(20,20,24,0.7)', borderRadius: 24, padding: 4 },
   dTogActive: { flex: 1, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 9, alignItems: 'center' },
-  dTogActiveTxt: { color: '#0C0C0F', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  dTogTxt: { flex: 1, textAlign: 'center', color: '#9B9AA6', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  dTogActiveTxt: { color: '#FBFAF8', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  dTogTxt: { flex: 1, textAlign: 'center', color: '#6E7191', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   alignPill: { width: 48, height: 40, borderRadius: 20, backgroundColor: 'rgba(20,20,24,0.85)', borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   alignPillTxt: { fontSize: 13, fontWeight: '800' },
   dPhoto: { height: 540, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  dPhotoFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 220, backgroundColor: '#0C0C0F', opacity: 0.55 },
+  dPhotoFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 220, backgroundColor: '#FBFAF8', opacity: 0.55 },
   dPhotoOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20, paddingBottom: 24 },
   dPremium: { color: '#F6D66E', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
   dName: { color: '#fff', fontSize: 44, fontWeight: '800', letterSpacing: -0.5 },
-  dAge: { color: '#D8D6E0', fontSize: 30, fontWeight: '300' },
+  dAge: { color: '#C9CCDD', fontSize: 30, fontWeight: '300' },
   dHeart: { color: '#fff', fontSize: 28, marginBottom: 8 },
-  dLoc: { color: '#D8D6E0', fontSize: 15, marginTop: 6 },
+  dLoc: { color: '#C9CCDD', fontSize: 15, marginTop: 6 },
   dPills: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 18 },
-  dPill: { backgroundColor: '#1A1A22', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: '#2A2A35' },
-  dPillTxt: { color: '#F5F4F0', fontSize: 14, fontWeight: '600' },
+  dPill: { backgroundColor: '#EFEDF6', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: '#E9E6F2' },
+  dPillTxt: { color: '#222540', fontSize: 14, fontWeight: '600' },
   dSection: { paddingHorizontal: 20, marginTop: 22 },
-  dH: { color: '#F5F4F0', fontSize: 20, fontWeight: '700', marginBottom: 14, letterSpacing: 0.3 },
-  dAbout: { color: '#C8C6D0', fontSize: 15, lineHeight: 24 },
-  dWhy: { backgroundColor: '#141022', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF650' },
+  dH: { color: '#222540', fontSize: 20, fontWeight: '700', marginBottom: 14, letterSpacing: 0.3 },
+  dAbout: { color: '#9CA0B5', fontSize: 15, lineHeight: 24 },
+  dWhy: { backgroundColor: '#F2F0FB', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF650' },
   dWhyLbl: { color: '#7B6EF6', fontSize: 10, fontWeight: '800', letterSpacing: 1.2, marginBottom: 6 },
-  dWhyTxt: { color: '#F5F4F0', fontSize: 14, lineHeight: 21 },
+  dWhyTxt: { color: '#222540', fontSize: 14, lineHeight: 21 },
   dTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  dTag: { backgroundColor: '#1A1A22', borderRadius: 22, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: '#2A2A35' },
-  dTagTxt: { color: '#F5F4F0', fontSize: 14, fontWeight: '600' },
-  dActions: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 32, backgroundColor: '#0C0C0F' },
+  dTag: { backgroundColor: '#EFEDF6', borderRadius: 22, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1, borderColor: '#E9E6F2' },
+  dTagTxt: { color: '#222540', fontSize: 14, fontWeight: '600' },
+  dActions: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 32, backgroundColor: '#FBFAF8' },
   dPass: { flex: 1, height: 60, borderRadius: 30, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadowMd },
   dPassIcon: { fontSize: 24 },
-  dMsg: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#1A1A22', borderWidth: 1, borderColor: '#2A2A35', alignItems: 'center', justifyContent: 'center', ...shadowSm },
+  dMsg: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#EFEDF6', borderWidth: 1, borderColor: '#E9E6F2', alignItems: 'center', justifyContent: 'center', ...shadowSm },
   dMsgIcon: { fontSize: 22 },
   dLike: { flex: 1.4, height: 60, borderRadius: 30, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', ...shadowMd },
   dLikeIcon: { fontSize: 26, color: '#fff' },
   alignPillFloat: { position: 'absolute', top: 70, right: 16, zIndex: 5 },
   dMe: { width: 48, height: 40, borderRadius: 20, backgroundColor: 'rgba(20,20,24,0.7)', alignItems: 'center', justifyContent: 'center' },
   dMeTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  styleCard: { flex: 1, backgroundColor: '#141022', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF640' },
+  styleCard: { flex: 1, backgroundColor: '#F2F0FB', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF640' },
   styleLbl: { color: '#7B6EF6', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
-  styleVal: { color: '#F5F4F0', fontSize: 15, fontWeight: '700' },
+  styleVal: { color: '#222540', fontSize: 15, fontWeight: '700' },
   // Profile builder
   pbBody: { flex: 1, paddingHorizontal: 22, paddingTop: 24 },
   pbDots: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 28 },
-  pbDot: { width: 24, height: 5, borderRadius: 3, backgroundColor: '#2A2A35' },
+  pbDot: { width: 24, height: 5, borderRadius: 3, backgroundColor: '#E9E6F2' },
   pbDotOn: { backgroundColor: '#7B6EF6' },
-  pbQCard: { backgroundColor: '#141418', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowMd },
+  pbQCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowMd },
   pbQLabel: { color: '#7B6EF6', fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 12 },
-  pbQ: { color: '#F5F4F0', fontSize: 19, fontWeight: '600', lineHeight: 28 },
-  pbHint: { color: '#9B9AA6', fontSize: 13, textAlign: 'center', marginTop: 24, lineHeight: 20 },
+  pbQ: { color: '#222540', fontSize: 19, fontWeight: '600', lineHeight: 28 },
+  pbHint: { color: '#6E7191', fontSize: 13, textAlign: 'center', marginTop: 24, lineHeight: 20 },
   // My profile extras
   myAvatar: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   autoTag: { color: '#6EF6A8', fontSize: 11, fontWeight: '700' },
-  autoCard: { backgroundColor: '#101810', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#6EF6A840' },
-  autoCardTxt: { color: '#F5F4F0', fontSize: 14, lineHeight: 22 },
-  autoCardDate: { color: '#9B9AA6', fontSize: 11, marginTop: 8 },
+  autoCard: { backgroundColor: '#EFF6EF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#6EF6A840' },
+  autoCardTxt: { color: '#222540', fontSize: 14, lineHeight: 22 },
+  autoCardDate: { color: '#6E7191', fontSize: 11, marginTop: 8 },
   uploadBtn: { position: 'absolute', top: '42%', backgroundColor: 'rgba(123,110,246,0.9)', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, zIndex: 5 },
   uploadBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
   changePhoto: { position: 'absolute', top: 70, right: 16, backgroundColor: 'rgba(20,20,24,0.8)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, zIndex: 5 },
   changePhotoTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  intimacyCard: { backgroundColor: '#1A1018', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F6379B40' },
+  intimacyCard: { backgroundColor: '#FBF1F4', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F6379B40' },
   intimacyLbl: { color: '#F6379B', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
-  intimacyTxt: { color: '#F5F4F0', fontSize: 14, lineHeight: 21 },
-  intimacyNote: { color: '#9B9AA6', fontSize: 11, lineHeight: 17, marginTop: 10, fontStyle: 'italic' },
+  intimacyTxt: { color: '#222540', fontSize: 14, lineHeight: 21 },
+  intimacyNote: { color: '#6E7191', fontSize: 11, lineHeight: 17, marginTop: 10, fontStyle: 'italic' },
   psychRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   psychPill: { color: '#A89BFA', fontSize: 12, fontWeight: '700', backgroundColor: '#7B6EF618', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, overflow: 'hidden' },
-  psychNote: { color: '#C8C6D0', fontSize: 13, lineHeight: 20, marginTop: 10 },
-  intimacyReport: { backgroundColor: '#1A1018', borderRadius: 16, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: '#F6379B50' },
+  psychNote: { color: '#9CA0B5', fontSize: 13, lineHeight: 20, marginTop: 10 },
+  intimacyReport: { backgroundColor: '#FBF1F4', borderRadius: 16, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: '#F6379B50' },
   intimacyRLbl: { color: '#F6379B', fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8 },
-  intimacyRTxt: { color: '#F5F4F0', fontSize: 15, lineHeight: 23 },
-  intimacyRNote: { color: '#9B9AA6', fontSize: 11, lineHeight: 17, marginTop: 10, fontStyle: 'italic' },
+  intimacyRTxt: { color: '#222540', fontSize: 15, lineHeight: 23 },
+  intimacyRNote: { color: '#6E7191', fontSize: 11, lineHeight: 17, marginTop: 10, fontStyle: 'italic' },
   likesBar: { position: 'absolute', bottom: 108, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  likesTxt: { color: '#9B9AA6', fontSize: 12, fontWeight: '600' },
+  likesTxt: { color: '#6E7191', fontSize: 12, fontWeight: '600' },
   likesUpgrade: { color: '#F6D66E', fontSize: 12, fontWeight: '700' },
-  secondaryBtn: { width: '100%', height: 52, borderRadius: 16, backgroundColor: '#141418', borderWidth: 1, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center', marginBottom: 4, ...shadowSm },
+  secondaryBtn: { width: '100%', height: 52, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center', marginBottom: 4, ...shadowSm },
   secondaryBtnTxt: { color: '#7B6EF6', fontSize: 15, fontWeight: '700' },
   matchPhoto: { width: 100, height: 100, borderRadius: 50, marginBottom: 14 },
   paywall: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(8,8,11,0.92)', alignItems: 'center', justifyContent: 'center', padding: 28, zIndex: 50 },
-  paywallCard: { width: '100%', backgroundColor: '#141418', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: '#F6D66E50', ...shadowLg },
-  paywallTitle: { color: '#F5F4F0', fontSize: 24, fontWeight: '800', marginTop: 10, textAlign: 'center', letterSpacing: 0.5 },
-  paywallSub: { color: '#9B9AA6', fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 10, marginBottom: 18 },
+  paywallCard: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: '#F6D66E50', ...shadowLg },
+  paywallTitle: { color: '#222540', fontSize: 24, fontWeight: '800', marginTop: 10, textAlign: 'center', letterSpacing: 0.5 },
+  paywallSub: { color: '#6E7191', fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 10, marginBottom: 18 },
   paywallPrice: { backgroundColor: '#F6D66E18', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 18 },
   paywallPriceTxt: { color: '#F6D66E', fontSize: 15, fontWeight: '800' },
   paywallBtn: { width: '100%', height: 54, borderRadius: 16, backgroundColor: '#F6D66E', alignItems: 'center', justifyContent: 'center', marginBottom: 12, ...shadowMd },
-  paywallBtnTxt: { color: '#0C0C0F', fontSize: 16, fontWeight: '800' },
-  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#1A1A22' },
+  paywallBtnTxt: { color: '#FBFAF8', fontSize: 16, fontWeight: '800' },
+  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#EFEDF6' },
   chatAvatar: { width: 42, height: 42, borderRadius: 21 },
-  chatName: { color: '#F5F4F0', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
+  chatName: { color: '#222540', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
   chatStatus: { color: '#6EF6A8', fontSize: 12, marginTop: 1 },
   chatAura: { color: '#7B6EF6', fontSize: 22 },
-  matchStrip: { backgroundColor: '#1A1428', paddingVertical: 10, paddingHorizontal: 16 },
+  matchStrip: { backgroundColor: '#F3F0FB', paddingVertical: 10, paddingHorizontal: 16 },
   matchStripTxt: { color: '#A89BFA', fontSize: 12, textAlign: 'center', fontWeight: '600' },
   // Connections
-  connRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#141418', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#2A2A35', ...shadowSm },
+  connRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
   connAvatar: { width: 56, height: 56, borderRadius: 28 },
-  connName: { color: '#F5F4F0', fontSize: 16, fontWeight: '700' },
+  connName: { color: '#222540', fontSize: 16, fontWeight: '700' },
   connScore: { color: '#7B6EF6', fontSize: 13, fontWeight: '700' },
-  connLast: { color: '#9B9AA6', fontSize: 13, marginTop: 4 },
+  connLast: { color: '#6E7191', fontSize: 13, marginTop: 4 },
   // Who liked you
   likedGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
-  likedCard: { width: '47%', height: 200, borderRadius: 18, overflow: 'hidden', marginBottom: 12, backgroundColor: '#141418', position: 'relative', ...shadowMd },
+  likedCard: { width: '47%', height: 200, borderRadius: 18, overflow: 'hidden', marginBottom: 12, backgroundColor: '#FFFFFF', position: 'relative', ...shadowMd },
   likedPhoto: { width: '100%', height: '100%' },
   blurred: { opacity: 0.7 },
   likedInfo: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, backgroundColor: 'rgba(12,12,15,0.6)' },
   likedName: { color: '#fff', fontSize: 15, fontWeight: '700' },
   likedLock: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  likedUpsell: { backgroundColor: '#141418', borderRadius: 20, padding: 22, marginTop: 10, borderWidth: 1, borderColor: '#F6D66E50', alignItems: 'center' },
+  likedUpsell: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 22, marginTop: 10, borderWidth: 1, borderColor: '#F6D66E50', alignItems: 'center' },
   likedUpsellTitle: { color: '#F6D66E', fontSize: 18, fontWeight: '800' },
-  likedUpsellSub: { color: '#9B9AA6', fontSize: 14, textAlign: 'center', lineHeight: 21, marginVertical: 12 },
+  likedUpsellSub: { color: '#6E7191', fontSize: 14, textAlign: 'center', lineHeight: 21, marginVertical: 12 },
   // Diary history
-  diaryEntry: { backgroundColor: '#141418', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#2A2A35', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowSm },
+  diaryEntry: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowSm },
   diaryEntryDate: { color: '#7B6EF6', fontSize: 12, fontWeight: '700', marginBottom: 6 },
-  diaryEntryTxt: { color: '#F5F4F0', fontSize: 15, lineHeight: 23 },
+  diaryEntryTxt: { color: '#222540', fontSize: 15, lineHeight: 23 },
   // Insights
-  insightHero: { backgroundColor: '#141418', borderRadius: 18, padding: 20, borderWidth: 1, borderColor: '#7B6EF640', marginBottom: 8, ...shadowMd },
-  insightSummary: { color: '#F5F4F0', fontSize: 17, lineHeight: 27, marginTop: 10 },
-  insightNote: { color: '#F5F4F0', fontSize: 15, lineHeight: 24, fontStyle: 'italic', marginTop: 8 },
+  insightHero: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 20, borderWidth: 1, borderColor: '#7B6EF640', marginBottom: 8, ...shadowMd },
+  insightSummary: { color: '#222540', fontSize: 17, lineHeight: 27, marginTop: 10 },
+  insightNote: { color: '#222540', fontSize: 15, lineHeight: 24, fontStyle: 'italic', marginTop: 8 },
   insightQ: { color: '#A89BFA', fontSize: 17, lineHeight: 26, marginTop: 10, fontWeight: '600' },
   // Settings
-  setRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#141418', borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#2A2A35', ...shadowSm },
+  setRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
   setIcon: { fontSize: 18 },
-  setLabel: { color: '#F5F4F0', fontSize: 15, fontWeight: '600', flex: 1 },
+  setLabel: { color: '#222540', fontSize: 15, fontWeight: '600', flex: 1 },
   setArrow: { color: '#7B6EF6', fontSize: 16, fontWeight: '700' },
-  privacyCard: { backgroundColor: '#101810', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#6EF6A830' },
-  privacyTxt: { color: '#C8C6D0', fontSize: 13, lineHeight: 21 },
-  aboutTxt: { color: '#4A4A56', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 30 },
+  privacyCard: { backgroundColor: '#EFF6EF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#6EF6A830' },
+  privacyTxt: { color: '#9CA0B5', fontSize: 13, lineHeight: 21 },
+  aboutTxt: { color: '#9A9DB2', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 30 },
   dealbreak: { color: '#F6A86E', fontSize: 13, lineHeight: 20, marginTop: 12, fontWeight: '600' },
   dealgood: { color: '#6EF6A8', fontSize: 13, lineHeight: 20, marginTop: 12, fontWeight: '600' },
-  contactSetup: { backgroundColor: '#141418', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF640' },
-  contactSetupTxt: { color: '#C8C6D0', fontSize: 13, lineHeight: 20, marginBottom: 12 },
-  contactInput: { backgroundColor: '#1A1A22', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#F5F4F0', fontSize: 15, borderWidth: 1, borderColor: '#2A2A35', marginBottom: 10 },
+  contactSetup: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF640' },
+  contactSetupTxt: { color: '#9CA0B5', fontSize: 13, lineHeight: 20, marginBottom: 12 },
+  contactInput: { backgroundColor: '#EFEDF6', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#222540', fontSize: 15, borderWidth: 1, borderColor: '#E9E6F2', marginBottom: 10 },
   contactSave: { backgroundColor: '#7B6EF6', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   contactSaveTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  crisisLine: { color: '#9B9AA6', fontSize: 11, lineHeight: 17, marginTop: 12, textAlign: 'center' },
-  typePill: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#141418', borderWidth: 1, borderColor: '#2A2A35' },
+  crisisLine: { color: '#6E7191', fontSize: 11, lineHeight: 17, marginTop: 12, textAlign: 'center' },
+  typePill: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9E6F2' },
   typePillActive: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
-  typePillTxt: { color: '#F5F4F0', fontSize: 14, fontWeight: '700' },
-  circleMember: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#141418', borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#2A2A35' },
+  typePillTxt: { color: '#222540', fontSize: 14, fontWeight: '700' },
+  circleMember: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#E9E6F2' },
   invitePending: { color: '#F6A86E', fontSize: 11, fontWeight: '600' },
   inviteCode: { color: '#7B6EF6', fontSize: 11, fontWeight: '700' },
   msgCount: { color: '#6EF6A8', fontSize: 11, fontWeight: '600' },
   registerScroll: { paddingHorizontal: 24, paddingVertical: 32, justifyContent: 'center', minHeight: '100vh' },
-  socialBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#141418', borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#2A2A35', ...shadowSm },
+  socialBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
   socialIcon: { fontSize: 18, width: 28, textAlign: 'center' },
-  socialLabel: { color: '#F5F4F0', fontSize: 15, fontWeight: '600', flex: 1 },
+  socialLabel: { color: '#222540', fontSize: 15, fontWeight: '600', flex: 1 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#2A2A35' },
-  dividerTxt: { color: '#6A6A76', fontSize: 12, fontWeight: '600' },
-  inputLabel: { color: '#F5F4F0', fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  authInput: { backgroundColor: '#141418', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: '#F5F4F0', fontSize: 15, borderWidth: 1.5, borderColor: '#2A2A35', ...shadowSm },
-  disclaimerTxt: { color: '#6A6A76', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 24 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#E9E6F2' },
+  dividerTxt: { color: '#9A9DB2', fontSize: 12, fontWeight: '600' },
+  inputLabel: { color: '#222540', fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  authInput: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', ...shadowSm },
+  disclaimerTxt: { color: '#9A9DB2', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 24 },
 })
