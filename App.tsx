@@ -719,6 +719,17 @@ function LanguageSelect({ onDone }: { onDone: () => void }) {
   )
 }
 
+// SOMA brand mark — the S-in-O monogram, crisp at any size.
+function SomaLogo({ size = 64, color = '#7B6EF6' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 400 400">
+      <SvgCircle cx={200} cy={200} r={122} fill="none" stroke={color} strokeWidth={19} />
+      <SvgPath d="M 306 166 L 184 166 C 163 166 156 190 184 199 C 210 207 248 208 248 235 L 152 235"
+        fill="none" stroke={color} strokeWidth={24} strokeLinecap="square" strokeLinejoin="miter" />
+    </Svg>
+  )
+}
+
 function Splash() {
   const fade = useRef(new Animated.Value(0)).current
   const rise = useRef(new Animated.Value(20)).current
@@ -731,7 +742,8 @@ function Splash() {
   return (
     <View style={g.screen}>
       <Animated.View style={{ opacity: fade, transform: [{ translateY: rise }], alignItems: 'center' }}>
-        <Text style={g.logo}>◈ SOMA</Text>
+        <SomaLogo size={92} />
+        <Text style={[g.logo, { marginTop: 16 }]}>SOMA</Text>
         <Text style={g.logoSub}>Know yourself before knowing each other.</Text>
       </Animated.View>
     </View>
@@ -835,7 +847,7 @@ function Register({ onDone }: { onDone: (name: string) => void }) {
     return (
       <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
         <View style={{ alignItems: 'center', marginBottom: 40 }}>
-          <Text style={{ fontSize: 48, marginBottom: 12 }}>✦</Text>
+          <View style={{ marginBottom: 14 }}><SomaLogo size={68} /></View>
           <Text style={g.logo}>Save your story</Text>
           <Text style={g.logoSub}>Keep your conversations with Soma and build your life.</Text>
         </View>
@@ -1043,7 +1055,7 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
 
         {!started ? (
           <View style={g.centerWrap}>
-            <Animated.View style={[g.bigOrb, { transform: [{ scale: pulse }] }]}><Text style={g.bigOrbIcon}>✦</Text></Animated.View>
+            <Animated.View style={[g.bigOrb, { transform: [{ scale: pulse }] }]}><SomaLogo size={56} /></Animated.View>
             <Text style={g.startTitle}>{mode === 'try' ? 'Talk to Soma.' : isDiary ? 'How was\nyour day?' : `Hi ${p.name}.`}</Text>
             <Text style={g.startSub}>
               {mode === 'try' ? 'Before you decide anything, just talk.\nShare what is on your mind. Soma is here\nas your friend, right now.'
@@ -1665,7 +1677,7 @@ function ProfileBuilder({ profile, onDone }: { profile: UserProfile; onDone: () 
     return (
       <View style={g.screen}>
         <View style={g.centerWrap}>
-          <Animated.View style={[g.bigOrb, { transform: [{ scale: pulse }] }]}><Text style={g.bigOrbIcon}>✦</Text></Animated.View>
+          <Animated.View style={[g.bigOrb, { transform: [{ scale: pulse }] }]}><SomaLogo size={56} /></Animated.View>
           <Text style={g.startTitle}>Building your profile...</Text>
           <Text style={g.startSub}>Soma is understanding your love language,{'\n'}attachment style, and what you need in love.</Text>
         </View>
@@ -1727,7 +1739,7 @@ function MyProfile({ profile, onBack, onBuild }: { profile: UserProfile; onBack:
           <View style={{ flex: 1 }} />
         </View>
         <View style={g.centerWrap}>
-          <View style={g.bigOrb}><Text style={g.bigOrbIcon}>✦</Text></View>
+          <View style={g.bigOrb}><SomaLogo size={56} /></View>
           <Text style={g.startTitle}>Build your{'\n'}dating profile.</Text>
           <Text style={g.startSub}>Soma will interview you by voice about your love language, attachment style, and what you need in love — then write your profile for you.</Text>
           <TouchableOpacity style={g.primaryBtn} onPress={onBuild}><Text style={g.primaryBtnTxt}>✦  Start the interview</Text></TouchableOpacity>
@@ -2830,12 +2842,12 @@ JSON only:` }], 'You are Soma writing a caring weekly reflection. Return only JS
       <View style={{ height: 20 }} />
       {loading ? (
         <View style={[g.centerWrap, { paddingTop: 60 }]}>
-          <View style={g.bigOrb}><Text style={g.bigOrbIcon}>✦</Text></View>
+          <View style={g.bigOrb}><SomaLogo size={56} /></View>
           <Text style={g.startSub}>Soma is reflecting on{'\n'}everything you've shared...</Text>
         </View>
       ) : !insight ? (
         <View style={[g.centerWrap, { paddingTop: 60 }]}>
-          <Text style={g.bigOrbIcon}>✦</Text>
+          <SomaLogo size={56} />
           <Text style={[g.startSub, { marginTop: 20 }]}>Not enough yet.{'\n'}Talk to Soma a few times to unlock insights.</Text>
         </View>
       ) : (
