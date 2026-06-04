@@ -998,6 +998,10 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
 function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void }) {
   const scoreByDomain = (d: DomainKey) => profile.memories.filter(m => m.domain === d).length
   const totalMem = profile.memories.length
+  const homeScore = (k: DomainKey) => {
+    const m = profile.manualScores?.[k]
+    return typeof m === 'number' ? m * 10 : (profile.wheel?.scores[k]?.score ?? domainWellbeing(profile.memories, k))
+  }
   return (
     <ScrollView style={g.screen} contentContainerStyle={g.homePad}>
       <View style={g.homeHeader}>
@@ -1013,19 +1017,9 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
         <Text style={g.secLabel}>CIRCLE OF LIFE</Text>
         <TouchableOpacity onPress={() => go('lifebalance')}><Text style={[g.secLabel, { color: '#7B6EF6' }]}>Details →</Text></TouchableOpacity>
       </View>
-      <View style={g.domainGrid}>
-        {DOMAINS.map(d => {
-          const n = scoreByDomain(d.key)
-          return (
-            <TouchableOpacity key={d.key} style={g.domainCard} onPress={() => go('lifebalance')}>
-              <Text style={{ fontSize: 24 }}>{d.icon}</Text>
-              <Text style={g.domainLabel}>{d.label}</Text>
-              <View style={g.domainBarBg}><View style={[g.domainBarFill, { width: `${profile.wheel?.scores[d.key]?.score ?? domainWellbeing(profile.memories, d.key)}%`, backgroundColor: d.color }]} /></View>
-              <Text style={[g.domainCount, { color: d.color }]}>{n} insight{n !== 1 ? 's' : ''}</Text>
-            </TouchableOpacity>
-          )
-        })}
-      </View>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => go('lifebalance')} style={{ alignItems: 'center', marginBottom: 4 }}>
+        <WheelOfLifeChart domains={DOMAINS} scoreOf={homeScore} size={320} />
+      </TouchableOpacity>
 
       <TouchableOpacity style={[g.auraMain, { marginTop: 20 }]} onPress={() => go('aura')}>
         <View style={g.orbSm}><Text style={{ color: '#fff', fontSize: 13 }}>✦</Text></View>
