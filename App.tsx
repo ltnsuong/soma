@@ -19,12 +19,16 @@ const REFRESH_KEY = 'soma_refresh_token'
 
 // ── LIFE DOMAINS (Circle of Life) ──────────────────────────
 const DOMAINS = [
-  { key: 'health',       label: 'Health',       icon: '❤️', color: '#F66E8E' },
-  { key: 'finance',      label: 'Finance',      icon: '💰', color: '#6EF6A8' },
-  { key: 'hobby',        label: 'Hobby',        icon: '🎨', color: '#F6A86E' },
-  { key: 'relationship', label: 'Relationships',icon: '👥', color: '#7B6EF6' },
-  { key: 'purpose',      label: 'Purpose',      icon: '🎯', color: '#6ECFF6' },
-  { key: 'mind',         label: 'Mind',         icon: '🧘', color: '#A89BFA' },
+  { key: 'health',       label: 'Health',  icon: '❤️',  color: '#F66E8E' },
+  { key: 'career',       label: 'Career',  icon: '💼',  color: '#6E8BF6' },
+  { key: 'finance',      label: 'Finance', icon: '💰',  color: '#6EF6A8' },
+  { key: 'relationship', label: 'Love',    icon: '💞',  color: '#7B6EF6' },
+  { key: 'family',       label: 'Family',  icon: '👨‍👩‍👧', color: '#F6C26E' },
+  { key: 'growth',       label: 'Growth',  icon: '🌱',  color: '#6EE6C0' },
+  { key: 'hobby',        label: 'Fun',     icon: '🎨',  color: '#F6A86E' },
+  { key: 'purpose',      label: 'Purpose', icon: '🎯',  color: '#6ECFF6' },
+  { key: 'mind',         label: 'Mind',    icon: '🧘',  color: '#A89BFA' },
+  { key: 'environment',  label: 'Home',    icon: '🏡',  color: '#C9A0F6' },
 ] as const
 type DomainKey = typeof DOMAINS[number]['key']
 type Sentiment = 'positive' | 'neutral' | 'negative'
@@ -125,7 +129,7 @@ ${byDomain}
 
 For EACH domain give a wellbeing score (0-100) and a brief insight (<=12 words, warm and clinical).
 JSON shape exactly:
-{"health":{"score":0,"note":""},"finance":{"score":0,"note":""},"hobby":{"score":0,"note":""},"relationship":{"score":0,"note":""},"purpose":{"score":0,"note":""},"mind":{"score":0,"note":""}}
+{"health":{"score":0,"note":""},"career":{"score":0,"note":""},"finance":{"score":0,"note":""},"relationship":{"score":0,"note":""},"family":{"score":0,"note":""},"growth":{"score":0,"note":""},"hobby":{"score":0,"note":""},"purpose":{"score":0,"note":""},"mind":{"score":0,"note":""},"environment":{"score":0,"note":""}}
 ${currentLangCode() === 'en' ? '' : `Write every "note" in ${currentLangName()}, but keep the JSON keys exactly as shown (English).\n`}JSON only:`
   const scores: Partial<Record<DomainKey, WheelDomain>> = {}
   try {
@@ -209,6 +213,7 @@ interface UserProfile {
   trustedContact: { name: string; phone: string }  // who to reach in a hard moment
   wheel?: WheelAssessment                            // psychologist's wheel-of-life assessment (cached)
   language?: string                                  // UI + AI language code (e.g. 'en','ru','es')
+  manualScores?: Partial<Record<DomainKey, number>>  // user's own 1-10 self-rating per domain (overrides AI)
 }
 
 const FREE_DAILY_LIKES = 10
@@ -349,6 +354,11 @@ const DB = {
   setTrustedContact: (name: string, phone: string) => { const p = DB.get(); p.trustedContact = { name, phone }; DB.save(p) },
   setWheel: (wheel: WheelAssessment) => { const p = DB.get(); p.wheel = wheel; DB.save(p) },
   setLanguage: (code: string) => { const p = DB.get(); p.language = code; p.wheel = undefined; DB.save(p) },
+  setManualScore: (domain: DomainKey, value: number | undefined) => {
+    const p = DB.get(); const ms: any = { ...(p.manualScores || {}) }
+    if (value === undefined) delete ms[domain]; else ms[domain] = value
+    p.manualScores = ms; DB.save(p)
+  },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
 
@@ -548,7 +558,7 @@ async function extract(msg: string): Promise<{ memories: { domain: DomainKey; co
 Message: "${msg}"
 {
  "name": "their first name if they introduce themselves else null",
- "memories": [{"domain":"health|finance|hobby|relationship|purpose|mind","content":"fact under 12 words","sentiment":"positive|neutral|negative"}],
+ "memories": [{"domain":"health|career|finance|relationship|family|growth|hobby|purpose|mind|environment","content":"fact under 12 words","sentiment":"positive|neutral|negative"}],
  "people": [{"name":"name","relationship":"mom|friend|partner|etc","context":"brief","interests":["shared interest"]}]
 }
 Rules: Skip vague or incomplete fragments (e.g. "I want to", "maybe"). Only store clear, self-contained facts.
@@ -1136,14 +1146,22 @@ function WheelSegment({ domain, profile, angle, index, score }: { domain: typeof
 
 // A real Wheel of Life: radial chart with a spoke per domain, scores plotted as
 // dots and connected into a polygon. Balanced life = smooth circle; imbalanced = jagged.
-function WheelOfLifeChart({ domains, scoreOf, size = 300 }: { domains: typeof DOMAINS; scoreOf: (k: DomainKey) => number; size?: number }) {
+function WheelOfLifeChart({ domains, scoreOf, size = 340 }: { domains: typeof DOMAINS; scoreOf: (k: DomainKey) => number; size?: number }) {
   const C = size / 2
-  const R = size / 2 - 56 // room for labels
+  const R = size / 2 - 66 // room for labels
   const N = domains.length
   const ang = (i: number) => (-90 + (360 / N) * i) * Math.PI / 180
   const pt = (i: number, r: number) => ({ x: C + r * Math.cos(ang(i)), y: C + r * Math.sin(ang(i)) })
   const scores = domains.map(d => Math.max(0, Math.min(100, scoreOf(d.key))))
-  const dataPts = scores.map((s, i) => pt(i, (s / 100) * R))
+  // Animate the polygon growing out from the centre on mount.
+  const [prog, setProg] = useState(0)
+  const av = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    const id = av.addListener(({ value }) => setProg(value))
+    Animated.timing(av, { toValue: 1, duration: 850, useNativeDriver: false }).start()
+    return () => av.removeListener(id)
+  }, [])
+  const dataPts = scores.map((s, i) => pt(i, (s / 100) * R * prog))
   const polygon = dataPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
   return (
     <View style={{ width: size, height: size, alignSelf: 'center' }}>
@@ -1160,10 +1178,10 @@ function WheelOfLifeChart({ domains, scoreOf, size = 300 }: { domains: typeof DO
         ))}
       </Svg>
       {domains.map((d, i) => {
-        const lp = pt(i, R + 32)
+        const lp = pt(i, R + 34)
         return (
-          <View key={d.key} style={{ position: 'absolute', width: 76, alignItems: 'center', left: lp.x - 38, top: lp.y - 20 }}>
-            <Text style={{ fontSize: 16 }}>{d.icon}</Text>
+          <View key={d.key} style={{ position: 'absolute', width: 64, alignItems: 'center', left: lp.x - 32, top: lp.y - 20 }}>
+            <Text style={{ fontSize: 15 }}>{d.icon}</Text>
             <Text style={{ fontSize: 9, fontWeight: '700', color: '#222540' }} numberOfLines={1}>{d.label}</Text>
             <Text style={{ fontSize: 11, fontWeight: '800', color: d.color }}>{Math.round(scores[i] / 10)}/10</Text>
           </View>
@@ -1177,6 +1195,13 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
   const [selectedDomain, setSelectedDomain] = useState<DomainKey | null>(null)
   const [wheel, setWheel] = useState<WheelAssessment | undefined>(profile.wheel)
   const [assessing, setAssessing] = useState(false)
+  const [manual, setManual] = useState<Partial<Record<DomainKey, number>>>(profile.manualScores || {})
+  // Tap a pip to set your own 1-10 rating; tap the same value again to clear it.
+  const setRating = (k: DomainKey, n: number) => {
+    const next = { ...manual }
+    if (next[k] === n) delete next[k]; else next[k] = n
+    setManual(next); DB.setManualScore(k, next[k])
+  }
 
   const runAssessment = () => {
     if (assessing || profile.memories.length === 0) return
@@ -1188,8 +1213,9 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
     if (profile.memories.length > 0 && (!wheel || wheel.basis !== profile.memories.length)) runAssessment()
   }, [])
 
-  const domScore = (k: DomainKey) => wheel?.scores[k]?.score ?? domainWellbeing(profile.memories, k)
-  const domNote = (k: DomainKey) => wheel?.scores[k]?.note || ''
+  // Your own rating wins; otherwise Soma's assessment; otherwise the quick heuristic.
+  const domScore = (k: DomainKey) => (typeof manual[k] === 'number' ? manual[k]! * 10 : (wheel?.scores[k]?.score ?? domainWellbeing(profile.memories, k)))
+  const domNote = (k: DomainKey) => (typeof manual[k] === 'number' ? '' : (wheel?.scores[k]?.note || ''))
   const ob = wheel?.overall ?? overallBalance(profile.memories)
 
   return (
@@ -1205,7 +1231,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
       {/* Wheel of Life — real radial chart */}
       <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 12 }}>
-        <WheelOfLifeChart domains={DOMAINS} scoreOf={domScore} size={300} />
+        <WheelOfLifeChart domains={DOMAINS} scoreOf={domScore} size={340} />
         {(() => {
           const sc = DOMAINS.map(d => domScore(d.key))
           const spread = Math.max(...sc) - Math.min(...sc)
@@ -1242,6 +1268,20 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                   </View>
                   {!!note && <Text style={{ fontSize: 12, color: '#6E7191', marginTop: 6, fontStyle: 'italic' }}>“{note}”</Text>}
                 </View>
+              </View>
+
+              {/* Your own 1–10 self-rating (overrides Soma's score) */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                <Text style={{ fontSize: 10, color: '#8A8FA8', marginRight: 4, fontWeight: '600' }}>Rate it yourself</Text>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => {
+                  const cur = manual[d.key]
+                  const on = typeof cur === 'number' && n <= cur
+                  return (
+                    <TouchableOpacity key={n} onPress={() => setRating(d.key, n)} hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+                      style={{ width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, borderColor: d.color, backgroundColor: on ? d.color : 'transparent' }} />
+                  )
+                })}
+                {typeof manual[d.key] === 'number' && <Text style={{ fontSize: 11, fontWeight: '800', color: d.color, marginLeft: 4 }}>{manual[d.key]}/10</Text>}
               </View>
 
               {items.length === 0
