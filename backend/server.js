@@ -1,6 +1,11 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
@@ -365,6 +370,12 @@ app.get('/matches', auth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// Privacy policy
+app.get('/privacy', (req, res) => {
+  res.setHeader('Content-Type', 'text/html')
+  res.send(readFileSync(join(__dirname, 'privacy.html'), 'utf8'))
 })
 
 // HEALTH (also serves "/" for Railway/uptime root checks)
