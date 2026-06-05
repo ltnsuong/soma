@@ -2893,13 +2893,34 @@ function SettingRow({ icon, title, subtitle, onPress, right, danger, last }: {
   )
 }
 
+// ── Twinby-style settings row ──────────────────────────────
+function StgRow({ icon, label, value, onPress, danger, last }: {
+  icon: string; label: string; value?: string; onPress?: () => void; danger?: boolean; last?: boolean
+}) {
+  const Wrap: any = onPress ? TouchableOpacity : View
+  return (
+    <Wrap onPress={onPress} activeOpacity={0.6}
+      style={[g.stgRow, last && { borderBottomWidth: 0 }]}>
+      <View style={g.stgIconCircle}><Text style={g.stgIconTxt}>{icon}</Text></View>
+      <View style={{ flex: 1 }}>
+        <Text style={[g.stgLabel, danger && { color: '#E8636F' }]}>{label}</Text>
+        {!!value && <Text style={g.stgValue}>{value}</Text>}
+      </View>
+      {onPress && <Text style={[g.stgChevron, danger && { color: '#E8636F' }]}>›</Text>}
+    </Wrap>
+  )
+}
+
 function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void }) {
+  type Panel = null | 'language' | 'companion' | 'safety'
+  const [panel, setPanel] = useState<Panel>(null)
   const [aiName, setAiName] = useState(profile.aiName || 'Soma')
   const [tcName, setTcName] = useState(profile.trustedContact?.name || '')
   const [tcPhone, setTcPhone] = useState(profile.trustedContact?.phone || '')
   const [showDanger, setShowDanger] = useState(false)
-  const saveAiName = () => { DB.setAiName(aiName); onRefresh() }
-  const saveContact = () => { DB.setTrustedContact(tcName.trim(), tcPhone.trim()); onRefresh() }
+  const back = () => setPanel(null)
+  const saveAiName = () => { DB.setAiName(aiName); onRefresh(); back() }
+  const saveContact = () => { DB.setTrustedContact(tcName.trim(), tcPhone.trim()); onRefresh(); back() }
   const changePipPhoto = () => pickPhoto(url => { DB.setAiPhoto(url); onRefresh() })
   const exportData = () => {
     try {
@@ -2911,165 +2932,153 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
       }
     } catch {}
   }
-  const initial = (profile.name || 'S').charAt(0).toUpperCase()
+  const curLang = LANGS.find(l => l.code === (profile.language || 'en'))
 
-  return (
-    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 80 }}>
-      {/* ── Hero Profile Card ── */}
-      <View style={g.settingsHero}>
-        <TouchableOpacity onPress={onBack} style={g.settingsBackBtn}>
-          <Text style={g.settingsBackTxt}>‹</Text>
-        </TouchableOpacity>
-        <View style={g.settingsAvatar}>
-          <Text style={g.settingsAvatarTxt}>{initial}</Text>
-        </View>
-        <Text style={g.settingsName}>{profile.name || 'You'}</Text>
-        <View style={[g.settingsPlanBadge, profile.premium && g.settingsPlanBadgePremium]}>
-          <Text style={g.settingsPlanTxt}>{profile.premium ? '★  SOMA+ Premium' : 'Free Plan'}</Text>
-        </View>
-        {/* Stats inside hero */}
-        <View style={g.settingsHeroStats}>
-          <View style={g.settingsHeroStat}>
-            <Text style={g.settingsHeroStatNum}>{profile.conversations}</Text>
-            <Text style={g.settingsHeroStatLbl}>Sessions</Text>
-          </View>
-          <View style={g.settingsHeroStatDiv} />
-          <View style={g.settingsHeroStat}>
-            <Text style={g.settingsHeroStatNum}>{profile.memories.length}</Text>
-            <Text style={g.settingsHeroStatLbl}>Memories</Text>
-          </View>
-          <View style={g.settingsHeroStatDiv} />
-          <View style={g.settingsHeroStat}>
-            <Text style={g.settingsHeroStatNum}>{profile.connections.length}</Text>
-            <Text style={g.settingsHeroStatLbl}>Matches</Text>
-          </View>
-          <View style={g.settingsHeroStatDiv} />
-          <View style={g.settingsHeroStat}>
-            <Text style={g.settingsHeroStatNum}>{profile.diary.length}</Text>
-            <Text style={g.settingsHeroStatLbl}>Diary</Text>
-          </View>
+  // ── Sub-screen: Language ──────────────────────────────────
+  if (panel === 'language') return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={back} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>Language</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <View style={[g.stgGroup, { padding: 16, marginTop: 20 }]}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {LANGS.map(l => {
+            const active = (profile.language || 'en') === l.code
+            return (
+              <TouchableOpacity key={l.code} onPress={() => { DB.setLanguage(l.code); onRefresh() }}
+                style={[g.settingsLangChip, active && g.settingsLangChipActive]}>
+                <Text style={[g.settingsLangChipTxt, active && { color: '#fff' }]}>{l.flag}  {l.label}</Text>
+              </TouchableOpacity>
+            )
+          })}
         </View>
       </View>
+    </ScrollView>
+  )
 
-      <View style={g.settingsBody}>
-
-        {/* ── ACCOUNT ── */}
-        <Text style={g.settingsSec}>ACCOUNT</Text>
-        <View style={g.setGroup}>
-          {profile.premium ? (
-            <SettingRow icon="★" title="SOMA+ Premium" subtitle="All features unlocked"
-              right={<View style={g.settingsActiveBadge}><Text style={g.settingsActiveTxt}>Active</Text></View>}
-              last />
-          ) : (
-            <SettingRow icon="★" title="Upgrade to SOMA+" subtitle="Unlimited AI, who liked you & more"
-              onPress={() => { DB.goPremium(); onRefresh() }}
-              right={<View style={g.settingsUpgradeBtn}><Text style={g.settingsUpgradeTxt}>Upgrade</Text></View>}
-              last />
-          )}
+  // ── Sub-screen: Companion ─────────────────────────────────
+  if (panel === 'companion') return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={back} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>Your companion</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <View style={[g.stgGroup, { padding: 20, marginTop: 20 }]}>
+        <View style={{ alignItems: 'center', marginBottom: 20 }}>
+          <View style={g.settingsCompanionOrb}><SomaLogo size={32} color="#7B6EF6" /></View>
+          <Text style={[g.stgLabel, { marginTop: 10, textAlign: 'center' }]}>{profile.aiName || 'Soma'}</Text>
         </View>
-        <View style={g.setGroup}>
-          <SettingRow icon="📦" title="Export my data" subtitle="Download all your memories as JSON" onPress={exportData} last />
-        </View>
+        <Text style={g.settingsInputLabel}>Companion name</Text>
+        <TextInput style={g.settingsInput} value={aiName} onChangeText={setAiName}
+          placeholder="e.g. Soma, Maya, Kai" placeholderTextColor="#B0B3C8" />
+        <TouchableOpacity style={[g.settingsSaveBtn, !aiName.trim() && g.off, { marginTop: 16 }]}
+          onPress={saveAiName} disabled={!aiName.trim()}>
+          <Text style={g.settingsSaveTxt}>Save</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={[g.stgGroup, { marginTop: 12 }]}>
+        <StgRow icon={profile.aiPhoto ? '🖼' : '🌟'} label={profile.aiPhoto ? 'Change photo' : 'Add a photo'}
+          value="Personalise your companion" onPress={changePipPhoto} last />
+      </View>
+    </ScrollView>
+  )
 
-        {/* ── LANGUAGE ── */}
-        <Text style={g.settingsSec}>{t('language').toUpperCase()}</Text>
-        <View style={[g.setGroup, { padding: 16 }]}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {LANGS.map(l => {
-              const active = (profile.language || 'en') === l.code
-              return (
-                <TouchableOpacity key={l.code} onPress={() => { DB.setLanguage(l.code); onRefresh() }}
-                  style={[g.settingsLangChip, active && g.settingsLangChipActive]}>
-                  <Text style={[g.settingsLangChipTxt, active && { color: '#fff' }]}>{l.flag}  {l.label}</Text>
-                </TouchableOpacity>
-              )
-            })}
+  // ── Sub-screen: Safety ────────────────────────────────────
+  if (panel === 'safety') return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={back} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>Trusted contact</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <View style={[g.stgGroup, { padding: 20, marginTop: 20 }]}>
+        <Text style={g.settingsHelpTxt}>If you ever have a really hard moment, {profile.aiName} can help you reach this person in one tap.</Text>
+        <Text style={g.settingsInputLabel}>Their name</Text>
+        <TextInput style={g.settingsInput} value={tcName} onChangeText={setTcName}
+          placeholder="e.g. Mom, best friend" placeholderTextColor="#B0B3C8" />
+        <Text style={g.settingsInputLabel}>Their phone number</Text>
+        <TextInput style={g.settingsInput} value={tcPhone} onChangeText={setTcPhone}
+          placeholder="+1 555 000 0000" placeholderTextColor="#B0B3C8" keyboardType="phone-pad" />
+        <TouchableOpacity style={[g.settingsSaveBtn, !(tcName.trim() && tcPhone.trim()) && g.off, { marginTop: 16 }]}
+          onPress={saveContact} disabled={!(tcName.trim() && tcPhone.trim())}>
+          <Text style={g.settingsSaveTxt}>{profile.trustedContact?.phone ? 'Update contact' : 'Save contact'}</Text>
+        </TouchableOpacity>
+        <Text style={g.settingsCrisisLine}>Need help now? Call or text <Text style={{ fontWeight: '700' }}>988</Text> (US) · findahelpline.com</Text>
+      </View>
+    </ScrollView>
+  )
+
+  // ── Main settings list ────────────────────────────────────
+  return (
+    <ScrollView style={[g.screen, { backgroundColor: '#F5F4FA' }]} contentContainerStyle={{ paddingBottom: 80 }}>
+      {/* Header */}
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>Settings</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Profile */}
+      <Text style={g.stgSec}>Profile</Text>
+      <View style={g.stgGroup}>
+        <StgRow icon="👤" label="Name" value={profile.name || '—'} />
+        <StgRow icon="📊" label="Sessions" value={`${profile.conversations} conversations`} />
+        <StgRow icon="🧠" label="Memories" value={`${profile.memories.length} saved`} last />
+      </View>
+
+      {/* Premium */}
+      <Text style={g.stgSec}>Premium</Text>
+      <View style={g.stgGroup}>
+        {profile.premium
+          ? <StgRow icon="★" label="SOMA+" value="Active" />
+          : <StgRow icon="★" label="SOMA+" value="Not activated" onPress={() => { DB.goPremium(); onRefresh() }} />}
+        <StgRow icon="📦" label="Export data" value="Download as JSON" onPress={exportData} last />
+      </View>
+
+      {/* Companion */}
+      <Text style={g.stgSec}>Your companion</Text>
+      <View style={g.stgGroup}>
+        <StgRow icon="🌟" label="Name" value={profile.aiName || 'Soma'} onPress={() => setPanel('companion')} />
+        <StgRow icon="🖼" label="Photo" value={profile.aiPhoto ? 'Set' : 'Not set'} onPress={changePipPhoto} last />
+      </View>
+
+      {/* Application */}
+      <Text style={g.stgSec}>Application</Text>
+      <View style={g.stgGroup}>
+        <StgRow icon="🌍" label="Language" value={`${curLang?.flag} ${curLang?.label}`} onPress={() => setPanel('language')} />
+        <StgRow icon="💜" label="Trusted contact"
+          value={profile.trustedContact?.name || 'Not set'} onPress={() => setPanel('safety')} />
+        <StgRow icon="🔒" label="Privacy" value="Data stays on your device" last />
+      </View>
+
+      {/* Bottom plain links */}
+      <View style={g.stgLinks}>
+        <TouchableOpacity onPress={() => setShowDanger(true)}><Text style={g.stgLinkDanger}>Delete account</Text></TouchableOpacity>
+      </View>
+
+      {/* Delete confirm */}
+      {showDanger && (
+        <View style={g.settingsDangerCard}>
+          <Text style={g.settingsDangerTitle}>Delete everything?</Text>
+          <Text style={g.settingsDangerSub}>This will permanently erase all your memories, diary, profile, and connections. This cannot be undone.</Text>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+            <TouchableOpacity style={[g.settingsSaveBtn, { flex: 1, backgroundColor: '#EDEAF8' }]} onPress={() => setShowDanger(false)}>
+              <Text style={[g.settingsSaveTxt, { color: '#6E7191' }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[g.settingsSaveBtn, { flex: 1, backgroundColor: '#F66E6E' }]} onPress={onReset}>
+              <Text style={g.settingsSaveTxt}>Delete all</Text>
+            </TouchableOpacity>
           </View>
         </View>
+      )}
 
-        {/* ── AI COMPANION ── */}
-        <Text style={g.settingsSec}>YOUR COMPANION</Text>
-        <View style={[g.setGroup, { padding: 16 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-            <View style={g.settingsCompanionOrb}>
-              <SomaLogo size={28} color="#7B6EF6" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={g.setTitle}>{profile.aiName || 'Soma'}</Text>
-              <Text style={g.setSub}>Your AI companion</Text>
-            </View>
-          </View>
-          <Text style={g.settingsInputLabel}>Companion name</Text>
-          <TextInput style={g.settingsInput} value={aiName} onChangeText={setAiName}
-            placeholder="e.g. Soma, Maya, Kai" placeholderTextColor="#B0B3C8" />
-          <TouchableOpacity style={[g.settingsSaveBtn, !aiName.trim() && g.off]} onPress={saveAiName} disabled={!aiName.trim()}>
-            <Text style={g.settingsSaveTxt}>{aiName !== profile.aiName ? 'Save name' : `✓  ${profile.aiName} is set`}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={g.setGroup}>
-          <SettingRow icon={profile.aiPhoto ? '🖼' : '🌟'} title={profile.aiPhoto ? `Change ${profile.aiName}'s photo` : `Give ${profile.aiName} a face`}
-            subtitle="Add a photo to personalise your companion" onPress={changePipPhoto} last />
-        </View>
-
-        {/* ── SAFETY ── */}
-        <Text style={g.settingsSec}>SAFETY</Text>
-        <View style={[g.setGroup, { padding: 16 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <Text style={{ fontSize: 20 }}>💜</Text>
-            <Text style={g.setTitle}>Trusted Contact</Text>
-          </View>
-          <Text style={g.settingsHelpTxt}>If you ever have a really hard moment, {profile.aiName} can help you reach this person in one tap.</Text>
-          <Text style={g.settingsInputLabel}>Their name</Text>
-          <TextInput style={g.settingsInput} value={tcName} onChangeText={setTcName}
-            placeholder="e.g. Mom, best friend" placeholderTextColor="#B0B3C8" />
-          <Text style={g.settingsInputLabel}>Their phone number</Text>
-          <TextInput style={g.settingsInput} value={tcPhone} onChangeText={setTcPhone}
-            placeholder="+1 555 000 0000" placeholderTextColor="#B0B3C8" keyboardType="phone-pad" />
-          <TouchableOpacity style={[g.settingsSaveBtn, !(tcName.trim() && tcPhone.trim()) && g.off]}
-            onPress={saveContact} disabled={!(tcName.trim() && tcPhone.trim())}>
-            <Text style={g.settingsSaveTxt}>{profile.trustedContact?.phone ? '✓  Update trusted contact' : 'Save trusted contact'}</Text>
-          </TouchableOpacity>
-          <Text style={g.settingsCrisisLine}>Need help now? Call or text <Text style={{ fontWeight: '700' }}>988</Text> (US) · findahelpline.com</Text>
-        </View>
-
-        {/* ── PRIVACY ── */}
-        <Text style={g.settingsSec}>PRIVACY</Text>
-        <View style={g.settingsPrivacyCard}>
-          <Text style={{ fontSize: 18, marginBottom: 8 }}>🔒</Text>
-          <Text style={g.settingsPrivacyTxt}>Everything you share with Soma stays only on this device. SOMA never sells your data. Intimacy notes are shared only agent-to-agent with a real match — never with us.</Text>
-        </View>
-
-        {/* ── DANGER ZONE ── */}
-        <Text style={g.settingsSec}>DANGER ZONE</Text>
-        {showDanger ? (
-          <View style={g.settingsDangerCard}>
-            <Text style={g.settingsDangerTitle}>Delete everything?</Text>
-            <Text style={g.settingsDangerSub}>This will permanently erase all your memories, diary, profile, and connections. This cannot be undone.</Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <TouchableOpacity style={[g.settingsSaveBtn, { flex: 1, backgroundColor: '#F5F4FB' }]} onPress={() => setShowDanger(false)}>
-                <Text style={[g.settingsSaveTxt, { color: '#6E7191' }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[g.settingsSaveBtn, { flex: 1, backgroundColor: '#F66E6E' }]} onPress={onReset}>
-                <Text style={g.settingsSaveTxt}>Delete all</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity style={g.settingsDangerRow} onPress={() => setShowDanger(true)}>
-            <Text style={{ fontSize: 18 }}>🗑</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={g.settingsDangerTxt}>Delete everything & restart</Text>
-              <Text style={g.settingsDangerSubTxt}>Erase all data and start fresh</Text>
-            </View>
-            <Text style={[g.setChevron, { color: '#F66E6E' }]}>›</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* ── Footer ── */}
-        <View style={g.settingsFooter}>
-          <SomaLogo size={28} color="#C5BFEC" />
-          <Text style={g.settingsFooterTxt}>SOMA · v0.1{'\n'}Know yourself before knowing each other.</Text>
-        </View>
+      {/* Footer */}
+      <View style={g.settingsFooter}>
+        <SomaLogo size={24} color="#C5BFEC" />
+        <Text style={g.settingsFooterTxt}>Account ID: {profile.name?.toLowerCase().replace(/\s/g, '') || 'soma'}_{profile.conversations || 0}{'\n'}v0.1  ·  SOMA</Text>
       </View>
     </ScrollView>
   )
@@ -3623,47 +3632,37 @@ const g = StyleSheet.create({
   privacyCard: { backgroundColor: '#EFF6EF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#6EF6A830' },
   privacyTxt: { color: '#9CA0B5', fontSize: 13, lineHeight: 21 },
   aboutTxt: { color: '#9A9DB2', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 30 },
-  // ── Settings redesign ──
-  settingsHero: { backgroundColor: '#7B6EF6', paddingTop: 56, paddingBottom: 28, paddingHorizontal: 24, alignItems: 'center' as const, backgroundImage: 'linear-gradient(145deg, #8B7FF8 0%, #6B5EE6 100%)' },
-  settingsBackBtn: { position: 'absolute' as const, top: 16, left: 16, width: 40, height: 40, alignItems: 'center' as const, justifyContent: 'center' as const },
-  settingsBackTxt: { color: 'rgba(255,255,255,0.85)', fontSize: 30, lineHeight: 34, fontWeight: '300' },
-  settingsAvatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 12, borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.35)' },
-  settingsAvatarTxt: { color: '#fff', fontSize: 32, fontWeight: '800' },
-  settingsName: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0.2, marginBottom: 8 },
-  settingsPlanBadge: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', marginBottom: 24 },
-  settingsPlanBadgePremium: { backgroundColor: 'rgba(255,215,0,0.22)', borderColor: 'rgba(255,215,0,0.45)' },
-  settingsPlanTxt: { color: 'rgba(255,255,255,0.92)', fontSize: 12, fontWeight: '700', letterSpacing: 0.8 },
-  settingsHeroStats: { flexDirection: 'row' as const, width: '100%' as any, backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: 16, paddingVertical: 14 },
-  settingsHeroStat: { flex: 1, alignItems: 'center' as const },
-  settingsHeroStatDiv: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 6 },
-  settingsHeroStatNum: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  settingsHeroStatLbl: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600', marginTop: 2, letterSpacing: 0.5 },
-  settingsBody: { paddingHorizontal: 20, paddingTop: 28 },
-  settingsSec: { color: '#9A9DB2', fontSize: 11, fontWeight: '700', letterSpacing: 1.8, marginBottom: 8, marginLeft: 4 },
-  settingsActiveBadge: { backgroundColor: '#E8FDF2', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  settingsActiveTxt: { color: '#1FB57A', fontSize: 12, fontWeight: '700' },
-  settingsUpgradeBtn: { backgroundColor: '#7B6EF6', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 },
-  settingsUpgradeTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  // ── Settings (Twinby-style) ──
+  stgHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 8, paddingTop: 20, paddingBottom: 8, backgroundColor: '#F5F4FA' },
+  stgBackBtn: { width: 40, height: 44, alignItems: 'center' as const, justifyContent: 'center' as const },
+  stgBackTxt: { fontSize: 34, lineHeight: 38, color: '#222540', fontWeight: '300' },
+  stgHeaderTitle: { fontSize: 18, fontWeight: '700', color: '#222540', textAlign: 'center' as const },
+  stgSec: { fontSize: 22, fontWeight: '800', color: '#222540', marginTop: 24, marginBottom: 10, paddingHorizontal: 20 },
+  stgGroup: { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#EDEAF4' },
+  stgRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EDEAF4', backgroundColor: '#FFFFFF' },
+  stgIconCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: '#DDDAF0', alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: '#FAFAFA' },
+  stgIconTxt: { fontSize: 15 },
+  stgLabel: { fontSize: 16, fontWeight: '600', color: '#222540' },
+  stgValue: { fontSize: 13, color: '#9A9DB2', marginTop: 1 },
+  stgChevron: { fontSize: 22, color: '#C9CCDD' },
+  stgLinks: { paddingHorizontal: 20, paddingTop: 28, gap: 20, alignItems: 'flex-start' as const },
+  stgLinkDanger: { fontSize: 15, color: '#E8636F', fontWeight: '500' },
+  // shared settings inputs / cards
   settingsLangChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: '#E9E6F2', backgroundColor: '#FAFAFA' },
   settingsLangChipActive: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
   settingsLangChipTxt: { fontSize: 13, fontWeight: '700', color: '#222540' },
-  settingsCompanionOrb: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F0EEFF', alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1.5, borderColor: '#7B6EF630' },
+  settingsCompanionOrb: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#F0EEFF', alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1.5, borderColor: '#7B6EF630' },
   settingsInputLabel: { color: '#6E7191', fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 6, marginTop: 10 },
   settingsInput: { backgroundColor: '#F5F4FB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', marginBottom: 4 },
-  settingsSaveBtn: { backgroundColor: '#7B6EF6', borderRadius: 12, paddingVertical: 13, alignItems: 'center' as const, marginTop: 10 },
+  settingsSaveBtn: { backgroundColor: '#7B6EF6', borderRadius: 12, paddingVertical: 13, alignItems: 'center' as const },
   settingsSaveTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   settingsHelpTxt: { color: '#8A8FA8', fontSize: 13, lineHeight: 20, marginBottom: 10 },
   settingsCrisisLine: { color: '#9CA0B5', fontSize: 11, lineHeight: 17, marginTop: 14, textAlign: 'center' as const },
-  settingsPrivacyCard: { backgroundColor: '#F0FBF4', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#1FB57A25', marginBottom: 10 },
-  settingsPrivacyTxt: { color: '#6E7191', fontSize: 13, lineHeight: 21 },
-  settingsDangerRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 14, backgroundColor: '#FFF5F5', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F66E6E30', marginBottom: 10 },
-  settingsDangerTxt: { color: '#E8636F', fontSize: 15, fontWeight: '700' },
-  settingsDangerSubTxt: { color: '#C09095', fontSize: 12, marginTop: 2 },
-  settingsDangerCard: { backgroundColor: '#FFF5F5', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#F66E6E40', marginBottom: 10 },
+  settingsDangerCard: { margin: 20, backgroundColor: '#FFF5F5', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#F66E6E40' },
   settingsDangerTitle: { color: '#E8636F', fontSize: 16, fontWeight: '800', marginBottom: 6 },
   settingsDangerSub: { color: '#9A7070', fontSize: 13, lineHeight: 20 },
-  settingsFooter: { alignItems: 'center' as const, gap: 10, marginTop: 40, opacity: 0.6 },
-  settingsFooterTxt: { color: '#9A9DB2', fontSize: 12, textAlign: 'center' as const, lineHeight: 18 },
+  settingsFooter: { alignItems: 'center' as const, gap: 8, marginTop: 40, marginBottom: 20, opacity: 0.5 },
+  settingsFooterTxt: { color: '#9A9DB2', fontSize: 11, textAlign: 'center' as const, lineHeight: 17 },
   dealbreak: { color: '#F6A86E', fontSize: 13, lineHeight: 20, marginTop: 12, fontWeight: '600' },
   dealgood: { color: '#6EF6A8', fontSize: 13, lineHeight: 20, marginTop: 12, fontWeight: '600' },
   contactSetup: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF640' },
