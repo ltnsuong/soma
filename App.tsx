@@ -220,6 +220,7 @@ interface UserProfile {
   aiName: string              // user's chosen name for their companion (e.g. Soma, Maya, Abuelo)
   aiPhoto: string             // user-chosen photo for their companion (data URL)
   trustedContact: { name: string; phone: string }  // who to reach in a hard moment
+  therapist: { name: string; email: string; phone: string }  // their mental health professional
   wheel?: WheelAssessment                            // psychologist's wheel-of-life assessment (cached)
   language?: string                                  // UI + AI language code (e.g. 'en','ru','es')
   languageChosen?: boolean                           // true once the user explicitly picked a language
@@ -253,11 +254,12 @@ const DB = {
         if (p.aiName === undefined) p.aiName = 'Soma'
         if (p.aiPhoto === undefined) p.aiPhoto = ''
         if (!p.trustedContact) p.trustedContact = { name: '', phone: '' }
+        if (!p.therapist) p.therapist = { name: '', email: '', phone: '' }
         if (p.language === undefined) p.language = detectLang()
         return p
       }
     } catch {}
-    return { name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }
+    return { name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' }, therapist: { name: '', email: '', phone: '' } }
   },
   save: (p: UserProfile) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {} },
   addMemory: (domain: DomainKey, content: string, sentiment: Sentiment = 'neutral') => {
@@ -377,7 +379,10 @@ const DB = {
     hist.push({ date: today, overall, scores })
     p.wheelHistory = hist.slice(-60); DB.save(p)
   },
-  reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
+  setTherapist: (name: string, email: string, phone: string) => {
+    const p = DB.get(); p.therapist = { name, email, phone }; DB.save(p)
+  },
+  reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' }, therapist: { name: '', email: '', phone: '' } }),
 }
 
 // ── CRISIS DETECTION + SUPPORT ─────────────────────────────
@@ -943,6 +948,94 @@ function Register({ onDone }: { onDone: (name: string) => void }) {
   return null
 }
 
+// ── SUPPORT FORWARDING ─────────────────────────────────────
+async function generateSupportUpdate(msgs: Msg[], profile: UserProfile): Promise<string> {
+  const name = profile.name || 'the user'
+  const convo = msgs.slice(-12).map(m => `${m.role === 'user' ? name : profile.aiName}: ${m.content}`).join('\n')
+  const prompt = `Based on this conversation, write a concise, compassionate update (under 100 words) that ${profile.aiName} would send to ${name}'s support team. Use this format exactly:\n\nEMOTIONAL STATE: [honest 1-sentence description]\nKEY THEMES: [2-4 comma-separated themes]\nWHAT MIGHT HELP: [1 concrete suggestion for the support person]\n\nConversation:\n${convo}`
+  return groq([{ role: 'user', content: prompt }], `You write brief, honest, clinically useful updates for a patient's therapist and trusted person. Be specific, not generic. ${name} has consented to this being shared.`, 180)
+}
+
+function ForwardToSupport({ summary, generating, profile, onClose }: { summary: string; generating: boolean; profile: UserProfile; onClose: () => void }) {
+  const therapist = profile.therapist
+  const tc = profile.trustedContact
+  const date = new Date().toLocaleDateString()
+  const userName = profile.name || 'Someone you care about'
+
+  const emailBody = `Hi ${therapist?.name || 'Doctor'},\n\n${userName} wanted you to see this update from ${profile.aiName}:\n\n${summary}\n\nSent via Soma · ${date}`
+  const smsBody = `Hi ${tc?.name || 'there'}, ${userName} wanted you to know how they're doing right now:\n\n${summary}\n\n— Soma`
+
+  return (
+    <View style={fs.overlay}>
+      <View style={fs.card}>
+        <Text style={fs.icon}>🤝</Text>
+        <Text style={fs.title}>Share with your support team</Text>
+        <Text style={fs.sub}>Review what will be sent, then choose who to reach.</Text>
+
+        <View style={fs.summaryBox}>
+          {generating ? (
+            <Text style={fs.generating}>Writing summary…</Text>
+          ) : (
+            <Text style={fs.summaryTxt}>{summary}</Text>
+          )}
+        </View>
+
+        {therapist?.email ? (
+          <TouchableOpacity style={fs.btn} onPress={() => openLink(`mailto:${therapist.email}?subject=Update from ${userName} via Soma&body=${encodeURIComponent(emailBody)}`)}>
+            <Text style={fs.btnIcon}>📧</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={fs.btnTitle}>Email {therapist.name || 'my therapist'}</Text>
+              <Text style={fs.btnSub}>{therapist.email}</Text>
+            </View>
+            <Text style={fs.btnArrow}>→</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={fs.btnEmpty}><Text style={fs.btnEmptyTxt}>Add your therapist's email in Settings to forward updates to them.</Text></View>
+        )}
+
+        {tc?.phone ? (
+          <TouchableOpacity style={fs.btn} onPress={() => openLink(`sms:${tc.phone}?&body=${encodeURIComponent(smsBody)}`)}>
+            <Text style={fs.btnIcon}>💬</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={fs.btnTitle}>Text {tc.name || 'my trusted person'}</Text>
+              <Text style={fs.btnSub}>{tc.phone}</Text>
+            </View>
+            <Text style={fs.btnArrow}>→</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={fs.btnEmpty}><Text style={fs.btnEmptyTxt}>Add a trusted contact in Settings to message them.</Text></View>
+        )}
+
+        <TouchableOpacity style={fs.closeBtn} onPress={onClose}>
+          <Text style={fs.closeBtnTxt}>Close</Text>
+        </TouchableOpacity>
+        <Text style={fs.note}>Nothing is sent automatically. You choose when and to whom.</Text>
+      </View>
+    </View>
+  )
+}
+
+const fs = StyleSheet.create({
+  overlay:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(8,8,16,0.72)', zIndex: 90, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 0 },
+  card:        { width: '100%', backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 28, paddingTop: 24, paddingBottom: 40 },
+  icon:        { fontSize: 32, textAlign: 'center', marginBottom: 8 },
+  title:       { color: '#222540', fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  sub:         { color: '#6E7191', fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+  summaryBox:  { backgroundColor: '#F5F3FC', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E9E6F2', minHeight: 90 },
+  summaryTxt:  { color: '#222540', fontSize: 13, lineHeight: 21 },
+  generating:  { color: '#A89BFA', fontSize: 13, textAlign: 'center', marginTop: 20 },
+  btn:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: '#7B6EF640' },
+  btnIcon:     { fontSize: 22 },
+  btnTitle:    { color: '#222540', fontSize: 15, fontWeight: '700' },
+  btnSub:      { color: '#9CA0B5', fontSize: 12, marginTop: 2 },
+  btnArrow:    { color: '#7B6EF6', fontWeight: '700', fontSize: 16 },
+  btnEmpty:    { backgroundColor: '#FAF9FF', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2' },
+  btnEmptyTxt: { color: '#9CA0B5', fontSize: 13, lineHeight: 20 },
+  closeBtn:    { backgroundColor: '#F5F3FC', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  closeBtnTxt: { color: '#7B6EF6', fontSize: 15, fontWeight: '700' },
+  note:        { color: '#C0BEDA', fontSize: 11, textAlign: 'center', marginTop: 12, lineHeight: 16 },
+})
+
 // ── AURA CHAT (try / full / diary) ─────────────────────────
 function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
   mode: 'try' | 'full' | 'diary'; profile: UserProfile; onRefresh: () => void; onDone: () => void; title: string; isDiary?: boolean
@@ -954,6 +1047,9 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
   const [listening, setListening] = useState(false)
   const [speaking, setSpeaking] = useState(false)
   const [crisis, setCrisis] = useState(false)
+  const [showForward, setShowForward] = useState(false)
+  const [forwardSummary, setForwardSummary] = useState('')
+  const [generatingForward, setGeneratingForward] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
   const fade = useRef(new Animated.Value(0)).current
   const pulse = useRef(new Animated.Value(1)).current
@@ -981,6 +1077,8 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
       setMsgs([...updated, { role: 'assistant' as const, content: gentle }])
       setLoading(false)
       setSpeaking(true); speak(gentle); setTimeout(() => setSpeaking(false), gentle.length * 60)
+      // Silently prepare the support forward so it's ready when they close crisis support
+      openForward([...updated, { role: 'assistant' as const, content: gentle }])
       return
     }
     const p = DB.get()
@@ -1028,12 +1126,29 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
     onDone()
   }
 
+  const openForward = async (msgsToSummarize: Msg[]) => {
+    setShowForward(true)
+    setGeneratingForward(true)
+    setForwardSummary('')
+    const summary = await generateSupportUpdate(msgsToSummarize, DB.get())
+    setForwardSummary(summary)
+    setGeneratingForward(false)
+  }
+
   const onMic = () => { if (listening) return; setListening(true); listen(t => { setListening(false); send(t) }, () => setListening(false)) }
   const p = DB.get()
 
   return (
     <KeyboardAvoidingView style={g.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {crisis && <CrisisSupport profile={p} onClose={() => setCrisis(false)} />}
+      {showForward && (
+        <ForwardToSupport
+          summary={forwardSummary}
+          generating={generatingForward}
+          profile={p}
+          onClose={() => setShowForward(false)}
+        />
+      )}
       <Animated.View style={{ flex: 1, opacity: fade }}>
         <View style={g.header}>
           <Animated.View style={[g.orbMd, { transform: [{ scale: pulse }] }, speaking && { backgroundColor: '#9B6EF6' }]}>
@@ -1046,6 +1161,11 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
                 : mode === 'try' ? 'Try me — no signup needed' : `Remembers ${p.memories.length} things about you`}
             </Text>
           </View>
+          {started && msgs.length >= 2 && mode !== 'try' && (
+            <TouchableOpacity onPress={() => openForward(msgs)} style={[g.smallBtn, { marginRight: 8 }]}>
+              <Text style={g.smallBtnTxt}>📤 Share</Text>
+            </TouchableOpacity>
+          )}
           {started && (
             <TouchableOpacity onPress={isDiary ? finishDiary : onDone} style={g.smallBtn}>
               <Text style={g.smallBtnTxt}>{isDiary ? 'Save' : mode === 'try' ? 'Join →' : 'Home'}</Text>
@@ -2892,8 +3012,12 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
   const [aiName, setAiName] = useState(profile.aiName || 'Soma')
   const [tcName, setTcName] = useState(profile.trustedContact?.name || '')
   const [tcPhone, setTcPhone] = useState(profile.trustedContact?.phone || '')
+  const [drName, setDrName] = useState(profile.therapist?.name || '')
+  const [drEmail, setDrEmail] = useState(profile.therapist?.email || '')
+  const [drPhone, setDrPhone] = useState(profile.therapist?.phone || '')
   const saveAiName = () => { DB.setAiName(aiName); onRefresh() }
   const saveContact = () => { DB.setTrustedContact(tcName.trim(), tcPhone.trim()); onRefresh() }
+  const saveTherapist = () => { DB.setTherapist(drName.trim(), drEmail.trim(), drPhone.trim()); onRefresh() }
   const changePipPhoto = () => pickPhoto(url => { DB.setAiPhoto(url); onRefresh() })
   const exportData = () => {
     try {
@@ -2971,6 +3095,18 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
           <Text style={g.contactSaveTxt}>{profile.trustedContact?.phone ? '✓ Update trusted contact' : 'Save trusted contact'}</Text>
         </TouchableOpacity>
         <Text style={g.crisisLine}>In a crisis right now? Call or text 988 (US) · findahelpline.com (worldwide)</Text>
+      </View>
+
+      {/* Therapist */}
+      <Text style={[g.secLabel, { marginTop: 20 }]}>MY THERAPIST · 🩺</Text>
+      <View style={g.contactSetup}>
+        <Text style={g.contactSetupTxt}>When you share something important with {profile.aiName}, you can forward a summary to your therapist in one tap — so they always know where you are.</Text>
+        <TextInput style={g.contactInput} value={drName} onChangeText={setDrName} placeholder="Their name (e.g. Dr. Anna)" placeholderTextColor="#9A9DB2" />
+        <TextInput style={g.contactInput} value={drEmail} onChangeText={setDrEmail} placeholder="Their email address" placeholderTextColor="#9A9DB2" keyboardType="email-address" autoCapitalize="none" />
+        <TextInput style={g.contactInput} value={drPhone} onChangeText={setDrPhone} placeholder="Their phone (optional)" placeholderTextColor="#9A9DB2" keyboardType="phone-pad" />
+        <TouchableOpacity style={[g.contactSave, !(drName.trim() && (drEmail.trim() || drPhone.trim())) && g.off]} onPress={saveTherapist} disabled={!(drName.trim() && (drEmail.trim() || drPhone.trim()))}>
+          <Text style={g.contactSaveTxt}>{profile.therapist?.email ? '✓ Update therapist' : 'Save therapist'}</Text>
+        </TouchableOpacity>
       </View>
 
       <Text style={[g.secLabel, { marginTop: 20 }]}>PRIVACY</Text>
