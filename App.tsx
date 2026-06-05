@@ -653,7 +653,7 @@ function pickPhoto(onPicked: (dataUrl: string) => void) {
 }
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login'
+type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'sleepwellness'
 
 // ════════════════════════════════════════════════════════════
 //  ROOT
@@ -694,7 +694,8 @@ export default function App() {
   if (screen === 'likedyou')    return <LikedYou profile={profile} onBack={() => go('home')} onUpgrade={() => { DB.goPremium(); refresh() }} />
   if (screen === 'diaryhistory')return <DiaryHistory profile={profile} onBack={() => go('home')} />
   if (screen === 'insights')    return <Insights profile={profile} onBack={() => go('home')} />
-  if (screen === 'settings')    return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('language') }} />
+  if (screen === 'settings')      return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('language') }} />
+  if (screen === 'sleepwellness') return <SleepWellness profile={profile} onBack={() => go('home')} />
   return <Home profile={profile} go={go} onReset={() => { DB.reset(); go('language') }} />
 }
 
@@ -1147,6 +1148,17 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       {profile.diary.length > 0 && (
         <TouchableOpacity onPress={() => go('diaryhistory')}><Text style={[g.secLabel, { color: '#7B6EF6', marginBottom: 12 }]}>View diary history →</Text></TouchableOpacity>
       )}
+
+      {/* Sleep & Calm */}
+      <TouchableOpacity style={g.sleepCard} onPress={() => go('sleepwellness')}>
+        <View style={g.sleepOrb}><Text style={{ fontSize: 18 }}>🌙</Text></View>
+        <View style={{ flex: 1 }}>
+          <Text style={g.cardTag}>SLEEP & CALM</Text>
+          <Text style={g.sleepTitle}>Breathe & unwind</Text>
+          <Text style={g.sleepSub}>Guided breathing · Calming sounds</Text>
+        </View>
+        <Text style={g.arrow}>→</Text>
+      </TouchableOpacity>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 12 }}>
         <Text style={g.secLabel}>MY CIRCLE</Text>
@@ -2978,6 +2990,341 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
 }
 
 // ════════════════════════════════════════════════════════════
+//  SLEEP WELLNESS — Guided breathing & calming ambient sounds
+// ════════════════════════════════════════════════════════════
+
+// Generates ambient sound using the Web Audio API (no audio files needed).
+// Returns a cleanup function that stops the sound.
+function playAmbientSound(type: string): () => void {
+  if (typeof window === 'undefined') return () => {}
+  const ACtx = (window as any).AudioContext || (window as any).webkitAudioContext
+  if (!ACtx) return () => {}
+  try {
+    const ctx: AudioContext = new ACtx()
+    const SR = ctx.sampleRate
+    const bufSec = 3
+    const bufSize = SR * bufSec
+
+    const makeSource = (buf: AudioBuffer) => {
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      return src
+    }
+
+    const buf = ctx.createBuffer(1, bufSize, SR)
+    const d = buf.getChannelData(0)
+    const masterGain = ctx.createGain()
+    masterGain.gain.value = 0
+    masterGain.connect(ctx.destination)
+    masterGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 1.5)
+
+    if (type === 'rain') {
+      // Brown noise: integrated white noise → deep, rumbling quality
+      let last = 0
+      for (let i = 0; i < bufSize; i++) {
+        const w = (Math.random() * 2 - 1) * 0.5
+        last = (last + 0.02 * w) / 1.02
+        d[i] = last * 4
+      }
+      const src = makeSource(buf)
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.value = 1200
+      src.connect(filter)
+      filter.connect(masterGain)
+      src.start()
+      return () => { try { src.stop(); ctx.close() } catch {} }
+    }
+
+    if (type === 'ocean') {
+      // Pink-ish noise with slow LFO for wave surge
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0
+      for (let i = 0; i < bufSize; i++) {
+        const w = Math.random() * 2 - 1
+        b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759
+        b2 = 0.96900 * b2 + w * 0.1538520; b3 = 0.86650 * b3 + w * 0.3104856
+        b4 = 0.55000 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.0168980
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + w * 0.5362) * 0.09
+      }
+      const src = makeSource(buf)
+      const lfo = ctx.createOscillator()
+      lfo.type = 'sine'
+      lfo.frequency.value = 0.07
+      const lfoGain = ctx.createGain()
+      lfoGain.gain.value = 0.28
+      lfo.connect(lfoGain)
+      lfoGain.connect(masterGain.gain)
+      lfo.start()
+      src.connect(masterGain)
+      src.start()
+      return () => { try { src.stop(); lfo.stop(); ctx.close() } catch {} }
+    }
+
+    if (type === 'forest') {
+      // Pink noise — balanced, natural-feeling
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0
+      for (let i = 0; i < bufSize; i++) {
+        const w = Math.random() * 2 - 1
+        b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759
+        b2 = 0.96900 * b2 + w * 0.1538520; b3 = 0.86650 * b3 + w * 0.3104856
+        b4 = 0.55000 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.0168980
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + w * 0.5362) * 0.11
+      }
+      const src = makeSource(buf)
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'bandpass'
+      filter.frequency.value = 900
+      filter.Q.value = 0.4
+      src.connect(filter)
+      filter.connect(masterGain)
+      src.start()
+      return () => { try { src.stop(); ctx.close() } catch {} }
+    }
+
+    // 'whitenoise' fallback
+    for (let i = 0; i < bufSize; i++) d[i] = (Math.random() * 2 - 1) * 0.12
+    const src = makeSource(buf)
+    src.connect(masterGain)
+    src.start()
+    return () => { try { src.stop(); ctx.close() } catch {} }
+  } catch { return () => {} }
+}
+
+const BREATH_PATTERNS = {
+  '478': { label: '4-7-8', sub: 'Deep relaxation', color: '#6ECFF6', timing: [4, 7, 8, 0] as const },
+  'box': { label: 'Box',   sub: 'Calm anxiety',    color: '#6EF6A8', timing: [4, 4, 4, 4] as const },
+  '446': { label: '4-4-6', sub: 'Sleep ease',       color: '#A89BFA', timing: [4, 2, 6, 0] as const },
+} as const
+type BreathKey = keyof typeof BREATH_PATTERNS
+
+const SOUNDS = [
+  { id: 'rain',       label: 'Rain',        icon: '🌧', color: '#6ECFF6' },
+  { id: 'ocean',      label: 'Ocean',       icon: '🌊', color: '#6EF6A8' },
+  { id: 'forest',     label: 'Forest',      icon: '🌿', color: '#6EE6C0' },
+  { id: 'whitenoise', label: 'White Noise', icon: '🤍', color: '#A89BFA' },
+] as const
+
+function SleepWellness({ profile, onBack }: { profile: UserProfile; onBack: () => void }) {
+  const [tab, setTab]         = useState<'breathe' | 'sounds'>('breathe')
+  const [pattern, setPattern] = useState<BreathKey>('478')
+  const [running, setRunning] = useState(false)
+  const [phase, setPhase]     = useState('Tap Start to begin')
+  const [elapsed, setElapsed] = useState(0)
+  const [activeSound, setActiveSound] = useState<string | null>(null)
+
+  const scale     = useRef(new Animated.Value(1)).current
+  const glow      = useRef(new Animated.Value(0)).current
+  const fade      = useRef(new Animated.Value(0)).current
+  const runningRef = useRef(false)
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stopSoundRef = useRef<(() => void) | null>(null)
+
+  const pat = BREATH_PATTERNS[pattern]
+
+  useEffect(() => {
+    Animated.timing(fade, { toValue: 1, duration: 500, useNativeDriver: true }).start()
+    return () => {
+      runningRef.current = false
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (stopSoundRef.current) stopSoundRef.current()
+    }
+  }, [])
+
+  // When pattern changes while running, restart the cycle
+  useEffect(() => {
+    if (running) {
+      scale.stopAnimation()
+      runCycle(BREATH_PATTERNS[pattern].timing)
+    }
+  }, [pattern])
+
+  function runCycle(timing: readonly [number, number, number, number]) {
+    if (!runningRef.current) return
+    const [inhale, hold1, exhale, hold2] = timing
+    setPhase('Breathe in...')
+    Animated.timing(scale, { toValue: 1.75, duration: inhale * 1000, useNativeDriver: true }).start(() => {
+      if (!runningRef.current) return
+      const afterHold1 = () => {
+        if (!runningRef.current) return
+        setPhase('Breathe out...')
+        Animated.timing(scale, { toValue: 1, duration: exhale * 1000, useNativeDriver: true }).start(() => {
+          if (!runningRef.current) return
+          if (hold2 > 0) {
+            setPhase('Hold...')
+            setTimeout(() => runCycle(timing), hold2 * 1000)
+          } else {
+            runCycle(timing)
+          }
+        })
+      }
+      if (hold1 > 0) { setPhase('Hold...'); setTimeout(afterHold1, hold1 * 1000) }
+      else afterHold1()
+    })
+  }
+
+  function startSession() {
+    runningRef.current = true
+    setRunning(true)
+    setElapsed(0)
+    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+    Animated.timing(glow, { toValue: 1, duration: 800, useNativeDriver: false }).start()
+    runCycle(pat.timing)
+  }
+
+  function stopSession() {
+    runningRef.current = false
+    setRunning(false)
+    setPhase('Tap Start to begin')
+    scale.stopAnimation()
+    Animated.timing(scale, { toValue: 1, duration: 600, useNativeDriver: true }).start()
+    Animated.timing(glow, { toValue: 0, duration: 600, useNativeDriver: false }).start()
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    if (elapsed > 30) DB.addMemory('mind', `Completed ${Math.round(elapsed / 60)} min ${pat.label} breathing session`, 'positive')
+    setElapsed(0)
+  }
+
+  function toggleSound(id: string) {
+    if (activeSound === id) {
+      stopSoundRef.current?.()
+      stopSoundRef.current = null
+      setActiveSound(null)
+    } else {
+      stopSoundRef.current?.()
+      stopSoundRef.current = playAmbientSound(id)
+      setActiveSound(id)
+    }
+  }
+
+  const fmtTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+
+  return (
+    <Animated.View style={[sw.wrap, { opacity: fade }]}>
+      {/* Header */}
+      <View style={sw.header}>
+        <TouchableOpacity onPress={() => { stopSession(); onBack() }} style={sw.backBtn}>
+          <Text style={sw.backTxt}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={sw.title}>Sleep & Calm</Text>
+        <View style={{ width: 60 }} />
+      </View>
+
+      {/* Tab bar */}
+      <View style={sw.tabBar}>
+        {(['breathe', 'sounds'] as const).map(t => (
+          <TouchableOpacity key={t} style={[sw.tab, tab === t && sw.tabActive]} onPress={() => setTab(t)}>
+            <Text style={[sw.tabTxt, tab === t && sw.tabTxtActive]}>
+              {t === 'breathe' ? '🫁  Breathe' : '🎵  Sounds'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <ScrollView contentContainerStyle={sw.scroll} showsVerticalScrollIndicator={false}>
+        {tab === 'breathe' ? (
+          <>
+            {/* Pattern selector */}
+            <View style={sw.patternRow}>
+              {(Object.entries(BREATH_PATTERNS) as [BreathKey, typeof BREATH_PATTERNS[BreathKey]][]).map(([k, p]) => (
+                <TouchableOpacity key={k} style={[sw.patternChip, pattern === k && { backgroundColor: p.color + '22', borderColor: p.color }]} onPress={() => setPattern(k)}>
+                  <Text style={[sw.patternLabel, pattern === k && { color: p.color }]}>{p.label}</Text>
+                  <Text style={sw.patternSub}>{p.sub}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Breathing orb */}
+            <View style={sw.orbWrap}>
+              <Animated.View style={[sw.orbGlow, { backgroundColor: pat.color + '18', transform: [{ scale: scale }] }]} />
+              <Animated.View style={[sw.orb, { backgroundColor: pat.color + '55', borderColor: pat.color, transform: [{ scale: scale }] }]}>
+                <Text style={[sw.orbPhase, { color: pat.color }]}>{phase}</Text>
+              </Animated.View>
+            </View>
+
+            {/* Timer */}
+            {running && (
+              <Text style={sw.timer}>{fmtTime(elapsed)}</Text>
+            )}
+
+            {/* Timing hint */}
+            <Text style={sw.hint}>
+              {pat.label}: Inhale {pat.timing[0]}s{pat.timing[1] > 0 ? ` · Hold ${pat.timing[1]}s` : ''} · Exhale {pat.timing[2]}s{pat.timing[3] > 0 ? ` · Hold ${pat.timing[3]}s` : ''}
+            </Text>
+
+            {/* Start / Stop */}
+            <TouchableOpacity style={[sw.mainBtn, running && sw.mainBtnStop]} onPress={running ? stopSession : startSession}>
+              <Text style={sw.mainBtnTxt}>{running ? 'Stop' : 'Start breathing'}</Text>
+            </TouchableOpacity>
+
+            <Text style={sw.tip}>
+              Breathe through your nose in, and gently out through your mouth.{'\n'}
+              Let your shoulders drop. You're safe here.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={sw.soundsHead}>Choose a sound to play while you rest</Text>
+            <View style={sw.soundGrid}>
+              {SOUNDS.map(s => (
+                <TouchableOpacity key={s.id} style={[sw.soundCard, activeSound === s.id && { borderColor: s.color, backgroundColor: s.color + '12' }]} onPress={() => toggleSound(s.id)}>
+                  <Text style={sw.soundIcon}>{s.icon}</Text>
+                  <Text style={[sw.soundLabel, activeSound === s.id && { color: s.color }]}>{s.label}</Text>
+                  {activeSound === s.id && <View style={[sw.soundDot, { backgroundColor: s.color }]} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={sw.soundNote}>
+              Sounds are generated in your browser — no files or streaming required. Works offline.
+            </Text>
+            <Text style={sw.tip}>
+              Try pairing a calming sound with the breathing exercise.{'\n'}
+              Even five minutes of focused breathing can ease anxiety enough to sleep.
+            </Text>
+          </>
+        )}
+
+        <View style={{ height: 60 }} />
+      </ScrollView>
+    </Animated.View>
+  )
+}
+
+const sw = StyleSheet.create({
+  wrap:          { flex: 1, backgroundColor: '#0D0E1C' },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16 },
+  backBtn:       { width: 60 },
+  backTxt:       { color: '#A89BFA', fontSize: 15, fontWeight: '600' },
+  title:         { color: '#E8E6F8', fontSize: 18, fontWeight: '800', letterSpacing: 0.4 },
+  tabBar:        { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#1A1B2E', borderRadius: 14, padding: 4, marginBottom: 8 },
+  tab:           { flex: 1, paddingVertical: 10, borderRadius: 11, alignItems: 'center' },
+  tabActive:     { backgroundColor: '#2A2B42' },
+  tabTxt:        { color: '#6E7191', fontSize: 14, fontWeight: '600' },
+  tabTxtActive:  { color: '#E8E6F8' },
+  scroll:        { paddingHorizontal: 20, paddingTop: 8, alignItems: 'center' },
+  patternRow:    { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 32 },
+  patternChip:   { flex: 1, backgroundColor: '#1A1B2E', borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#2A2B42' },
+  patternLabel:  { color: '#E8E6F8', fontSize: 15, fontWeight: '800' },
+  patternSub:    { color: '#6E7191', fontSize: 10, marginTop: 3, textAlign: 'center' },
+  orbWrap:       { width: 240, height: 240, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  orbGlow:       { position: 'absolute', width: 220, height: 220, borderRadius: 110 },
+  orb:           { width: 150, height: 150, borderRadius: 75, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  orbPhase:      { fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  timer:         { color: '#E8E6F8', fontSize: 28, fontWeight: '200', letterSpacing: 4, marginBottom: 8 },
+  hint:          { color: '#4A4B6A', fontSize: 12, textAlign: 'center', marginBottom: 28, lineHeight: 18 },
+  mainBtn:       { width: '100%', backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginBottom: 24 },
+  mainBtnStop:   { backgroundColor: '#2A2B42', borderWidth: 1, borderColor: '#7B6EF640' },
+  mainBtnTxt:    { color: '#fff', fontSize: 17, fontWeight: '700' },
+  tip:           { color: '#4A4B6A', fontSize: 13, lineHeight: 21, textAlign: 'center', fontStyle: 'italic' },
+  soundsHead:    { color: '#9CA0B5', fontSize: 14, marginBottom: 20, textAlign: 'center', lineHeight: 22 },
+  soundGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%', marginBottom: 20, justifyContent: 'space-between' },
+  soundCard:     { width: '47%', backgroundColor: '#1A1B2E', borderRadius: 18, padding: 20, alignItems: 'center', borderWidth: 1.5, borderColor: '#2A2B42', position: 'relative' },
+  soundIcon:     { fontSize: 32, marginBottom: 10 },
+  soundLabel:    { color: '#9CA0B5', fontSize: 14, fontWeight: '700' },
+  soundDot:      { position: 'absolute', top: 12, right: 12, width: 8, height: 8, borderRadius: 4 },
+  soundNote:     { color: '#3A3B52', fontSize: 11, textAlign: 'center', lineHeight: 17, marginBottom: 20 },
+})
+
+// ════════════════════════════════════════════════════════════
 //  CRISIS SUPPORT — shown when someone is in a dark moment
 // ════════════════════════════════════════════════════════════
 function openLink(url: string) {
@@ -3540,4 +3887,9 @@ const g = StyleSheet.create({
   inputLabel: { color: '#222540', fontSize: 13, fontWeight: '700', marginBottom: 8 },
   authInput: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', ...shadowSm },
   disclaimerTxt: { color: '#9A9DB2', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 24 },
+  // Sleep & Calm card on Home
+  sleepCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#0D0E1C', borderRadius: 18, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#2A2B42', ...shadowMd },
+  sleepOrb:   { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A1B2E', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#A89BFA40' },
+  sleepTitle: { color: '#E8E6F8', fontSize: 16, fontWeight: '700' },
+  sleepSub:   { color: '#6E7191', fontSize: 12, marginTop: 2 },
 })
