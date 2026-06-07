@@ -256,6 +256,7 @@ interface UserProfile {
     gratitudeHour: number    // 0-23, default 21
     gratitudeMinute: number  // 0-59, default 0
   }
+  notifMessages?: string[]   // 7 AI-personalized messages (one per weekday), cached
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
@@ -478,17 +479,23 @@ const DB = {
   setNotifSettings: (settings: NonNullable<UserProfile['notifSettings']>) => {
     const p = DB.get(); p.notifSettings = settings; DB.save(p)
   },
+  setNotifMessages: (messages: string[]) => {
+    const p = DB.get(); p.notifMessages = messages; DB.save(p)
+  },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
 
 // ════════════════════════════════════════════════════════════
-//  PUSH NOTIFICATIONS — local scheduling (no server needed)
+//  PUSH NOTIFICATIONS — local scheduling, AI-personalized
 // ════════════════════════════════════════════════════════════
 
 // Map med time keys → notification hour
 const MED_TIME_HOURS: Record<string, number> = {
   morning: 8, afternoon: 13, evening: 18, night: 21,
 }
+
+// Weekday labels for expo-notifications (1=Sunday…7=Saturday)
+const WEEKDAY_LABELS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
 // Set the foreground notification handler once
 if (Platform.OS !== 'web') {
@@ -506,7 +513,6 @@ if (Platform.OS !== 'web') {
 async function requestNotifPermission(): Promise<boolean> {
   if (Platform.OS === 'web') return false
   try {
-    // Android channel
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('soma-reminders', {
         name: 'SOMA Reminders',
@@ -563,34 +569,131 @@ async function syncMedNotifications(medications: Medication[], enabled: boolean)
   }
 }
 
-async function syncGratitudeNotification(hour: number, minute: number, enabled: boolean) {
+// Schedule 7 weekly notifications (Sun–Sat), each with a unique personalized message
+async function syncGratitudeNotification(hour: number, minute: number, enabled: boolean, messages: string[]) {
   await cancelNotifsByPrefix('gratitude_')
   if (!enabled || Platform.OS === 'web') return
-  const messages = [
+  const fallback = [
     'What made you smile today? 🌟',
-    'Name 3 things you\'re grateful for 🙏',
+    "Name 3 things you're grateful for 🙏",
     'Your daily reflection is waiting ✨',
     'A moment of gratitude changes everything 💜',
     'How did your day go? Tell Soma 🌙',
+    'Reflect on one good thing that happened 🌈',
+    'You showed up today — that matters 💪',
   ]
-  const body = messages[new Date().getDay() % messages.length]
+  const pool = messages.length >= 7 ? messages : fallback
+  for (let weekday = 1; weekday <= 7; weekday++) {
+    const body = pool[(weekday - 1) % pool.length]
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `gratitude_w${weekday}`,
+        content: {
+          title: '🌸 SOMA Check-in',
+          body,
+          data: { screen: 'gratitude' },
+          sound: 'default',
+        },
+        trigger: {
+          type: SchedulableTriggerInputTypes.WEEKLY,
+          weekday,   // 1=Sunday … 7=Saturday
+          hour,
+          minute,
+          channelId: 'soma-reminders',
+        },
+      })
+    } catch {}
+  }
+}
+
+// ── AI message generation ──────────────────────────────────
+// Builds a rich context from everything the user shared,
+// then asks Groq to write 7 warm, personal notification bodies.
+async function generatePersonalizedMessages(profile: UserProfile): Promise<string[]> {
+  const name = profile.name || 'friend'
+  const aiName = profile.aiName || 'Soma'
+
+  // Gather positive signals from their data
+  const posMemories = (profile.memories || [])
+    .filter(m => m.sentiment === 'positive')
+    .slice(-10)
+    .map(m => m.content)
+
+  const gratItems = (profile.gratitudeEntries || [])
+    .slice(-7)
+    .flatMap(e => e.items)
+    .filter(Boolean)
+
+  const affirmations = (profile.loveEntries || [])
+    .slice(-5)
+    .map(e => e.affirmation)
+    .filter(Boolean)
+
+  const circleNames = (profile.circle || [])
+    .filter(c => c.relationship !== 'self')
+    .map(c => c.name)
+    .slice(0, 5)
+
+  const diaryHighlights = (profile.diary || [])
+    .slice(-5)
+    .map(e => e.summary)
+    .filter(Boolean)
+
+  const activeMeds = (profile.medications || []).filter(m => m.active).map(m => m.name)
+
+  // Build a rich but concise context string
+  const context = [
+    posMemories.length ? `Positive memories: ${posMemories.join('; ')}` : '',
+    gratItems.length ? `Gratitude entries: ${gratItems.join(', ')}` : '',
+    affirmations.length ? `Personal affirmations: ${affirmations.join('; ')}` : '',
+    circleNames.length ? `Important people: ${circleNames.join(', ')}` : '',
+    diaryHighlights.length ? `Recent diary notes: ${diaryHighlights.join('; ')}` : '',
+    activeMeds.length ? `On medication: ${activeMeds.join(', ')} (healing journey)` : '',
+  ].filter(Boolean).join('\n')
+
+  if (!context.trim()) {
+    // No data yet — return warm defaults
+    return [
+      `Hey ${name}, what's one good thing about today? 🌟`,
+      `${name}, your daily reflection is waiting — open ${aiName} 💜`,
+      `What made you smile this week, ${name}? 🌸`,
+      `One thing you're proud of today, ${name}? ✨`,
+      `${name}, how are you really doing? ${aiName} is listening 🤍`,
+      `Gratitude unlocks more of what you love — take a moment, ${name} 🙏`,
+      `${name}, you're doing better than you think 💪`,
+    ]
+  }
+
+  const prompt = `You are ${aiName}, ${name}'s personal AI companion in the SOMA app.
+
+Based on what ${name} has shared with you, write exactly 7 short notification messages (one per line, no numbering, no quotes). Each message should:
+- Feel personal and warm, referencing specific things they've shared
+- Be under 80 characters
+- End with one relevant emoji
+- Gently invite them to open the app and reflect
+- NOT be generic — use their actual words and experiences
+
+Here is what ${name} has shared:
+${context}
+
+Write 7 lines, one message per line:`
+
   try {
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'gratitude_daily',
-      content: {
-        title: '🌸 SOMA Daily Check-in',
-        body,
-        data: { screen: 'gratitude' },
-        sound: 'default',
-      },
-      trigger: {
-        type: SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-        channelId: 'soma-reminders',
-      },
-    })
+    const raw = await groq([{ role: 'user', content: prompt }], 'You write warm, personal notification messages.', 400, 0.9)
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 5 && l.length < 120)
+    if (lines.length >= 5) return lines.slice(0, 7)
   } catch {}
+
+  // Fallback with name
+  return [
+    `${name}, what's one thing you're grateful for today? 🙏`,
+    `${aiName} is here — how are you, ${name}? 💜`,
+    `${name}, reflect on one good moment from today ✨`,
+    `Your healing journey continues, ${name}. How are you feeling? 🌱`,
+    `${name}, what made you smile today? 🌸`,
+    `Take a moment for yourself, ${name} 🤍`,
+    `${name}, you're making progress every day 💪`,
+  ]
 }
 
 // ── CRISIS DETECTION + SUPPORT ─────────────────────────────
@@ -890,13 +993,29 @@ export default function App() {
     }
   }, [profile.registered])
 
-  // Sync local notifications whenever medications or notification settings change
+  // Sync local notifications whenever relevant profile data changes
   useEffect(() => {
     const ns = profile.notifSettings
     if (!ns?.enabled) { cancelNotifsByPrefix('med_'); cancelNotifsByPrefix('gratitude_'); return }
     syncMedNotifications(profile.medications || [], ns.medReminders)
-    syncGratitudeNotification(ns.gratitudeHour ?? 21, ns.gratitudeMinute ?? 0, ns.gratitudeEnabled)
-  }, [profile.notifSettings, profile.medications])
+    const msgs = profile.notifMessages || []
+    syncGratitudeNotification(ns.gratitudeHour ?? 21, ns.gratitudeMinute ?? 0, ns.gratitudeEnabled, msgs)
+  }, [profile.notifSettings, profile.medications, profile.notifMessages])
+
+  // Regenerate personalized messages when user's positive data grows
+  useEffect(() => {
+    const ns = profile.notifSettings
+    if (!ns?.enabled || !ns.gratitudeEnabled) return
+    const dataSize = (profile.memories?.length || 0) + (profile.gratitudeEntries?.length || 0) + (profile.loveEntries?.length || 0)
+    const cachedSize = (profile.notifMessages || []).length
+    // Regenerate if no cache yet, or data has grown significantly (every 3 new entries)
+    const shouldRegen = cachedSize === 0 || dataSize > 0 && dataSize % 3 === 0
+    if (!shouldRegen) return
+    generatePersonalizedMessages(profile).then(msgs => {
+      DB.setNotifMessages(msgs)
+      refresh()
+    })
+  }, [profile.memories?.length, profile.gratitudeEntries?.length, profile.loveEntries?.length])
 
   const go = (s: Screen) => { refresh(); setScreen(s) }
 
@@ -4565,6 +4684,7 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
   const [gratitudeHour, setGratitudeHour] = useState(ns.gratitudeHour ?? 21)
   const [gratitudeMinute, setGratitudeMinute] = useState(ns.gratitudeMinute ?? 0)
   const [permDenied, setPermDenied] = useState(false)
+  const [generating, setGenerating] = useState(false)
 
   const save = (patch: Partial<typeof ns>) => {
     const next = { enabled, medReminders, gratitudeEnabled, gratitudeHour, gratitudeMinute, ...patch }
@@ -4576,6 +4696,14 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
     if (val) {
       const granted = await requestNotifPermission()
       if (!granted) { setPermDenied(true); return }
+      // Generate personalized messages on first enable
+      if (!profile.notifMessages?.length) {
+        setGenerating(true)
+        const msgs = await generatePersonalizedMessages(profile)
+        DB.setNotifMessages(msgs)
+        setGenerating(false)
+        onRefresh()
+      }
     }
     setPermDenied(false)
     setEnabled(val)
@@ -4589,7 +4717,22 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
     save({ gratitudeHour: hour, gratitudeMinute: minute })
   }
 
+  const refreshMessages = async () => {
+    setGenerating(true)
+    const msgs = await generatePersonalizedMessages(profile)
+    DB.setNotifMessages(msgs)
+    setGenerating(false)
+    onRefresh()
+  }
+
   const activeMedCount = (profile.medications || []).filter(m => m.active).length
+  const cachedMessages = profile.notifMessages || []
+  const aiName = profile.aiName || 'Soma'
+
+  // Count how much personal data feeds the AI
+  const dataPoints = (profile.memories?.filter(m => m.sentiment === 'positive').length || 0) +
+    (profile.gratitudeEntries?.length || 0) +
+    (profile.loveEntries?.length || 0)
 
   return (
     <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
@@ -4657,13 +4800,15 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
         </View>
       )}
 
-      {/* Gratitude reminder */}
+      {/* Daily check-in */}
       <Text style={g.stgSec}>Daily check-in</Text>
       <View style={g.stgGroup}>
         <View style={g.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Gratitude reminder</Text>
-            <Text style={g.notifRowSub}>Daily prompt to reflect and write in your diary</Text>
+            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Personalised reminder</Text>
+            <Text style={g.notifRowSub}>
+              {aiName} writes your reminders from what you've shared — gratitude, memories, loved ones
+            </Text>
           </View>
           <Switch
             value={gratitudeEnabled && enabled}
@@ -4694,11 +4839,59 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
         </View>
       </View>
 
-      {/* Info */}
+      {/* AI-generated message preview */}
+      <Text style={g.stgSec}>This week's messages</Text>
+      <View style={[g.stgGroup, { padding: 16 }]}>
+        {/* Data source info */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dataPoints > 0 ? '#6EE6C0' : '#E0DCED' }} />
+          <Text style={{ fontSize: 12, color: '#9CA0B5', flex: 1 }}>
+            {dataPoints > 0
+              ? `Based on ${dataPoints} positive thing${dataPoints > 1 ? 's' : ''} you've shared — memories, gratitude, affirmations`
+              : `Share more with ${aiName} to get truly personal messages`}
+          </Text>
+        </View>
+
+        {generating ? (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '600' }}>✨ {aiName} is writing your messages…</Text>
+          </View>
+        ) : cachedMessages.length > 0 ? (
+          <View style={{ gap: 8 }}>
+            {cachedMessages.map((msg, i) => (
+              <View key={i} style={g.notifMsgPreview}>
+                <Text style={g.notifMsgDay}>{WEEKDAY_LABELS[i % 7]}</Text>
+                <Text style={g.notifMsgText}>{msg}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+            <Text style={{ fontSize: 13, color: '#B0B3C8', textAlign: 'center', lineHeight: 20 }}>
+              Enable notifications above and {aiName} will write messages just for you
+            </Text>
+          </View>
+        )}
+
+        {/* Refresh button */}
+        {enabled && (
+          <TouchableOpacity
+            onPress={refreshMessages}
+            disabled={generating}
+            style={[g.settingsSaveBtn, { marginTop: 14, backgroundColor: generating ? '#E0DCED' : '#7B6EF6' }]}
+          >
+            <Text style={g.settingsSaveTxt}>
+              {generating ? '✨ Generating…' : '✦ Refresh messages'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Privacy note */}
       <View style={{ margin: 20, padding: 14, backgroundColor: '#F5F3FF', borderRadius: 12 }}>
-        <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '600', marginBottom: 4 }}>🔒 Privacy note</Text>
+        <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '600', marginBottom: 4 }}>🔒 Privacy first</Text>
         <Text style={{ fontSize: 12, color: '#666', lineHeight: 18 }}>
-          All notifications are scheduled locally on your device. SOMA never sends your data to any server to trigger reminders.
+          Your messages are generated from what you share with {aiName} and scheduled locally on your device. No data leaves your phone to trigger reminders.
         </Text>
       </View>
     </ScrollView>
@@ -5493,6 +5686,9 @@ const g = StyleSheet.create({
   notifTimeChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#EDE9F8', borderWidth: 1, borderColor: '#D4CFF0' },
   notifTimeChipActive: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
   notifTimeChipTxt: { fontSize: 13, fontWeight: '600' as const, color: '#7B6EF6' },
+  notifMsgPreview: { flexDirection: 'row' as const, gap: 10, alignItems: 'flex-start' as const, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F0EDF8' },
+  notifMsgDay: { fontSize: 11, fontWeight: '700' as const, color: '#A89BFA', width: 70, paddingTop: 1 },
+  notifMsgText: { fontSize: 13, color: '#333', flex: 1, lineHeight: 19 },
   // ── Love & Gratitude home cards ──
   loveCard: { flex: 1, backgroundColor: '#FFF0F8', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#F9B8D840', ...shadowSm },
   gratCard: { flex: 1, backgroundColor: '#F0F8FF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#7B6EF630', ...shadowSm },
