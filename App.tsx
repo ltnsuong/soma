@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity,
   TextInput, ScrollView, KeyboardAvoidingView,
-  Platform, Animated, Image, ImageBackground
+  Platform, Animated, Image, ImageBackground, Switch
 } from 'react-native'
 import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline } from 'react-native-svg'
 import * as WebBrowser from 'expo-web-browser'
 import * as Google from 'expo-auth-session/providers/google'
+import * as Notifications from 'expo-notifications'
+import { SchedulableTriggerInputTypes } from 'expo-notifications'
 
 WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app reopens
 
@@ -247,6 +249,13 @@ interface UserProfile {
   therapySessions?: TherapySession[]                 // therapy session notes
   healthLogs?: DailyHealthLog[]                      // daily health metrics (steps, sleep, HR…)
   connectedApps?: string[]                           // 'apple_health' | 'google_fit' | 'fitbit' | 'garmin' | 'samsung'
+  notifSettings?: {
+    enabled: boolean
+    medReminders: boolean
+    gratitudeEnabled: boolean
+    gratitudeHour: number    // 0-23, default 21
+    gratitudeMinute: number  // 0-59, default 0
+  }
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
@@ -466,7 +475,122 @@ const DB = {
     const p = DB.get()
     p.connectedApps = (p.connectedApps || []).filter(a => a !== appId); DB.save(p)
   },
+  setNotifSettings: (settings: NonNullable<UserProfile['notifSettings']>) => {
+    const p = DB.get(); p.notifSettings = settings; DB.save(p)
+  },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
+}
+
+// ════════════════════════════════════════════════════════════
+//  PUSH NOTIFICATIONS — local scheduling (no server needed)
+// ════════════════════════════════════════════════════════════
+
+// Map med time keys → notification hour
+const MED_TIME_HOURS: Record<string, number> = {
+  morning: 8, afternoon: 13, evening: 18, night: 21,
+}
+
+// Set the foreground notification handler once
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  })
+}
+
+async function requestNotifPermission(): Promise<boolean> {
+  if (Platform.OS === 'web') return false
+  try {
+    // Android channel
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('soma-reminders', {
+        name: 'SOMA Reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: 'default',
+      })
+    }
+    const { status: existing } = await Notifications.getPermissionsAsync()
+    if (existing === 'granted') return true
+    const { status } = await Notifications.requestPermissionsAsync()
+    return status === 'granted'
+  } catch { return false }
+}
+
+async function cancelNotifsByPrefix(prefix: string) {
+  if (Platform.OS === 'web') return
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync()
+    for (const n of scheduled) {
+      if (n.identifier.startsWith(prefix)) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier)
+      }
+    }
+  } catch {}
+}
+
+async function syncMedNotifications(medications: Medication[], enabled: boolean) {
+  await cancelNotifsByPrefix('med_')
+  if (!enabled || Platform.OS === 'web') return
+  const active = medications.filter(m => m.active)
+  for (const med of active) {
+    for (const timeKey of med.times) {
+      const hour = MED_TIME_HOURS[timeKey] ?? 8
+      const id = `med_${med.id}_${timeKey}`
+      try {
+        await Notifications.scheduleNotificationAsync({
+          identifier: id,
+          content: {
+            title: `💊 Time for ${med.name}`,
+            body: med.dosage ? `${med.dosage} — tap to log your dose` : 'Tap to log your dose',
+            data: { screen: 'medication' },
+            sound: 'default',
+          },
+          trigger: {
+            type: SchedulableTriggerInputTypes.DAILY,
+            hour,
+            minute: 0,
+            channelId: 'soma-reminders',
+          },
+        })
+      } catch {}
+    }
+  }
+}
+
+async function syncGratitudeNotification(hour: number, minute: number, enabled: boolean) {
+  await cancelNotifsByPrefix('gratitude_')
+  if (!enabled || Platform.OS === 'web') return
+  const messages = [
+    'What made you smile today? 🌟',
+    'Name 3 things you\'re grateful for 🙏',
+    'Your daily reflection is waiting ✨',
+    'A moment of gratitude changes everything 💜',
+    'How did your day go? Tell Soma 🌙',
+  ]
+  const body = messages[new Date().getDay() % messages.length]
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'gratitude_daily',
+      content: {
+        title: '🌸 SOMA Daily Check-in',
+        body,
+        data: { screen: 'gratitude' },
+        sound: 'default',
+      },
+      trigger: {
+        type: SchedulableTriggerInputTypes.DAILY,
+        hour,
+        minute,
+        channelId: 'soma-reminders',
+      },
+    })
+  } catch {}
 }
 
 // ── CRISIS DETECTION + SUPPORT ─────────────────────────────
@@ -765,6 +889,14 @@ export default function App() {
       refresh()
     }
   }, [profile.registered])
+
+  // Sync local notifications whenever medications or notification settings change
+  useEffect(() => {
+    const ns = profile.notifSettings
+    if (!ns?.enabled) { cancelNotifsByPrefix('med_'); cancelNotifsByPrefix('gratitude_'); return }
+    syncMedNotifications(profile.medications || [], ns.medReminders)
+    syncGratitudeNotification(ns.gratitudeHour ?? 21, ns.gratitudeMinute ?? 0, ns.gratitudeEnabled)
+  }, [profile.notifSettings, profile.medications])
 
   const go = (s: Screen) => { refresh(); setScreen(s) }
 
@@ -4415,8 +4547,166 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
   )
 }
 
+// ════════════════════════════════════════════════════════════
+//  NOTIFICATION SETTINGS PANEL
+// ════════════════════════════════════════════════════════════
+const GRATITUDE_TIME_OPTIONS = [
+  { label: '8:00 AM', hour: 8, minute: 0 },
+  { label: '12:00 PM', hour: 12, minute: 0 },
+  { label: '6:00 PM', hour: 18, minute: 0 },
+  { label: '9:00 PM', hour: 21, minute: 0 },
+]
+
+function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const ns = profile.notifSettings ?? { enabled: false, medReminders: true, gratitudeEnabled: true, gratitudeHour: 21, gratitudeMinute: 0 }
+  const [enabled, setEnabled] = useState(ns.enabled)
+  const [medReminders, setMedReminders] = useState(ns.medReminders)
+  const [gratitudeEnabled, setGratitudeEnabled] = useState(ns.gratitudeEnabled)
+  const [gratitudeHour, setGratitudeHour] = useState(ns.gratitudeHour ?? 21)
+  const [gratitudeMinute, setGratitudeMinute] = useState(ns.gratitudeMinute ?? 0)
+  const [permDenied, setPermDenied] = useState(false)
+
+  const save = (patch: Partial<typeof ns>) => {
+    const next = { enabled, medReminders, gratitudeEnabled, gratitudeHour, gratitudeMinute, ...patch }
+    DB.setNotifSettings(next)
+    onRefresh()
+  }
+
+  const toggleEnabled = async (val: boolean) => {
+    if (val) {
+      const granted = await requestNotifPermission()
+      if (!granted) { setPermDenied(true); return }
+    }
+    setPermDenied(false)
+    setEnabled(val)
+    save({ enabled: val })
+  }
+
+  const toggleMed = (val: boolean) => { setMedReminders(val); save({ medReminders: val }) }
+  const toggleGratitude = (val: boolean) => { setGratitudeEnabled(val); save({ gratitudeEnabled: val }) }
+  const pickGratitudeTime = (hour: number, minute: number) => {
+    setGratitudeHour(hour); setGratitudeMinute(minute)
+    save({ gratitudeHour: hour, gratitudeMinute: minute })
+  }
+
+  const activeMedCount = (profile.medications || []).filter(m => m.active).length
+
+  return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>Notifications</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {permDenied && (
+        <View style={{ margin: 20, padding: 14, backgroundColor: '#FFF3F3', borderRadius: 12, borderColor: '#F66E6E', borderWidth: 1 }}>
+          <Text style={{ fontSize: 13, color: '#C0392B', fontWeight: '600' }}>
+            Permission denied. Please enable notifications in your device Settings → SOMA.
+          </Text>
+        </View>
+      )}
+
+      {/* Master toggle */}
+      <View style={[g.stgGroup, { marginTop: 20 }]}>
+        <View style={[g.notifRow, { borderBottomWidth: 0 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={g.notifRowTitle}>Enable notifications</Text>
+            <Text style={g.notifRowSub}>Allow SOMA to send you reminders</Text>
+          </View>
+          <Switch
+            value={enabled}
+            onValueChange={toggleEnabled}
+            trackColor={{ false: '#E0DCED', true: '#7B6EF6' }}
+            thumbColor="#fff"
+          />
+        </View>
+      </View>
+
+      {/* Medication reminders */}
+      <Text style={g.stgSec}>Medication</Text>
+      <View style={g.stgGroup}>
+        <View style={[g.notifRow, { borderBottomWidth: 0 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Medication reminders</Text>
+            <Text style={g.notifRowSub}>
+              {activeMedCount > 0
+                ? `${activeMedCount} active medication${activeMedCount > 1 ? 's' : ''} — notified at each dose time`
+                : 'Add medications in Health Hub to get reminders'}
+            </Text>
+          </View>
+          <Switch
+            value={medReminders && enabled}
+            onValueChange={toggleMed}
+            disabled={!enabled}
+            trackColor={{ false: '#E0DCED', true: '#7B6EF6' }}
+            thumbColor="#fff"
+          />
+        </View>
+      </View>
+      {enabled && medReminders && activeMedCount > 0 && (
+        <View style={{ marginHorizontal: 20, marginTop: -4, marginBottom: 8 }}>
+          {(profile.medications || []).filter(m => m.active).map(med => (
+            <View key={med.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: med.color }} />
+              <Text style={{ fontSize: 12, color: '#555' }}>
+                {med.name} — {med.times.map(t => ({ morning: '8:00 AM', afternoon: '1:00 PM', evening: '6:00 PM', night: '9:00 PM' }[t] || t)).join(', ')}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Gratitude reminder */}
+      <Text style={g.stgSec}>Daily check-in</Text>
+      <View style={g.stgGroup}>
+        <View style={g.notifRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Gratitude reminder</Text>
+            <Text style={g.notifRowSub}>Daily prompt to reflect and write in your diary</Text>
+          </View>
+          <Switch
+            value={gratitudeEnabled && enabled}
+            onValueChange={toggleGratitude}
+            disabled={!enabled}
+            trackColor={{ false: '#E0DCED', true: '#7B6EF6' }}
+            thumbColor="#fff"
+          />
+        </View>
+        {/* Time picker */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+          <Text style={[g.notifRowSub, { marginBottom: 8 }]}>Reminder time</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {GRATITUDE_TIME_OPTIONS.map(opt => {
+              const active = opt.hour === gratitudeHour && opt.minute === gratitudeMinute
+              return (
+                <TouchableOpacity
+                  key={opt.label}
+                  onPress={() => pickGratitudeTime(opt.hour, opt.minute)}
+                  disabled={!enabled || !gratitudeEnabled}
+                  style={[g.notifTimeChip, active && g.notifTimeChipActive, (!enabled || !gratitudeEnabled) && { opacity: 0.4 }]}
+                >
+                  <Text style={[g.notifTimeChipTxt, active && { color: '#fff' }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        </View>
+      </View>
+
+      {/* Info */}
+      <View style={{ margin: 20, padding: 14, backgroundColor: '#F5F3FF', borderRadius: 12 }}>
+        <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '600', marginBottom: 4 }}>🔒 Privacy note</Text>
+        <Text style={{ fontSize: 12, color: '#666', lineHeight: 18 }}>
+          All notifications are scheduled locally on your device. SOMA never sends your data to any server to trigger reminders.
+        </Text>
+      </View>
+    </ScrollView>
+  )
+}
+
 function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void }) {
-  type Panel = null | 'language' | 'companion' | 'safety'
+  type Panel = null | 'language' | 'companion' | 'safety' | 'notifications'
   const [panel, setPanel] = useState<Panel>(null)
   const [aiName, setAiName] = useState(profile.aiName || 'Soma')
   const [tcName, setTcName] = useState(profile.trustedContact?.name || '')
@@ -4515,6 +4805,9 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
     </ScrollView>
   )
 
+  // ── Sub-screen: Notifications ────────────────────────────
+  if (panel === 'notifications') return <NotificationSettingsPanel profile={profile} onBack={back} onRefresh={onRefresh} />
+
   // ── Main settings list ────────────────────────────────────
   return (
     <ScrollView style={[g.screen, { backgroundColor: '#F5F4FA' }]} contentContainerStyle={{ paddingBottom: 80 }}>
@@ -4555,6 +4848,8 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
         <StgRow icon="🌍" label="Language" value={`${curLang?.flag} ${curLang?.label}`} onPress={() => setPanel('language')} />
         <StgRow icon="💜" label="Trusted contact"
           value={profile.trustedContact?.name || 'Not set'} onPress={() => setPanel('safety')} />
+        <StgRow icon="🔔" label="Notifications"
+          value={profile.notifSettings?.enabled ? 'On' : 'Off'} onPress={() => setPanel('notifications')} />
         <StgRow icon="🔒" label="Privacy" value="Data stays on your device" last />
       </View>
 
@@ -5191,6 +5486,13 @@ const g = StyleSheet.create({
   settingsDangerSub: { color: '#9A7070', fontSize: 13, lineHeight: 20 },
   settingsFooter: { alignItems: 'center' as const, gap: 8, marginTop: 40, marginBottom: 20, opacity: 0.5 },
   settingsFooterTxt: { color: '#9A9DB2', fontSize: 11, textAlign: 'center' as const, lineHeight: 17 },
+  // Notification settings
+  notifRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F0EDF8' },
+  notifRowTitle: { fontSize: 15, fontWeight: '600' as const, color: '#222540', marginBottom: 2 },
+  notifRowSub: { fontSize: 12, color: '#9CA0B5', lineHeight: 17 },
+  notifTimeChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#EDE9F8', borderWidth: 1, borderColor: '#D4CFF0' },
+  notifTimeChipActive: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
+  notifTimeChipTxt: { fontSize: 13, fontWeight: '600' as const, color: '#7B6EF6' },
   // ── Love & Gratitude home cards ──
   loveCard: { flex: 1, backgroundColor: '#FFF0F8', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#F9B8D840', ...shadowSm },
   gratCard: { flex: 1, backgroundColor: '#F0F8FF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#7B6EF630', ...shadowSm },
