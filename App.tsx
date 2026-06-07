@@ -180,6 +180,11 @@ interface CirclePerson {
   somaMessages: ChatMessage[]       // Soma's continuity messages about this person
 }
 interface DiaryEntry { id: string; date: string; mood: string; summary: string }
+interface GratitudeEntry { id: string; date: string; items: string[]; somaNote?: string }
+interface LoveEntry { id: string; date: string; affirmation: string; checks: Record<string,boolean>; note?: string }
+interface Medication { id: string; name: string; dosage: string; times: string[]; color: string; notes?: string; active: boolean }
+interface MedLog { date: string; taken: Record<string, boolean> } // key = `${medId}_${time}`
+interface TherapySession { id: string; date: string; notes: string; somaReflection?: string }
 interface DatingProfile {
   complete: boolean
   age: string; location: string
@@ -225,6 +230,11 @@ interface UserProfile {
   languageChosen?: boolean                           // true once the user explicitly picked a language
   manualScores?: Partial<Record<DomainKey, number>>  // user's own 1-10 self-rating per domain (overrides AI)
   wheelHistory?: WheelSnapshot[]                     // dated snapshots of the wheel for the progress view
+  gratitudeEntries?: GratitudeEntry[]                // daily thankful diary entries
+  loveEntries?: LoveEntry[]                          // daily love yourself check-ins
+  medications?: Medication[]                         // medication list
+  medLogs?: MedLog[]                                 // daily medication adherence logs
+  therapySessions?: TherapySession[]                 // therapy session notes
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
@@ -376,6 +386,51 @@ const DB = {
     const hist = (p.wheelHistory || []).filter(h => h.date !== today) // one snapshot per day (latest wins)
     hist.push({ date: today, overall, scores })
     p.wheelHistory = hist.slice(-60); DB.save(p)
+  },
+  addGratitude: (items: string[], somaNote?: string) => {
+    const p = DB.get()
+    const today = new Date().toISOString().slice(0, 10)
+    const entries = (p.gratitudeEntries || []).filter(e => e.date !== today)
+    entries.unshift({ id: Date.now() + '', date: today, items, somaNote })
+    p.gratitudeEntries = entries.slice(0, 365); DB.save(p)
+  },
+  addLoveEntry: (affirmation: string, checks: Record<string,boolean>, note?: string) => {
+    const p = DB.get()
+    const today = new Date().toISOString().slice(0, 10)
+    const entries = (p.loveEntries || []).filter(e => e.date !== today)
+    entries.unshift({ id: Date.now() + '', date: today, affirmation, checks, note })
+    p.loveEntries = entries.slice(0, 365); DB.save(p)
+  },
+  // Medication management
+  addMedication: (name: string, dosage: string, times: string[], color: string, notes?: string) => {
+    const p = DB.get()
+    const med: Medication = { id: Date.now() + '', name, dosage, times, color, notes, active: true }
+    p.medications = [med, ...(p.medications || [])]
+    DB.save(p)
+  },
+  removeMedication: (id: string) => {
+    const p = DB.get()
+    p.medications = (p.medications || []).map(m => m.id === id ? { ...m, active: false } : m)
+    DB.save(p)
+  },
+  logMedTaken: (medId: string, time: string, taken: boolean) => {
+    const p = DB.get()
+    const today = new Date().toISOString().slice(0, 10)
+    const logs = p.medLogs || []
+    let todayLog = logs.find(l => l.date === today)
+    if (!todayLog) { todayLog = { date: today, taken: {} }; logs.unshift(todayLog) }
+    todayLog.taken[`${medId}_${time}`] = taken
+    p.medLogs = logs.slice(0, 365); DB.save(p)
+  },
+  getMedLog: (date: string): MedLog | undefined => {
+    return (DB.get().medLogs || []).find(l => l.date === date)
+  },
+  // Therapy sessions
+  addTherapySession: (notes: string, somaReflection?: string) => {
+    const p = DB.get()
+    const session: TherapySession = { id: Date.now() + '', date: new Date().toISOString().slice(0, 10), notes, somaReflection }
+    p.therapySessions = [session, ...(p.therapySessions || [])].slice(0, 100)
+    DB.save(p)
   },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
@@ -653,7 +708,7 @@ function pickPhoto(onPicked: (dataUrl: string) => void) {
 }
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login'
+type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy'
 
 // ════════════════════════════════════════════════════════════
 //  ROOT
@@ -695,6 +750,10 @@ export default function App() {
   if (screen === 'diaryhistory')return <DiaryHistory profile={profile} onBack={() => go('home')} />
   if (screen === 'insights')    return <Insights profile={profile} onBack={() => go('home')} />
   if (screen === 'settings')    return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('language') }} />
+  if (screen === 'gratitude')   return <ThankfulDiary profile={profile} onBack={() => go('home')} onRefresh={refresh} />
+  if (screen === 'loveyourself')return <LoveYourself profile={profile} onBack={() => go('home')} onRefresh={refresh} />
+  if (screen === 'medication')  return <MedicationTracker profile={profile} onBack={() => go('home')} onRefresh={refresh} />
+  if (screen === 'therapy')     return <TherapyConnect profile={profile} onBack={() => go('home')} onRefresh={refresh} />
   return <Home profile={profile} go={go} onReset={() => { DB.reset(); go('language') }} />
 }
 
@@ -1147,6 +1206,34 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       {profile.diary.length > 0 && (
         <TouchableOpacity onPress={() => go('diaryhistory')}><Text style={[g.secLabel, { color: '#7B6EF6', marginBottom: 12 }]}>View diary history →</Text></TouchableOpacity>
       )}
+
+      {/* Love & Gratitude row */}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 20 }}>
+        <TouchableOpacity style={g.loveCard} onPress={() => go('loveyourself')}>
+          <Text style={g.loveCardEmoji}>🌸</Text>
+          <Text style={g.loveCardTitle}>Love Yourself</Text>
+          <Text style={g.loveCardSub}>{(profile.loveEntries?.length ?? 0) > 0 ? `${profile.loveEntries!.length} day streak` : 'Daily ritual'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={g.gratCard} onPress={() => go('gratitude')}>
+          <Text style={g.loveCardEmoji}>🙏</Text>
+          <Text style={g.loveCardTitle}>Thankful Diary</Text>
+          <Text style={g.loveCardSub}>{(profile.gratitudeEntries?.length ?? 0) > 0 ? `${profile.gratitudeEntries!.length} entries` : '3 things daily'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Healing Path row */}
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+        <TouchableOpacity style={g.medCard} onPress={() => go('medication')}>
+          <Text style={g.loveCardEmoji}>💊</Text>
+          <Text style={g.loveCardTitle}>Medications</Text>
+          <Text style={g.loveCardSub}>{(profile.medications?.filter(m=>m.active).length ?? 0) > 0 ? `${profile.medications!.filter(m=>m.active).length} active` : 'Track meds'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={g.therapyCard} onPress={() => go('therapy')}>
+          <Text style={g.loveCardEmoji}>🧠</Text>
+          <Text style={g.loveCardTitle}>Therapy & Support</Text>
+          <Text style={g.loveCardSub}>{(profile.therapySessions?.length ?? 0) > 0 ? `${profile.therapySessions!.length} sessions` : 'You\'re not alone'}</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 12 }}>
         <Text style={g.secLabel}>MY CIRCLE</Text>
@@ -2911,6 +2998,740 @@ function StgRow({ icon, label, value, onPress, danger, last }: {
   )
 }
 
+// ════════════════════════════════════════════════════════════
+//  THANKFUL DIARY — 3 gratitudes a day
+// ════════════════════════════════════════════════════════════
+const GRATITUDE_PROMPTS = [
+  'Something that made me smile today…',
+  'A person I feel lucky to have…',
+  'A small moment that felt good…',
+]
+
+function ThankfulDiary({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const todayEntry = (profile.gratitudeEntries || []).find(e => e.date === today)
+  const [items, setItems] = useState<string[]>(todayEntry?.items || ['', '', ''])
+  const [saving, setSaving] = useState(false)
+  const [somaNote, setSomaNote] = useState(todayEntry?.somaNote || '')
+  const [saved, setSaved] = useState(!!todayEntry)
+  const aiName = profile.aiName || 'Soma'
+  const streak = (() => {
+    const entries = profile.gratitudeEntries || []
+    let s = 0; let d = new Date()
+    for (let i = 0; i < 365; i++) {
+      const key = d.toISOString().slice(0, 10)
+      if (entries.find(e => e.date === key)) { s++; d.setDate(d.getDate() - 1) } else if (i === 0) { d.setDate(d.getDate() - 1) } else break
+    }
+    return s
+  })()
+
+  const save = async () => {
+    const filled = items.filter(x => x.trim())
+    if (!filled.length) return
+    setSaving(true)
+    const note = await groq([{ role: 'user', content:
+      `You are ${aiName}, a warm and emotionally intelligent companion. The user shared these 3 things they're grateful for today:\n1. ${items[0]}\n2. ${items[1]}\n3. ${items[2]}\nWrite a short (2-3 sentences), heartfelt reflection that honours what they shared. Be warm, personal, not generic.${langDirective()}`
+    }], 0.8).catch(() => '')
+    DB.addGratitude(items, note)
+    setSomaNote(note); setSaved(true); setSaving(false); onRefresh()
+  }
+
+  const past = (profile.gratitudeEntries || []).filter(e => e.date !== today).slice(0, 10)
+
+  return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 80 }}>
+      {/* Header */}
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>Thankful Diary</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+        {/* Streak banner */}
+        {streak > 0 && (
+          <View style={g.streakBanner}>
+            <Text style={g.streakEmoji}>🔥</Text>
+            <Text style={g.streakTxt}>{streak} day streak — keep it going!</Text>
+          </View>
+        )}
+
+        {/* Today's card */}
+        <View style={g.gratCard2}>
+          <Text style={g.gratDate}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+          <Text style={g.gratHeading}>Today I am grateful for…</Text>
+
+          {saved ? (
+            <>
+              {items.filter(x => x.trim()).map((item, i) => (
+                <View key={i} style={g.gratSavedItem}>
+                  <Text style={g.gratNum}>{i + 1}</Text>
+                  <Text style={g.gratItemTxt}>{item}</Text>
+                </View>
+              ))}
+              {!!somaNote && (
+                <View style={g.gratSomaNote}>
+                  <Text style={g.gratSomaName}>{aiName}</Text>
+                  <Text style={g.gratSomaTxt}>{somaNote}</Text>
+                </View>
+              )}
+              <TouchableOpacity style={g.gratEditBtn} onPress={() => setSaved(false)}>
+                <Text style={g.gratEditTxt}>Edit today's entry</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {GRATITUDE_PROMPTS.map((prompt, i) => (
+                <View key={i} style={{ marginBottom: 12 }}>
+                  <Text style={g.gratLabel}>{i + 1}. {prompt}</Text>
+                  <TextInput
+                    style={g.gratInput}
+                    value={items[i]}
+                    onChangeText={v => setItems(prev => { const n = [...prev]; n[i] = v; return n })}
+                    placeholder="Write anything…"
+                    placeholderTextColor="#B0B3C8"
+                    multiline
+                  />
+                </View>
+              ))}
+              <TouchableOpacity
+                style={[g.gratSaveBtn, saving && g.off]}
+                onPress={save}
+                disabled={saving}
+              >
+                <Text style={g.gratSaveTxt}>{saving ? `${aiName} is reflecting…` : 'Save & get reflection'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Past entries */}
+        {past.length > 0 && (
+          <>
+            <Text style={[g.secLabel, { marginTop: 28, marginBottom: 12 }]}>PAST ENTRIES</Text>
+            {past.map(entry => (
+              <View key={entry.id} style={g.gratPastCard}>
+                <Text style={g.gratPastDate}>{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                {entry.items.filter(x => x.trim()).map((item, i) => (
+                  <Text key={i} style={g.gratPastItem}>· {item}</Text>
+                ))}
+              </View>
+            ))}
+          </>
+        )}
+      </View>
+    </ScrollView>
+  )
+}
+
+// ════════════════════════════════════════════════════════════
+//  LOVE YOURSELF — daily self-love ritual
+// ════════════════════════════════════════════════════════════
+const AFFIRMATIONS = [
+  'I am enough, exactly as I am right now.',
+  'I deserve kindness — especially from myself.',
+  'My feelings are valid and I honour them.',
+  'I am growing, even when it doesn\'t feel like it.',
+  'I choose to treat myself with the same compassion I give others.',
+  'I am worthy of love, rest, and joy.',
+  'My presence is a gift to this world.',
+  'I am allowed to take up space.',
+  'Every day I am becoming more of who I truly am.',
+  'I trust myself. I believe in myself.',
+  'It\'s okay to not have everything figured out.',
+  'I am resilient. I have overcome hard things before.',
+  'I release what no longer serves me.',
+  'I am proud of how far I have come.',
+  'Small steps still count. I celebrate them.',
+  'I am allowed to rest without guilt.',
+  'My worth is not measured by my productivity.',
+  'I bring something unique and beautiful to this world.',
+  'I forgive myself for past mistakes. I was doing my best.',
+  'I choose peace over perfection.',
+  'I am learning to love all of me — the light and the shadow.',
+  'Today I will be gentle with myself.',
+]
+
+const SELF_CARE_CHECKS = [
+  { key: 'water', emoji: '💧', label: 'Drank enough water' },
+  { key: 'ate', emoji: '🥗', label: 'Nourished my body' },
+  { key: 'moved', emoji: '🚶', label: 'Moved my body' },
+  { key: 'rested', emoji: '😴', label: 'Got enough rest' },
+  { key: 'connected', emoji: '🤝', label: 'Connected with someone' },
+  { key: 'offline', emoji: '📵', label: 'Took a break from screens' },
+]
+
+function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const todayEntry = (profile.loveEntries || []).find(e => e.date === today)
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000)
+  const affirmation = AFFIRMATIONS[dayOfYear % AFFIRMATIONS.length]
+  const [checks, setChecks] = useState<Record<string,boolean>>(todayEntry?.checks || {})
+  const [note, setNote] = useState(todayEntry?.note || '')
+  const [saved, setSaved] = useState(!!todayEntry)
+  const aiName = profile.aiName || 'Soma'
+  const streak = (() => {
+    const entries = profile.loveEntries || []
+    let s = 0; let d = new Date()
+    for (let i = 0; i < 365; i++) {
+      const key = d.toISOString().slice(0, 10)
+      if (entries.find(e => e.date === key)) { s++; d.setDate(d.getDate() - 1) } else if (i === 0) { d.setDate(d.getDate() - 1) } else break
+    }
+    return s
+  })()
+
+  const toggle = (key: string) => {
+    if (saved) return
+    setChecks(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const save = () => {
+    DB.addLoveEntry(affirmation, checks, note.trim() || undefined)
+    setSaved(true); onRefresh()
+  }
+
+  const checkedCount = Object.values(checks).filter(Boolean).length
+  const past = (profile.loveEntries || []).filter(e => e.date !== today).slice(0, 7)
+
+  return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 80 }}>
+      {/* Header */}
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>Love Yourself</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+        {streak > 0 && (
+          <View style={[g.streakBanner, { backgroundColor: '#FFF0F8', borderColor: '#F9B8D840' }]}>
+            <Text style={g.streakEmoji}>🌸</Text>
+            <Text style={[g.streakTxt, { color: '#C2668A' }]}>{streak} day streak — you keep showing up for yourself!</Text>
+          </View>
+        )}
+
+        {/* Affirmation of the day */}
+        <View style={g.affirmCard}>
+          <Text style={g.affirmLabel}>TODAY'S AFFIRMATION</Text>
+          <Text style={g.affirmTxt}>"{affirmation}"</Text>
+          <Text style={g.affirmHint}>Read it slowly. Breathe. Let it land.</Text>
+        </View>
+
+        {/* Self-care checklist */}
+        <Text style={[g.secLabel, { marginTop: 24, marginBottom: 12 }]}>HOW DID YOU CARE FOR YOURSELF?</Text>
+        <View style={g.loveChecklist}>
+          {SELF_CARE_CHECKS.map(item => {
+            const checked = !!checks[item.key]
+            return (
+              <TouchableOpacity key={item.key} style={[g.loveCheck, checked && g.loveCheckDone]} onPress={() => toggle(item.key)} activeOpacity={0.7}>
+                <Text style={g.loveCheckEmoji}>{item.emoji}</Text>
+                <Text style={[g.loveCheckTxt, checked && { color: '#7B6EF6' }]}>{item.label}</Text>
+                <View style={[g.loveCheckBox, checked && g.loveCheckBoxDone]}>
+                  {checked && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+        {checkedCount > 0 && (
+          <Text style={g.loveScore}>{checkedCount === SELF_CARE_CHECKS.length ? '✨ You took amazing care of yourself today!' : `${checkedCount} of ${SELF_CARE_CHECKS.length} — every one counts.`}</Text>
+        )}
+
+        {/* Note to self */}
+        <Text style={[g.secLabel, { marginTop: 24, marginBottom: 10 }]}>A NOTE TO YOURSELF</Text>
+        <TextInput
+          style={g.loveNoteInput}
+          value={note}
+          onChangeText={saved ? undefined : setNote}
+          editable={!saved}
+          placeholder={`What do you want to remember, feel, or tell yourself today?`}
+          placeholderTextColor="#B0B3C8"
+          multiline
+          numberOfLines={4}
+        />
+
+        {!saved ? (
+          <TouchableOpacity style={g.loveSaveBtn} onPress={save}>
+            <Text style={g.loveSaveTxt}>Complete today's ritual 🌸</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={g.loveDoneRow}>
+            <Text style={g.loveDoneTxt}>✓ Today's ritual complete</Text>
+            <TouchableOpacity onPress={() => setSaved(false)}><Text style={[g.secLabel, { color: '#7B6EF6' }]}>Edit</Text></TouchableOpacity>
+          </View>
+        )}
+
+        {/* Past entries */}
+        {past.length > 0 && (
+          <>
+            <Text style={[g.secLabel, { marginTop: 32, marginBottom: 12 }]}>PAST RITUALS</Text>
+            {past.map(entry => {
+              const done = Object.values(entry.checks).filter(Boolean).length
+              return (
+                <View key={entry.id} style={g.lovePastCard}>
+                  <Text style={g.gratPastDate}>{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                  <Text style={g.lovePastAffirm} numberOfLines={2}>"{entry.affirmation}"</Text>
+                  <Text style={g.lovePastChecks}>{done}/{SELF_CARE_CHECKS.length} self-care · {entry.note ? '📝 note' : ''}</Text>
+                </View>
+              )
+            })}
+          </>
+        )}
+      </View>
+    </ScrollView>
+  )
+}
+
+// ════════════════════════════════════════════════════════════
+//  MEDICATION TRACKER
+// ════════════════════════════════════════════════════════════
+const MED_COLORS = ['#7B6EF6','#F66E8E','#6EE6C0','#F6C26E','#6E8BF6','#F6A86E','#A89BFA','#6ECFF6']
+const MED_TIMES = [
+  { key: 'morning',   label: 'Morning',   emoji: '🌅' },
+  { key: 'afternoon', label: 'Afternoon', emoji: '☀️' },
+  { key: 'evening',   label: 'Evening',   emoji: '🌆' },
+  { key: 'night',     label: 'Night',     emoji: '🌙' },
+]
+
+function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [tab, setTab] = useState<'today' | 'add' | 'history'>('today')
+  const [newName, setNewName] = useState('')
+  const [newDosage, setNewDosage] = useState('')
+  const [newTimes, setNewTimes] = useState<string[]>(['morning'])
+  const [newNotes, setNewNotes] = useState('')
+  const [newColor, setNewColor] = useState(MED_COLORS[0])
+  const [saving, setSaving] = useState(false)
+  const [todayLog, setTodayLog] = useState<Record<string, boolean>>(() => DB.getMedLog(today)?.taken || {})
+
+  const activeMeds = (profile.medications || []).filter(m => m.active)
+  const logs = profile.medLogs || []
+
+  // Adherence streak: consecutive days where ALL scheduled meds were taken
+  function calcStreak(): number {
+    if (!activeMeds.length) return 0
+    let streak = 0
+    const d = new Date(); d.setDate(d.getDate() - 1) // start from yesterday
+    for (let i = 0; i < 30; i++) {
+      const dateStr = d.toISOString().slice(0, 10)
+      const log = logs.find(l => l.date === dateStr)
+      if (!log) break
+      const allTaken = activeMeds.every(m => m.times.every(t => log.taken[`${m.id}_${t}`] === true))
+      if (!allTaken) break
+      streak++
+      d.setDate(d.getDate() - 1)
+    }
+    return streak
+  }
+
+  function todayProgress(): { done: number; total: number } {
+    let done = 0, total = 0
+    activeMeds.forEach(m => {
+      m.times.forEach(t => {
+        total++
+        if (todayLog[`${m.id}_${t}`]) done++
+      })
+    })
+    return { done, total }
+  }
+
+  function toggleDose(medId: string, time: string) {
+    const key = `${medId}_${time}`
+    const next = { ...todayLog, [key]: !todayLog[key] }
+    setTodayLog(next)
+    DB.logMedTaken(medId, time, next[key])
+    onRefresh()
+  }
+
+  function addMed() {
+    if (!newName.trim()) return
+    setSaving(true)
+    DB.addMedication(newName.trim(), newDosage.trim(), newTimes, newColor, newNotes.trim() || undefined)
+    onRefresh()
+    setNewName(''); setNewDosage(''); setNewTimes(['morning']); setNewNotes(''); setNewColor(MED_COLORS[0])
+    setSaving(false)
+    setTab('today')
+  }
+
+  const { done, total } = todayProgress()
+  const streak = calcStreak()
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+
+  return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 40 }}>
+      {/* Header */}
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>💊 Medications</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Streak banner */}
+      {streak > 0 && (
+        <View style={[g.streakBanner, { backgroundColor: '#7B6EF610', borderColor: '#7B6EF640' }]}>
+          <Text style={{ fontSize: 22 }}>🏆</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#7B6EF6' }}>{streak} day streak!</Text>
+            <Text style={{ fontSize: 12, color: '#666' }}>Keep going — every dose matters</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Tab bar */}
+      <View style={g.tabRow}>
+        {(['today','add','history'] as const).map(t => (
+          <TouchableOpacity key={t} style={[g.tabBtn, tab === t && g.tabBtnActive]} onPress={() => setTab(t)}>
+            <Text style={[g.tabBtnTxt, tab === t && g.tabBtnTxtActive]}>
+              {t === 'today' ? 'Today' : t === 'add' ? '+ Add Med' : 'History'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* TODAY tab */}
+      {tab === 'today' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          {total > 0 && (
+            <View style={g.medProgressCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540' }}>Today's doses</Text>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: pct === 100 ? '#6EE6C0' : '#7B6EF6' }}>{done}/{total} taken</Text>
+              </View>
+              <View style={{ height: 8, backgroundColor: '#E9E6F2', borderRadius: 4, overflow: 'hidden' }}>
+                <View style={{ width: `${pct}%`, height: 8, backgroundColor: pct === 100 ? '#6EE6C0' : '#7B6EF6', borderRadius: 4 }} />
+              </View>
+              {pct === 100 && <Text style={{ textAlign: 'center', marginTop: 8, fontSize: 13, color: '#6EE6C0', fontWeight: '700' }}>✓ All done for today! Great job 🎉</Text>}
+            </View>
+          )}
+
+          {activeMeds.length === 0 ? (
+            <TouchableOpacity style={g.emptyCircle} onPress={() => setTab('add')}>
+              <Text style={g.emptyCircleTxt}>No medications yet. Tap "+ Add Med" to start tracking.</Text>
+            </TouchableOpacity>
+          ) : (
+            activeMeds.map(med => (
+              <View key={med.id} style={[g.medCard2, { borderLeftColor: med.color }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <View style={[g.medDot, { backgroundColor: med.color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#222540' }}>{med.name}</Text>
+                    {med.dosage ? <Text style={{ fontSize: 12, color: '#9A9DB2' }}>{med.dosage}</Text> : null}
+                  </View>
+                  <TouchableOpacity onPress={() => { DB.removeMedication(med.id); onRefresh() }}>
+                    <Text style={{ color: '#E8636F', fontSize: 12 }}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {med.times.map(time => {
+                    const t = MED_TIMES.find(x => x.key === time)!
+                    const key = `${med.id}_${time}`
+                    const taken = todayLog[key]
+                    return (
+                      <TouchableOpacity
+                        key={time}
+                        style={[g.doseChip, taken && { backgroundColor: med.color + '25', borderColor: med.color }]}
+                        onPress={() => toggleDose(med.id, time)}
+                      >
+                        <Text style={{ fontSize: 14 }}>{t.emoji}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: taken ? med.color : '#9A9DB2' }}>{t.label}</Text>
+                        {taken && <Text style={{ fontSize: 14, color: med.color }}>✓</Text>}
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+                {med.notes ? <Text style={{ fontSize: 12, color: '#9A9DB2', marginTop: 8 }}>📝 {med.notes}</Text> : null}
+              </View>
+            ))
+          )}
+        </View>
+      )}
+
+      {/* ADD tab */}
+      {tab === 'add' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          <Text style={[g.secLabel, { marginBottom: 16 }]}>NEW MEDICATION</Text>
+          <Text style={g.fieldLabel}>Medication name *</Text>
+          <TextInput style={g.input} placeholder="e.g. Sertraline, Vitamin D…" value={newName} onChangeText={setNewName} />
+          <Text style={g.fieldLabel}>Dosage</Text>
+          <TextInput style={g.input} placeholder="e.g. 50mg, 1 tablet" value={newDosage} onChangeText={setNewDosage} />
+          <Text style={g.fieldLabel}>When to take</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+            {MED_TIMES.map(t => (
+              <TouchableOpacity
+                key={t.key}
+                style={[g.timeChip, newTimes.includes(t.key) && g.timeChipActive]}
+                onPress={() => setNewTimes(prev => prev.includes(t.key) ? prev.filter(x => x !== t.key) : [...prev, t.key])}
+              >
+                <Text style={{ fontSize: 16 }}>{t.emoji}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: newTimes.includes(t.key) ? '#fff' : '#222540' }}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={g.fieldLabel}>Color</Text>
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+            {MED_COLORS.map(c => (
+              <TouchableOpacity key={c} onPress={() => setNewColor(c)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c, borderWidth: newColor === c ? 3 : 0, borderColor: '#fff', shadowColor: c, shadowOpacity: 0.5, shadowRadius: 4, elevation: 3 }} />
+            ))}
+          </View>
+          <Text style={g.fieldLabel}>Notes (optional)</Text>
+          <TextInput style={[g.input, { height: 70 }]} placeholder="Take with food, avoid grapefruit…" value={newNotes} onChangeText={setNewNotes} multiline />
+          <TouchableOpacity style={[g.saveBtn, { backgroundColor: '#7B6EF6', opacity: !newName.trim() || saving ? 0.5 : 1 }]}
+            onPress={addMed} disabled={!newName.trim() || saving}>
+            <Text style={g.saveBtnTxt}>Add Medication</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* HISTORY tab */}
+      {tab === 'history' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          {logs.length === 0 ? (
+            <View style={g.emptyCircle}><Text style={g.emptyCircleTxt}>No history yet. Start tracking today!</Text></View>
+          ) : (
+            logs.slice(0, 30).map(log => {
+              const meds = profile.medications || []
+              const allDoses = meds.filter(m => m.active).flatMap(m => m.times.map(t => ({ med: m, time: t, taken: log.taken[`${m.id}_${t}`] })))
+              const takenCount = allDoses.filter(d => d.taken).length
+              const totalCount = allDoses.length
+              const pctDay = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0
+              return (
+                <View key={log.date} style={[g.histRow, { marginBottom: 10 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540' }}>{log.date}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: pctDay === 100 ? '#6EE6C0' : pctDay >= 50 ? '#F6C26E' : '#F66E8E' }}>{pctDay}%</Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: '#E9E6F2', borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ width: `${pctDay}%`, height: 6, backgroundColor: pctDay === 100 ? '#6EE6C0' : pctDay >= 50 ? '#F6C26E' : '#F66E8E', borderRadius: 3 }} />
+                  </View>
+                  <Text style={{ fontSize: 11, color: '#9A9DB2', marginTop: 3 }}>{takenCount}/{totalCount} doses taken</Text>
+                </View>
+              )
+            })
+          )}
+        </View>
+      )}
+    </ScrollView>
+  )
+}
+
+// ════════════════════════════════════════════════════════════
+//  THERAPY & SUPPORT
+// ════════════════════════════════════════════════════════════
+const CRISIS_LINES = [
+  { country: '🌍 International', name: 'Crisis Text Line', contact: 'Text HOME to 741741', url: 'https://www.crisistextline.org' },
+  { country: '🇺🇸 USA', name: '988 Suicide & Crisis Lifeline', contact: 'Call or text 988', url: 'https://988lifeline.org' },
+  { country: '🇬🇧 UK', name: 'Samaritans', contact: '116 123 (free, 24/7)', url: 'https://www.samaritans.org' },
+  { country: '🇦🇺 Australia', name: 'Lifeline', contact: '13 11 14', url: 'https://www.lifeline.org.au' },
+  { country: '🇨🇦 Canada', name: 'Crisis Services Canada', contact: '1-833-456-4566', url: 'https://www.crisisservicescanada.ca' },
+  { country: '🇩🇪 Germany', name: 'Telefonseelsorge', contact: '0800 111 0 111', url: 'https://www.telefonseelsorge.de' },
+  { country: '🇫🇷 France', name: 'SOS Amitié', contact: '09 72 39 40 50', url: 'https://www.sos-amitie.com' },
+  { country: '🌐 IASP Directory', name: 'Find your country\'s line', contact: 'International list', url: 'https://www.iasp.info/resources/Crisis_Centres' },
+]
+const THERAPY_PLATFORMS = [
+  { name: 'BetterHelp', desc: 'Online therapy, matched in 48h', emoji: '💬', url: 'https://www.betterhelp.com' },
+  { name: 'Talkspace', desc: 'Text, audio & video therapy', emoji: '🎙️', url: 'https://www.talkspace.com' },
+  { name: 'Psychology Today', desc: 'Find local therapists', emoji: '🔍', url: 'https://www.psychologytoday.com/us/therapists' },
+  { name: 'Open Path', desc: 'Affordable therapy ($30–$80)', emoji: '🌿', url: 'https://openpathcollective.org' },
+]
+const RECOVERY_STEPS = [
+  { emoji: '😴', label: 'Sleep', tip: 'Aim for 7–9 hours. Same bedtime every night.' },
+  { emoji: '🚶', label: 'Move', tip: '20 min walk outdoors. Sunlight resets your mood.' },
+  { emoji: '💧', label: 'Hydrate', tip: 'Drink 2L water. Dehydration amplifies low mood.' },
+  { emoji: '🥗', label: 'Eat', tip: 'One nourishing meal. Omega-3s support brain health.' },
+  { emoji: '📵', label: 'Disconnect', tip: '1 hour offline. Social media amplifies anxiety.' },
+  { emoji: '🤝', label: 'Connect', tip: 'Reach out to one person, even just a text.' },
+  { emoji: '💊', label: 'Meds', tip: 'Take your medication if prescribed. Consistency matters.' },
+  { emoji: '✍️', label: 'Express', tip: 'Write 3 sentences about how you feel. No filter.' },
+]
+
+function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const [tab, setTab] = useState<'support' | 'soma' | 'sessions'>('support')
+  const [sessionNote, setSessionNote] = useState('')
+  const [somaThought, setSomaThought] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [savingSession, setSavingSession] = useState(false)
+  const [recoveryChecks, setRecoveryChecks] = useState<Record<string,boolean>>({})
+  const sessions = profile.therapySessions || []
+
+  const aiName = profile.aiName || 'Soma'
+
+  async function getSomaSupport() {
+    if (!sessionNote.trim()) return
+    setAiLoading(true)
+    try {
+      const sys = `You are ${aiName}, a warm and compassionate AI companion trained in evidence-based emotional support (CBT, ACT, mindfulness). The user is going through a hard time and reaching out for mental health support. Be deeply empathetic, non-judgmental, and helpful. Offer concrete grounding techniques or coping strategies when appropriate. Never give medical diagnoses or replace professional therapy — gently encourage professional help when needed. Keep your response to 3-4 short paragraphs.${langDirective()}`
+      const reflection = await groq([{ role: 'user', content: sessionNote }], sys, 500, 0.7)
+      setSomaThought(reflection)
+    } catch { setSomaThought('I\'m here with you. Take a slow breath — you reached out and that takes courage.') }
+    setAiLoading(false)
+  }
+
+  async function saveSession() {
+    if (!sessionNote.trim()) return
+    setSavingSession(true)
+    const reflection = somaThought || undefined
+    DB.addTherapySession(sessionNote.trim(), reflection)
+    onRefresh()
+    setSessionNote(''); setSomaThought('')
+    setSavingSession(false)
+    setTab('sessions')
+  }
+
+  return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 40 }}>
+      {/* Header */}
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>🧠 Therapy & Support</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Crisis banner — always visible */}
+      <View style={g.crisisBanner}>
+        <Text style={{ fontSize: 18 }}>🆘</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: '#E8636F' }}>In crisis right now?</Text>
+          <Text style={{ fontSize: 12, color: '#666' }}>Call or text a crisis line — free, confidential, 24/7</Text>
+        </View>
+        <TouchableOpacity style={g.crisisBtn} onPress={() => setTab('support')}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Get Help</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab bar */}
+      <View style={g.tabRow}>
+        {([['support','Resources'],['soma',`Talk to ${aiName}`],['sessions','My Sessions']] as [string,string][]).map(([t, label]) => (
+          <TouchableOpacity key={t} style={[g.tabBtn, tab === t && g.tabBtnActive]} onPress={() => setTab(t as any)}>
+            <Text style={[g.tabBtnTxt, tab === t && g.tabBtnTxtActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* SUPPORT tab */}
+      {tab === 'support' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          {/* Recovery checklist */}
+          <Text style={[g.secLabel, { marginBottom: 12 }]}>RECOVERY BASICS — TODAY</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+            {RECOVERY_STEPS.map(step => {
+              const checked = recoveryChecks[step.label]
+              return (
+                <TouchableOpacity key={step.label}
+                  style={[g.recoveryChip, checked && g.recoveryChipDone]}
+                  onPress={() => setRecoveryChecks(prev => ({ ...prev, [step.label]: !prev[step.label] }))}
+                >
+                  <Text style={{ fontSize: 20 }}>{step.emoji}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: checked ? '#fff' : '#444', textAlign: 'center' }}>{step.label}</Text>
+                  {checked && <Text style={{ fontSize: 11, color: '#ffffff99' }}>✓</Text>}
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+          {Object.values(recoveryChecks).filter(Boolean).length > 0 && (
+            <View style={{ backgroundColor: '#6EE6C010', borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: '#6EE6C030' }}>
+              <Text style={{ fontSize: 13, color: '#2A7A5E', fontWeight: '600' }}>
+                {Object.values(recoveryChecks).filter(Boolean).length} of {RECOVERY_STEPS.length} basics done today — every step is progress. 💚
+              </Text>
+            </View>
+          )}
+
+          {/* Crisis lines */}
+          <Text style={[g.secLabel, { marginBottom: 12 }]}>CRISIS HOTLINES</Text>
+          {CRISIS_LINES.map(line => (
+            <View key={line.name} style={g.crisisRow}>
+              <Text style={{ fontSize: 12, color: '#9A9DB2', marginBottom: 2 }}>{line.country}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#222540' }}>{line.name}</Text>
+              <Text style={{ fontSize: 13, color: '#E8636F', fontWeight: '700', marginTop: 2 }}>{line.contact}</Text>
+            </View>
+          ))}
+
+          {/* Online therapy platforms */}
+          <Text style={[g.secLabel, { marginTop: 20, marginBottom: 12 }]}>FIND A THERAPIST</Text>
+          {THERAPY_PLATFORMS.map(p => (
+            <View key={p.name} style={g.therapyPlatformRow}>
+              <Text style={{ fontSize: 24, marginRight: 12 }}>{p.emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#222540' }}>{p.name}</Text>
+                <Text style={{ fontSize: 12, color: '#9A9DB2' }}>{p.desc}</Text>
+              </View>
+              <Text style={{ fontSize: 18, color: '#7B6EF6' }}>→</Text>
+            </View>
+          ))}
+          <Text style={{ fontSize: 11, color: '#C0C0D0', textAlign: 'center', marginTop: 12 }}>SOMA is not a replacement for professional therapy. Please reach out to a licensed therapist for ongoing care.</Text>
+        </View>
+      )}
+
+      {/* SOMA SUPPORT tab */}
+      {tab === 'soma' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          <View style={{ backgroundColor: '#7B6EF610', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#7B6EF630' }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#7B6EF6', marginBottom: 4 }}>Talk to {aiName} about how you feel</Text>
+            <Text style={{ fontSize: 13, color: '#666' }}>{aiName} uses evidence-based techniques — CBT, ACT, mindfulness — to support your recovery. Always confidential, always caring.</Text>
+          </View>
+          <Text style={g.fieldLabel}>How are you feeling right now?</Text>
+          <TextInput
+            style={[g.input, { height: 120, textAlignVertical: 'top' }]}
+            placeholder={`Write freely — ${aiName} is listening. How are you really doing? What's weighing on you?`}
+            value={sessionNote}
+            onChangeText={setSessionNote}
+            multiline
+          />
+          <TouchableOpacity
+            style={[g.saveBtn, { backgroundColor: '#7B6EF6', opacity: (!sessionNote.trim() || aiLoading) ? 0.5 : 1, marginBottom: 12 }]}
+            onPress={getSomaSupport} disabled={!sessionNote.trim() || aiLoading}
+          >
+            <Text style={g.saveBtnTxt}>{aiLoading ? `${aiName} is listening…` : `Share with ${aiName} 💜`}</Text>
+          </TouchableOpacity>
+
+          {somaThought ? (
+            <View style={[g.somaReflCard, { marginBottom: 16 }]}>
+              <Text style={g.somaReflLabel}>🧠 {aiName} says</Text>
+              <Text style={g.somaReflTxt}>{somaThought}</Text>
+              <TouchableOpacity
+                style={[g.saveBtn, { backgroundColor: '#6EE6C0', marginTop: 12, opacity: savingSession ? 0.5 : 1 }]}
+                onPress={saveSession} disabled={savingSession}
+              >
+                <Text style={[g.saveBtnTxt, { color: '#222540' }]}>Save this session ✓</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <View style={{ backgroundColor: '#F5F4FA', borderRadius: 12, padding: 12, marginTop: 8 }}>
+            <Text style={{ fontSize: 12, color: '#9A9DB2', textAlign: 'center' }}>
+              {aiName} is an AI companion, not a licensed therapist. In a crisis, please call a crisis line. 💙
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* MY SESSIONS tab */}
+      {tab === 'sessions' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          {sessions.length === 0 ? (
+            <TouchableOpacity style={g.emptyCircle} onPress={() => setTab('soma')}>
+              <Text style={g.emptyCircleTxt}>No sessions yet. Talk to {aiName} to record your first session.</Text>
+            </TouchableOpacity>
+          ) : (
+            sessions.slice(0, 20).map(s => (
+              <View key={s.id} style={[g.histRow, { marginBottom: 14 }]}>
+                <Text style={{ fontSize: 12, color: '#9A9DB2', marginBottom: 4 }}>{s.date}</Text>
+                <Text style={{ fontSize: 14, color: '#222540', marginBottom: 8 }} numberOfLines={3}>{s.notes}</Text>
+                {s.somaReflection && (
+                  <View style={{ backgroundColor: '#7B6EF608', borderRadius: 10, padding: 10, borderLeftWidth: 3, borderLeftColor: '#7B6EF6' }}>
+                    <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '700', marginBottom: 2 }}>🧠 {aiName}</Text>
+                    <Text style={{ fontSize: 12, color: '#555', fontStyle: 'italic' }} numberOfLines={4}>{s.somaReflection}</Text>
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+      )}
+    </ScrollView>
+  )
+}
+
 function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void }) {
   type Panel = null | 'language' | 'companion' | 'safety'
   const [panel, setPanel] = useState<Panel>(null)
@@ -3663,6 +4484,56 @@ const g = StyleSheet.create({
   settingsDangerSub: { color: '#9A7070', fontSize: 13, lineHeight: 20 },
   settingsFooter: { alignItems: 'center' as const, gap: 8, marginTop: 40, marginBottom: 20, opacity: 0.5 },
   settingsFooterTxt: { color: '#9A9DB2', fontSize: 11, textAlign: 'center' as const, lineHeight: 17 },
+  // ── Love & Gratitude home cards ──
+  loveCard: { flex: 1, backgroundColor: '#FFF0F8', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#F9B8D840', ...shadowSm },
+  gratCard: { flex: 1, backgroundColor: '#F0F8FF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#7B6EF630', ...shadowSm },
+  loveCardEmoji: { fontSize: 26, marginBottom: 6 },
+  loveCardTitle: { fontSize: 15, fontWeight: '800', color: '#222540', marginBottom: 2 },
+  loveCardSub: { fontSize: 12, color: '#9A9DB2' },
+  // ── Streak banner ──
+  streakBanner: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, backgroundColor: '#FFF8EC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#F6C96E40', marginBottom: 16 },
+  streakEmoji: { fontSize: 20 },
+  streakTxt: { color: '#C28A1A', fontSize: 13, fontWeight: '700', flex: 1 },
+  // ── Thankful Diary ──
+  gratCard2: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#E9E6F2', marginBottom: 8, ...shadowSm },
+  gratDate: { color: '#9A9DB2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
+  gratHeading: { color: '#222540', fontSize: 20, fontWeight: '800', marginBottom: 18 },
+  gratLabel: { color: '#6E7191', fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  gratInput: { backgroundColor: '#F5F4FB', borderRadius: 12, padding: 14, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', minHeight: 56 },
+  gratSaveBtn: { backgroundColor: '#7B6EF6', borderRadius: 14, paddingVertical: 14, alignItems: 'center' as const, marginTop: 8 },
+  gratSaveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  gratSavedItem: { flexDirection: 'row' as const, gap: 10, alignItems: 'flex-start' as const, marginBottom: 10 },
+  gratNum: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#7B6EF6', color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' as const, lineHeight: 22 },
+  gratItemTxt: { flex: 1, color: '#222540', fontSize: 15, lineHeight: 22 },
+  gratSomaNote: { backgroundColor: '#F5F4FB', borderRadius: 14, padding: 14, marginTop: 14, borderLeftWidth: 3, borderLeftColor: '#7B6EF6' },
+  gratSomaName: { color: '#7B6EF6', fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 4 },
+  gratSomaTxt: { color: '#444', fontSize: 14, lineHeight: 22, fontStyle: 'italic' },
+  gratEditBtn: { alignItems: 'center' as const, paddingTop: 14 },
+  gratEditTxt: { color: '#9A9DB2', fontSize: 13 },
+  gratPastCard: { backgroundColor: '#FAFAFA', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E9E6F2', marginBottom: 10 },
+  gratPastDate: { color: '#7B6EF6', fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  gratPastItem: { color: '#555', fontSize: 14, lineHeight: 22 },
+  // ── Love Yourself ──
+  affirmCard: { backgroundColor: '#FFF0F8', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#F9B8D850', alignItems: 'center' as const, marginBottom: 4 },
+  affirmLabel: { color: '#C2668A', fontSize: 10, fontWeight: '800', letterSpacing: 1.8, marginBottom: 12 },
+  affirmTxt: { color: '#222540', fontSize: 20, fontWeight: '700', lineHeight: 30, textAlign: 'center' as const, fontStyle: 'italic', marginBottom: 12 },
+  affirmHint: { color: '#C2668A', fontSize: 12, opacity: 0.8 },
+  loveChecklist: { backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: '#E9E6F2', overflow: 'hidden' as const, ...shadowSm },
+  loveCheck: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#F1EFF7' },
+  loveCheckDone: { backgroundColor: '#FAF9FF' },
+  loveCheckEmoji: { fontSize: 20, width: 28 },
+  loveCheckTxt: { flex: 1, color: '#222540', fontSize: 15, fontWeight: '500' },
+  loveCheckBox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#D0CCE8', alignItems: 'center' as const, justifyContent: 'center' as const },
+  loveCheckBoxDone: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
+  loveScore: { color: '#7B6EF6', fontSize: 13, fontWeight: '700', textAlign: 'center' as const, marginTop: 14 },
+  loveNoteInput: { backgroundColor: '#F5F4FB', borderRadius: 14, padding: 16, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', minHeight: 100, textAlignVertical: 'top' as const },
+  loveSaveBtn: { backgroundColor: '#C2668A', borderRadius: 14, paddingVertical: 14, alignItems: 'center' as const, marginTop: 14 },
+  loveSaveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  loveDoneRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, paddingVertical: 14 },
+  loveDoneTxt: { color: '#C2668A', fontSize: 14, fontWeight: '700' },
+  lovePastCard: { backgroundColor: '#FAFAFA', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#F9B8D840', marginBottom: 10 },
+  lovePastAffirm: { color: '#555', fontSize: 13, lineHeight: 20, fontStyle: 'italic', marginVertical: 4 },
+  lovePastChecks: { color: '#9A9DB2', fontSize: 12, marginTop: 4 },
   dealbreak: { color: '#F6A86E', fontSize: 13, lineHeight: 20, marginTop: 12, fontWeight: '600' },
   dealgood: { color: '#6EF6A8', fontSize: 13, lineHeight: 20, marginTop: 12, fontWeight: '600' },
   contactSetup: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7B6EF640' },
@@ -3688,4 +4559,35 @@ const g = StyleSheet.create({
   inputLabel: { color: '#222540', fontSize: 13, fontWeight: '700', marginBottom: 8 },
   authInput: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', ...shadowSm },
   disclaimerTxt: { color: '#9A9DB2', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 24 },
+  // ── Healing Path home cards ──
+  medCard: { flex: 1, backgroundColor: '#F3F0FF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#7B6EF630', ...shadowSm },
+  therapyCard: { flex: 1, backgroundColor: '#F0FAF5', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#6EE6C030', ...shadowSm },
+  // ── Shared screen primitives (medication / therapy) ──
+  tabRow: { flexDirection: 'row' as const, marginHorizontal: 20, marginBottom: 18, backgroundColor: '#F5F4FA', borderRadius: 14, padding: 4 },
+  tabBtn: { flex: 1, paddingVertical: 9, borderRadius: 11, alignItems: 'center' as const },
+  tabBtnActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  tabBtnTxt: { fontSize: 13, fontWeight: '600', color: '#9A9DB2' },
+  tabBtnTxtActive: { color: '#222540', fontWeight: '700' },
+  fieldLabel: { color: '#6E7191', fontSize: 12, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: '#F5F4FB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', marginBottom: 4 },
+  saveBtn: { borderRadius: 14, paddingVertical: 14, alignItems: 'center' as const, marginTop: 8 },
+  saveBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  histRow: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
+  somaReflCard: { backgroundColor: '#F5F4FB', borderRadius: 16, padding: 16, borderLeftWidth: 3, borderLeftColor: '#7B6EF6' },
+  somaReflLabel: { color: '#7B6EF6', fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
+  somaReflTxt: { color: '#444', fontSize: 14, lineHeight: 22, fontStyle: 'italic' },
+  // ── Medication Tracker ──
+  medProgressCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
+  medCard2: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E9E6F2', borderLeftWidth: 4, ...shadowSm },
+  medDot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
+  doseChip: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F5F4FA', borderWidth: 1.5, borderColor: '#E9E6F2' },
+  timeChip: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#F5F4FA', borderWidth: 1.5, borderColor: '#E9E6F2' },
+  timeChipActive: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
+  // ── Therapy & Support ──
+  crisisBanner: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, backgroundColor: '#FFF5F5', borderRadius: 14, padding: 14, marginHorizontal: 20, marginBottom: 16, borderWidth: 1, borderColor: '#F66E6E30' },
+  crisisBtn: { backgroundColor: '#E8636F', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  crisisRow: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#F66E6E20', borderLeftWidth: 3, borderLeftColor: '#E8636F' },
+  therapyPlatformRow: { flexDirection: 'row' as const, alignItems: 'center' as const, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
+  recoveryChip: { width: 80, alignItems: 'center' as const, padding: 10, borderRadius: 14, backgroundColor: '#F5F4FA', borderWidth: 1.5, borderColor: '#E9E6F2', gap: 4 },
+  recoveryChipDone: { backgroundColor: '#6EE6C0', borderColor: '#6EE6C0' },
 })
