@@ -185,6 +185,16 @@ interface LoveEntry { id: string; date: string; affirmation: string; checks: Rec
 interface Medication { id: string; name: string; dosage: string; times: string[]; color: string; notes?: string; active: boolean }
 interface MedLog { date: string; taken: Record<string, boolean> } // key = `${medId}_${time}`
 interface TherapySession { id: string; date: string; notes: string; somaReflection?: string }
+interface DailyHealthLog {
+  date: string
+  steps?: number
+  sleepHours?: number
+  heartRate?: number        // bpm resting
+  activeMinutes?: number
+  calories?: number
+  weight?: number           // kg
+  source: 'manual' | 'apple_health' | 'google_fit' | 'fitbit' | 'garmin' | 'samsung'
+}
 interface DatingProfile {
   complete: boolean
   age: string; location: string
@@ -235,6 +245,8 @@ interface UserProfile {
   medications?: Medication[]                         // medication list
   medLogs?: MedLog[]                                 // daily medication adherence logs
   therapySessions?: TherapySession[]                 // therapy session notes
+  healthLogs?: DailyHealthLog[]                      // daily health metrics (steps, sleep, HR…)
+  connectedApps?: string[]                           // 'apple_health' | 'google_fit' | 'fitbit' | 'garmin' | 'samsung'
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
@@ -431,6 +443,28 @@ const DB = {
     const session: TherapySession = { id: Date.now() + '', date: new Date().toISOString().slice(0, 10), notes, somaReflection }
     p.therapySessions = [session, ...(p.therapySessions || [])].slice(0, 100)
     DB.save(p)
+  },
+  // Health logs
+  logHealth: (data: Omit<DailyHealthLog, 'date'>, date?: string) => {
+    const p = DB.get()
+    const today = date || new Date().toISOString().slice(0, 10)
+    const logs = (p.healthLogs || []).filter(l => l.date !== today)
+    const existing = (p.healthLogs || []).find(l => l.date === today) || {}
+    logs.unshift({ ...existing, ...data, date: today } as DailyHealthLog)
+    p.healthLogs = logs.slice(0, 365); DB.save(p)
+  },
+  getTodayHealth: (): DailyHealthLog | undefined => {
+    const today = new Date().toISOString().slice(0, 10)
+    return (DB.get().healthLogs || []).find(l => l.date === today)
+  },
+  connectApp: (appId: string) => {
+    const p = DB.get()
+    const apps = p.connectedApps || []
+    if (!apps.includes(appId)) { p.connectedApps = [...apps, appId]; DB.save(p) }
+  },
+  disconnectApp: (appId: string) => {
+    const p = DB.get()
+    p.connectedApps = (p.connectedApps || []).filter(a => a !== appId); DB.save(p)
   },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
@@ -708,7 +742,7 @@ function pickPhoto(onPicked: (dataUrl: string) => void) {
 }
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy'
+type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy' | 'healthhub'
 
 // ════════════════════════════════════════════════════════════
 //  ROOT
@@ -752,8 +786,9 @@ export default function App() {
   if (screen === 'settings')    return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('language') }} />
   if (screen === 'gratitude')   return <ThankfulDiary profile={profile} onBack={() => go('home')} onRefresh={refresh} />
   if (screen === 'loveyourself')return <LoveYourself profile={profile} onBack={() => go('home')} onRefresh={refresh} />
-  if (screen === 'medication')  return <MedicationTracker profile={profile} onBack={() => go('home')} onRefresh={refresh} />
+  if (screen === 'medication')  return <MedicationTracker profile={profile} onBack={() => go('healthhub')} onRefresh={refresh} />
   if (screen === 'therapy')     return <TherapyConnect profile={profile} onBack={() => go('home')} onRefresh={refresh} />
+  if (screen === 'healthhub')   return <HealthHub profile={profile} onBack={() => go('home')} onRefresh={refresh} onMedication={() => go('medication')} />
   return <Home profile={profile} go={go} onReset={() => { DB.reset(); go('language') }} />
 }
 
@@ -1223,10 +1258,15 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
 
       {/* Healing Path row */}
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-        <TouchableOpacity style={g.medCard} onPress={() => go('medication')}>
-          <Text style={g.loveCardEmoji}>💊</Text>
-          <Text style={g.loveCardTitle}>Medications</Text>
-          <Text style={g.loveCardSub}>{(profile.medications?.filter(m=>m.active).length ?? 0) > 0 ? `${profile.medications!.filter(m=>m.active).length} active` : 'Track meds'}</Text>
+        <TouchableOpacity style={g.medCard} onPress={() => go('healthhub')}>
+          <Text style={g.loveCardEmoji}>❤️‍🩹</Text>
+          <Text style={g.loveCardTitle}>Health Hub</Text>
+          <Text style={g.loveCardSub}>{(() => {
+            const todayLog = (profile.healthLogs || []).find(l => l.date === new Date().toISOString().slice(0,10))
+            if (todayLog?.steps) return `${todayLog.steps.toLocaleString()} steps today`
+            const meds = (profile.medications || []).filter(m => m.active).length
+            return meds > 0 ? `${meds} med${meds>1?'s':''} tracked` : 'Track your health'
+          })()}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={g.therapyCard} onPress={() => go('therapy')}>
           <Text style={g.loveCardEmoji}>🧠</Text>
@@ -1696,6 +1736,76 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
               {/* About this area */}
               <Text style={g.lbAbout}>{DOMAIN_INFO[d.key].about}</Text>
+
+              {/* Health domain: show live medication + activity data */}
+              {d.key === 'health' && (() => {
+                const today = new Date().toISOString().slice(0, 10)
+                const todayHealth = (profile.healthLogs || []).find(l => l.date === today)
+                const activeMeds = (profile.medications || []).filter(m => m.active)
+                const todayMedLog = (profile.medLogs || []).find(l => l.date === today)
+                const medTotal = activeMeds.reduce((acc, m) => acc + m.times.length, 0)
+                const medTaken = activeMeds.reduce((acc, m) => acc + m.times.filter(t => todayMedLog?.taken[`${m.id}_${t}`]).length, 0)
+                const week7 = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6-i)); return d.toISOString().slice(0,10) })
+                const medAdherence = week7.reduce((acc, date) => {
+                  const log = (profile.medLogs || []).find(l => l.date === date)
+                  if (!log || !activeMeds.length) return acc
+                  const t = activeMeds.reduce((a, m) => a + m.times.length, 0)
+                  const done = activeMeds.reduce((a, m) => a + m.times.filter(ti => log.taken[`${m.id}_${ti}`]).length, 0)
+                  return t > 0 ? { sum: acc.sum + (done/t)*100, days: acc.days + 1 } : acc
+                }, { sum: 0, days: 0 })
+                const adherencePct = medAdherence.days > 0 ? Math.round(medAdherence.sum / medAdherence.days) : null
+                const hasAnyData = activeMeds.length > 0 || todayHealth
+                if (!hasAnyData) return null
+                return (
+                  <View style={g.healthDataPanel}>
+                    <Text style={g.lbSectionLabel}>TODAY'S HEALTH DATA</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {todayHealth?.steps !== undefined && (
+                        <View style={g.healthMetricChip}>
+                          <Text style={{ fontSize: 16 }}>🚶</Text>
+                          <Text style={g.healthMetricVal}>{todayHealth.steps.toLocaleString()}</Text>
+                          <Text style={g.healthMetricLbl}>steps</Text>
+                        </View>
+                      )}
+                      {todayHealth?.sleepHours !== undefined && (
+                        <View style={g.healthMetricChip}>
+                          <Text style={{ fontSize: 16 }}>😴</Text>
+                          <Text style={g.healthMetricVal}>{todayHealth.sleepHours}h</Text>
+                          <Text style={g.healthMetricLbl}>sleep</Text>
+                        </View>
+                      )}
+                      {todayHealth?.heartRate !== undefined && (
+                        <View style={g.healthMetricChip}>
+                          <Text style={{ fontSize: 16 }}>❤️</Text>
+                          <Text style={g.healthMetricVal}>{todayHealth.heartRate}</Text>
+                          <Text style={g.healthMetricLbl}>bpm</Text>
+                        </View>
+                      )}
+                      {todayHealth?.activeMinutes !== undefined && (
+                        <View style={g.healthMetricChip}>
+                          <Text style={{ fontSize: 16 }}>⚡</Text>
+                          <Text style={g.healthMetricVal}>{todayHealth.activeMinutes}m</Text>
+                          <Text style={g.healthMetricLbl}>active</Text>
+                        </View>
+                      )}
+                      {activeMeds.length > 0 && (
+                        <View style={[g.healthMetricChip, { backgroundColor: medTaken === medTotal && medTotal > 0 ? '#6EE6C015' : '#FFF5F5' }]}>
+                          <Text style={{ fontSize: 16 }}>💊</Text>
+                          <Text style={[g.healthMetricVal, { color: medTaken === medTotal && medTotal > 0 ? '#2A7A5E' : '#E8636F' }]}>{medTaken}/{medTotal}</Text>
+                          <Text style={g.healthMetricLbl}>meds</Text>
+                        </View>
+                      )}
+                      {adherencePct !== null && (
+                        <View style={g.healthMetricChip}>
+                          <Text style={{ fontSize: 16 }}>📊</Text>
+                          <Text style={[g.healthMetricVal, { color: adherencePct >= 80 ? '#2A7A5E' : adherencePct >= 50 ? '#C28A1A' : '#E8636F' }]}>{adherencePct}%</Text>
+                          <Text style={g.healthMetricLbl}>7d meds</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )
+              })()}
 
               {/* Memories from conversations */}
               {items.length > 0 && (
@@ -3491,6 +3601,285 @@ function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; on
 }
 
 // ════════════════════════════════════════════════════════════
+//  HEALTH HUB
+// ════════════════════════════════════════════════════════════
+const HEALTH_APPS = [
+  { id: 'apple_health', name: 'Apple Health', emoji: '🍎', desc: 'Steps, sleep, heart rate, workouts', color: '#FF3B30', platform: 'iOS' },
+  { id: 'google_fit',   name: 'Google Fit',   emoji: '🤖', desc: 'Activity, heart points, workouts',  color: '#4285F4', platform: 'Android' },
+  { id: 'fitbit',       name: 'Fitbit',        emoji: '⌚', desc: 'Activity, sleep, stress, SpO2',    color: '#00B0B9', platform: 'Both' },
+  { id: 'garmin',       name: 'Garmin Connect',emoji: '🏃', desc: 'GPS workouts, HRV, VO2 max',       color: '#007AC0', platform: 'Both' },
+  { id: 'samsung',      name: 'Samsung Health',emoji: '📱', desc: 'Steps, blood pressure, sleep',     color: '#1428A0', platform: 'Android' },
+  { id: 'whoop',        name: 'WHOOP',         emoji: '💪', desc: 'Recovery, strain, HRV, sleep',     color: '#000000', platform: 'Both' },
+]
+const METRIC_GOALS = { steps: 10000, sleepHours: 8, activeMinutes: 30, heartRate: 70 }
+
+function HealthHub({ profile, onBack, onRefresh, onMedication }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onMedication: () => void }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [tab, setTab] = useState<'dashboard' | 'log' | 'connect'>('dashboard')
+  const [logSteps, setLogSteps] = useState('')
+  const [logSleep, setLogSleep] = useState('')
+  const [logHR, setLogHR] = useState('')
+  const [logActive, setLogActive] = useState('')
+  const [logWeight, setLogWeight] = useState('')
+  const [logCals, setLogCals] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [connectedApps, setConnectedApps] = useState<string[]>(profile.connectedApps || [])
+
+  const healthLogs = profile.healthLogs || []
+  const todayLog = healthLogs.find(l => l.date === today)
+  const activeMeds = (profile.medications || []).filter(m => m.active)
+  const todayMedLog = (profile.medLogs || []).find(l => l.date === today)
+
+  // Med adherence today
+  const medTotal = activeMeds.reduce((a, m) => a + m.times.length, 0)
+  const medTaken = activeMeds.reduce((a, m) => a + m.times.filter(t => todayMedLog?.taken[`${m.id}_${t}`]).length, 0)
+
+  // 7-day data for mini chart
+  const week7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i))
+    const dateStr = d.toISOString().slice(0, 10)
+    const log = healthLogs.find(l => l.date === dateStr)
+    const medLog = (profile.medLogs || []).find(l => l.date === dateStr)
+    const medDone = activeMeds.length > 0 && medLog
+      ? activeMeds.reduce((acc, m) => acc + m.times.filter(t => medLog.taken[`${m.id}_${t}`]).length, 0)
+      : 0
+    const medTot = activeMeds.reduce((a, m) => a + m.times.length, 0)
+    return { date: dateStr, day: ['S','M','T','W','T','F','S'][d.getDay()], log, medPct: medTot > 0 ? Math.round((medDone/medTot)*100) : null }
+  })
+
+  function saveLog() {
+    setSaving(true)
+    const data: Omit<DailyHealthLog,'date'> = { source: 'manual' }
+    if (logSteps.trim()) data.steps = parseInt(logSteps) || 0
+    if (logSleep.trim()) data.sleepHours = parseFloat(logSleep) || 0
+    if (logHR.trim()) data.heartRate = parseInt(logHR) || 0
+    if (logActive.trim()) data.activeMinutes = parseInt(logActive) || 0
+    if (logWeight.trim()) data.weight = parseFloat(logWeight) || 0
+    if (logCals.trim()) data.calories = parseInt(logCals) || 0
+    DB.logHealth(data)
+    onRefresh()
+    setLogSteps(''); setLogSleep(''); setLogHR(''); setLogActive(''); setLogWeight(''); setLogCals('')
+    setSaving(false)
+    setTab('dashboard')
+  }
+
+  function toggleApp(id: string) {
+    const next = connectedApps.includes(id) ? connectedApps.filter(a => a !== id) : [...connectedApps, id]
+    setConnectedApps(next)
+    if (next.includes(id)) DB.connectApp(id); else DB.disconnectApp(id)
+    onRefresh()
+  }
+
+  const MetricBar = ({ label, emoji, value, goal, unit, color }: { label: string; emoji: string; value?: number; goal: number; unit: string; color: string }) => {
+    const pct = value !== undefined ? Math.min(100, Math.round((value / goal) * 100)) : 0
+    return (
+      <View style={g.metricBar}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#222540' }}>{emoji} {label}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: value !== undefined ? color : '#C0C0D0' }}>
+            {value !== undefined ? `${value.toLocaleString()} ${unit}` : '— not logged'}
+          </Text>
+        </View>
+        <View style={{ height: 8, backgroundColor: '#F0EFF8', borderRadius: 4, overflow: 'hidden' }}>
+          <View style={{ width: `${pct}%`, height: 8, backgroundColor: color, borderRadius: 4 }} />
+        </View>
+        <Text style={{ fontSize: 10, color: '#9A9DB2', marginTop: 2 }}>Goal: {goal.toLocaleString()} {unit}</Text>
+      </View>
+    )
+  }
+
+  return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 48 }}>
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>❤️‍🩹 Health Hub</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Quick stats strip */}
+      <View style={g.healthStatsStrip}>
+        {[
+          { emoji: '🚶', val: todayLog?.steps?.toLocaleString() ?? '—', lbl: 'Steps', color: '#6E8BF6' },
+          { emoji: '😴', val: todayLog?.sleepHours ? `${todayLog.sleepHours}h` : '—', lbl: 'Sleep', color: '#A89BFA' },
+          { emoji: '❤️', val: todayLog?.heartRate ? `${todayLog.heartRate}` : '—', lbl: 'BPM', color: '#F66E8E' },
+          { emoji: '💊', val: medTotal > 0 ? `${medTaken}/${medTotal}` : '—', lbl: 'Meds', color: medTaken === medTotal && medTotal > 0 ? '#6EE6C0' : '#F6C26E' },
+        ].map(s => (
+          <View key={s.lbl} style={g.healthStatBox}>
+            <Text style={{ fontSize: 18 }}>{s.emoji}</Text>
+            <Text style={[g.healthStatVal, { color: s.color }]}>{s.val}</Text>
+            <Text style={g.healthStatLbl}>{s.lbl}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Tab bar */}
+      <View style={g.tabRow}>
+        {([['dashboard','Today'],['log','Log Data'],['connect','Devices']] as [string,string][]).map(([t, label]) => (
+          <TouchableOpacity key={t} style={[g.tabBtn, tab === t && g.tabBtnActive]} onPress={() => setTab(t as any)}>
+            <Text style={[g.tabBtnTxt, tab === t && g.tabBtnTxtActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* DASHBOARD */}
+      {tab === 'dashboard' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          {/* Metrics progress bars */}
+          <Text style={[g.lbSectionLabel, { marginBottom: 12 }]}>TODAY'S PROGRESS</Text>
+          <MetricBar label="Steps" emoji="🚶" value={todayLog?.steps} goal={METRIC_GOALS.steps} unit="steps" color="#6E8BF6" />
+          <MetricBar label="Sleep" emoji="😴" value={todayLog?.sleepHours} goal={METRIC_GOALS.sleepHours} unit="hrs" color="#A89BFA" />
+          <MetricBar label="Active time" emoji="⚡" value={todayLog?.activeMinutes} goal={METRIC_GOALS.activeMinutes} unit="min" color="#6EE6C0" />
+          <MetricBar label="Resting HR" emoji="❤️" value={todayLog?.heartRate} goal={METRIC_GOALS.heartRate} unit="bpm" color="#F66E8E" />
+          {todayLog?.calories !== undefined && <MetricBar label="Calories burned" emoji="🔥" value={todayLog?.calories} goal={500} unit="kcal" color="#F6A86E" />}
+          {todayLog?.weight !== undefined && (
+            <View style={g.metricBar}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#222540' }}>⚖️ Weight</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#7B6EF6', textAlign: 'right' }}>{todayLog.weight} kg</Text>
+            </View>
+          )}
+
+          {/* Medication adherence */}
+          {activeMeds.length > 0 && (
+            <View style={[g.healthDataPanel, { marginTop: 16 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={g.lbSectionLabel}>MEDICATIONS TODAY</Text>
+                <TouchableOpacity onPress={onMedication}><Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '700' }}>Manage →</Text></TouchableOpacity>
+              </View>
+              {activeMeds.map(med => {
+                const takenCount = med.times.filter(t => todayMedLog?.taken[`${med.id}_${t}`]).length
+                const pct = med.times.length > 0 ? Math.round((takenCount / med.times.length) * 100) : 0
+                return (
+                  <View key={med.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <View style={[g.medDot, { backgroundColor: med.color, width: 10, height: 10 }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#222540' }}>{med.name} <Text style={{ color: '#9A9DB2', fontWeight: '400' }}>{med.dosage}</Text></Text>
+                      <View style={{ height: 4, backgroundColor: '#F0EFF8', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
+                        <View style={{ width: `${pct}%`, height: 4, backgroundColor: pct === 100 ? '#6EE6C0' : med.color, borderRadius: 2 }} />
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: pct === 100 ? '#6EE6C0' : med.color }}>{takenCount}/{med.times.length}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          )}
+
+          {/* 7-day mini chart */}
+          <Text style={[g.lbSectionLabel, { marginTop: 20, marginBottom: 12 }]}>THIS WEEK</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E9E6F2' }}>
+            {week7.map((w, i) => {
+              const stepH = w.log?.steps ? Math.min(60, Math.round((w.log.steps / METRIC_GOALS.steps) * 60)) : 0
+              const isToday = w.date === today
+              return (
+                <View key={i} style={{ alignItems: 'center', gap: 4 }}>
+                  <View style={{ height: 60, width: 16, justifyContent: 'flex-end', borderRadius: 4, backgroundColor: '#F0EFF8', overflow: 'hidden' }}>
+                    {stepH > 0 && <View style={{ height: stepH, backgroundColor: isToday ? '#7B6EF6' : '#A89BFA', borderRadius: 4 }} />}
+                  </View>
+                  {w.medPct !== null && (
+                    <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: w.medPct >= 80 ? '#6EE6C0' : w.medPct >= 50 ? '#F6C26E' : '#F66E8E' }} />
+                  )}
+                  <Text style={{ fontSize: 10, color: isToday ? '#7B6EF6' : '#9A9DB2', fontWeight: isToday ? '800' : '500' }}>{w.day}</Text>
+                </View>
+              )
+            })}
+          </View>
+          <Text style={{ fontSize: 11, color: '#9A9DB2', textAlign: 'center', marginTop: 6 }}>Purple bars = steps · Dots = medication adherence (🟢 ≥80% · 🟡 50–79% · 🔴 &lt;50%)</Text>
+
+          {(!todayLog && activeMeds.length === 0) && (
+            <TouchableOpacity style={[g.saveBtn, { backgroundColor: '#7B6EF6', marginTop: 20 }]} onPress={() => setTab('log')}>
+              <Text style={g.saveBtnTxt}>+ Log today's health data</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* LOG DATA */}
+      {tab === 'log' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          <Text style={[g.lbSectionLabel, { marginBottom: 4 }]}>LOG TODAY'S METRICS</Text>
+          <Text style={{ fontSize: 13, color: '#9A9DB2', marginBottom: 16 }}>Enter whatever you have — you don't need to fill everything.</Text>
+
+          {[
+            { label: '🚶 Steps', key: 'steps', val: logSteps, set: setLogSteps, placeholder: 'e.g. 8500', kb: 'numeric' as const },
+            { label: '😴 Sleep (hours)', key: 'sleep', val: logSleep, set: setLogSleep, placeholder: 'e.g. 7.5', kb: 'decimal-pad' as const },
+            { label: '❤️ Resting heart rate (bpm)', key: 'hr', val: logHR, set: setLogHR, placeholder: 'e.g. 62', kb: 'numeric' as const },
+            { label: '⚡ Active minutes', key: 'active', val: logActive, set: setLogActive, placeholder: 'e.g. 45', kb: 'numeric' as const },
+            { label: '🔥 Calories burned', key: 'cals', val: logCals, set: setLogCals, placeholder: 'e.g. 350', kb: 'numeric' as const },
+            { label: '⚖️ Weight (kg)', key: 'weight', val: logWeight, set: setLogWeight, placeholder: 'e.g. 72.5', kb: 'decimal-pad' as const },
+          ].map(f => (
+            <View key={f.key}>
+              <Text style={g.fieldLabel}>{f.label}</Text>
+              <TextInput style={g.input} placeholder={f.placeholder} value={f.val} onChangeText={f.set} keyboardType={f.kb} />
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={[g.saveBtn, { backgroundColor: '#7B6EF6', opacity: saving ? 0.5 : 1, marginTop: 16 }]}
+            onPress={saveLog} disabled={saving}
+          >
+            <Text style={g.saveBtnTxt}>Save health data ✓</Text>
+          </TouchableOpacity>
+
+          <View style={{ backgroundColor: '#F3F0FF', borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1, borderColor: '#7B6EF620' }}>
+            <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '700', marginBottom: 4 }}>💡 Tip: Connect a device for automatic sync</Text>
+            <Text style={{ fontSize: 12, color: '#666' }}>Apple Watch, Fitbit and Google Fit can sync your data automatically without manual entry.</Text>
+            <TouchableOpacity onPress={() => setTab('connect')} style={{ marginTop: 8 }}>
+              <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '700' }}>Connect devices →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* CONNECT DEVICES */}
+      {tab === 'connect' && (
+        <View style={{ paddingHorizontal: 20 }}>
+          <Text style={[g.lbSectionLabel, { marginBottom: 4 }]}>CONNECT HEALTH APPS & DEVICES</Text>
+          <Text style={{ fontSize: 13, color: '#9A9DB2', marginBottom: 16 }}>Connected apps sync your activity, sleep, and heart rate automatically into SOMA Health Hub.</Text>
+
+          {HEALTH_APPS.map(app => {
+            const connected = connectedApps.includes(app.id)
+            return (
+              <View key={app.id} style={[g.deviceRow, connected && { borderColor: app.color + '60', backgroundColor: app.color + '05' }]}>
+                <View style={[g.deviceIcon, { backgroundColor: app.color + '18' }]}>
+                  <Text style={{ fontSize: 22 }}>{app.emoji}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#222540' }}>{app.name}</Text>
+                    <View style={{ backgroundColor: '#F0EFF8', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 10, color: '#9A9DB2', fontWeight: '700' }}>{app.platform}</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: '#9A9DB2', marginTop: 2 }}>{app.desc}</Text>
+                  {connected && <Text style={{ fontSize: 11, color: app.color, fontWeight: '700', marginTop: 4 }}>✓ Connected — syncing automatically</Text>}
+                </View>
+                <TouchableOpacity
+                  style={[g.deviceConnectBtn, { backgroundColor: connected ? '#F5F4FA' : app.color }]}
+                  onPress={() => toggleApp(app.id)}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: connected ? '#9A9DB2' : '#fff' }}>
+                    {connected ? 'Disconnect' : 'Connect'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )
+          })}
+
+          <View style={{ backgroundColor: '#F0FAF5', borderRadius: 14, padding: 14, marginTop: 8, borderWidth: 1, borderColor: '#6EE6C030' }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#2A7A5E', marginBottom: 4 }}>🔐 Privacy first</Text>
+            <Text style={{ fontSize: 12, color: '#555', lineHeight: 19 }}>Health data stays on your device. SOMA never uploads your steps, heart rate, or sleep data to any server. Connections use the app's secure OS-level permission system.</Text>
+          </View>
+
+          <Text style={{ fontSize: 11, color: '#C0C0D0', textAlign: 'center', marginTop: 16 }}>
+            On a real device, Connect buttons open the official OS permission dialog (HealthKit on iOS, Health Connect on Android). Approval is required before any data syncs.
+          </Text>
+        </View>
+      )}
+    </ScrollView>
+  )
+}
+
+// ════════════════════════════════════════════════════════════
 //  MEDICATION TRACKER
 // ════════════════════════════════════════════════════════════
 const MED_COLORS = ['#7B6EF6','#F66E8E','#6EE6C0','#F6C26E','#6E8BF6','#F6A86E','#A89BFA','#6ECFF6']
@@ -4441,6 +4830,19 @@ const g = StyleSheet.create({
   lbDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   lbItemTxt: { color: '#222540', fontSize: 14, lineHeight: 21, flex: 1 },
   lbAbout: { color: '#555', fontSize: 13.5, lineHeight: 21, marginBottom: 12 },
+  // ── Health Hub ──
+  healthDataPanel: { backgroundColor: '#F8F7FF', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2' },
+  healthMetricChip: { flexDirection: 'column' as const, alignItems: 'center' as const, backgroundColor: '#F5F4FA', borderRadius: 12, padding: 10, gap: 2, minWidth: 64 },
+  healthMetricVal: { fontSize: 15, fontWeight: '800', color: '#222540' },
+  healthMetricLbl: { fontSize: 10, color: '#9A9DB2', fontWeight: '600' },
+  healthStatsStrip: { flexDirection: 'row' as const, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#EDEAF4', marginBottom: 16 },
+  healthStatBox: { flex: 1, alignItems: 'center' as const, paddingVertical: 14, gap: 2 },
+  healthStatVal: { fontSize: 17, fontWeight: '800' },
+  healthStatLbl: { fontSize: 10, color: '#9A9DB2', fontWeight: '600' },
+  metricBar: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2' },
+  deviceRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: '#E9E6F2' },
+  deviceIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center' as const, justifyContent: 'center' as const },
+  deviceConnectBtn: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   lbSectionLabel: { fontSize: 10, fontWeight: '800', color: '#9A9DB2', letterSpacing: 1.2, marginBottom: 8 },
   lbInfoToggle: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignSelf: 'flex-start' as const, marginTop: 4 },
   lbInfoToggleTxt: { fontSize: 12, fontWeight: '700' },
