@@ -3603,6 +3603,94 @@ function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; on
 // ════════════════════════════════════════════════════════════
 //  HEALTH HUB
 // ════════════════════════════════════════════════════════════
+
+function HealthAppLogo({ id, size = 48 }: { id: string; size?: number }) {
+  const br = size * 0.26
+  const ic = size * 0.62
+
+  if (id === 'apple_health') return (
+    <View style={{ width: size, height: size, borderRadius: br, backgroundColor: '#FF2D55', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Svg width={ic} height={ic} viewBox="0 0 100 100">
+        {/* White heart */}
+        <SvgPath d="M50,78 C28,62 6,52 6,33 C6,17 19,9 31,9 C39,9 45,13 50,22 C55,13 61,9 69,9 C81,9 94,17 94,33 C94,52 72,62 50,78Z" fill="white"/>
+        {/* Pink ECG line across heart */}
+        <SvgPolyline points="8,44 22,44 29,28 37,62 44,38 50,48 56,44 76,44 92,44" fill="none" stroke="#FF2D55" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </Svg>
+    </View>
+  )
+
+  if (id === 'google_fit') return (
+    <View style={{ width: size, height: size, borderRadius: br, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#E8E8E8', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Svg width={ic} height={ic} viewBox="0 0 100 100">
+        {/* 4 Google-coloured teardrops meeting at centre */}
+        {/* Blue — top */}
+        <SvgPath d="M50,50 C50,50 37,38 37,24 C37,15 43,10 50,10 C57,10 63,15 63,24 C63,38 50,50 50,50Z" fill="#4285F4"/>
+        {/* Red — left */}
+        <SvgPath d="M50,50 C50,50 38,63 24,63 C15,63 10,57 10,50 C10,43 15,37 24,37 C38,37 50,50 50,50Z" fill="#EA4335"/>
+        {/* Yellow — bottom */}
+        <SvgPath d="M50,50 C50,50 63,62 63,76 C63,85 57,90 50,90 C43,90 37,85 37,76 C37,62 50,50 50,50Z" fill="#FBBC05"/>
+        {/* Green — right */}
+        <SvgPath d="M50,50 C50,50 62,37 76,37 C85,37 90,43 90,50 C90,57 85,63 76,63 C62,63 50,50 50,50Z" fill="#34A853"/>
+      </Svg>
+    </View>
+  )
+
+  if (id === 'fitbit') return (
+    <View style={{ width: size, height: size, borderRadius: br, backgroundColor: '#00B0B9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Svg width={ic} height={ic} viewBox="0 0 100 100">
+        {/* 3×3 dot grid — bottom row brightest, top row faintest (Fitbit signature) */}
+        {[{ y: 22, r: 8, op: 0.45 }, { y: 50, r: 10, op: 0.72 }, { y: 80, r: 13, op: 1 }].map(({ y, r, op }, row) =>
+          [22, 50, 78].map((x, col) => (
+            <SvgCircle key={`${row}-${col}`} cx={x} cy={y} r={r} fill="white" opacity={op}/>
+          ))
+        )}
+      </Svg>
+    </View>
+  )
+
+  if (id === 'garmin') return (
+    <View style={{ width: size, height: size, borderRadius: br, backgroundColor: '#003087', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Svg width={ic} height={ic} viewBox="0 0 100 110">
+        {/* Simplified running figure */}
+        <SvgCircle cx="62" cy="13" r="11" fill="white"/>
+        {/* Torso */}
+        <SvgPath d="M58,24 L46,58" stroke="white" strokeWidth="9" strokeLinecap="round"/>
+        {/* Arms — back arm forward, front arm back */}
+        <SvgPath d="M55,38 L38,28" stroke="white" strokeWidth="7.5" strokeLinecap="round"/>
+        <SvgPath d="M52,35 L70,30" stroke="white" strokeWidth="7.5" strokeLinecap="round"/>
+        {/* Legs — stride */}
+        <SvgPath d="M46,58 L30,88" stroke="white" strokeWidth="8" strokeLinecap="round"/>
+        <SvgPath d="M46,58 L62,85" stroke="white" strokeWidth="8" strokeLinecap="round"/>
+        {/* Foot flick */}
+        <SvgPath d="M30,88 L18,84" stroke="white" strokeWidth="6" strokeLinecap="round"/>
+        <SvgPath d="M62,85 L74,90" stroke="white" strokeWidth="6" strokeLinecap="round"/>
+      </Svg>
+    </View>
+  )
+
+  if (id === 'samsung') return (
+    <View style={{ width: size, height: size, borderRadius: br, backgroundColor: '#1428A0', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Svg width={ic} height={ic} viewBox="0 0 100 100">
+        {/* Hexagon outline */}
+        <SvgPolygon points="50,8 88,29 88,71 50,92 12,71 12,29" fill="none" stroke="white" strokeWidth="7" strokeLinejoin="round"/>
+        {/* Heart inside */}
+        <SvgPath d="M50,68 C36,57 20,50 20,38 C20,28 28,23 36,23 C42,23 47,26 50,32 C53,26 58,23 64,23 C72,23 80,28 80,38 C80,50 64,57 50,68Z" fill="white" opacity="0.9"/>
+      </Svg>
+    </View>
+  )
+
+  if (id === 'whoop') return (
+    <View style={{ width: size, height: size, borderRadius: br, backgroundColor: '#0A0A0A', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Svg width={size * 0.78} height={size * 0.5} viewBox="0 0 130 70">
+        {/* Bold W — WHOOP's signature mark */}
+        <SvgPath d="M5,8 L24,62 L44,22 L64,62 L84,22 L104,62 L125,8" stroke="white" strokeWidth="13" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+      </Svg>
+    </View>
+  )
+
+  return <Text style={{ fontSize: size * 0.5 }}>📱</Text>
+}
+
 const HEALTH_APPS = [
   { id: 'apple_health', name: 'Apple Health', emoji: '🍎', desc: 'Steps, sleep, heart rate, workouts', color: '#FF3B30', platform: 'iOS' },
   { id: 'google_fit',   name: 'Google Fit',   emoji: '🤖', desc: 'Activity, heart points, workouts',  color: '#4285F4', platform: 'Android' },
@@ -3840,9 +3928,7 @@ function HealthHub({ profile, onBack, onRefresh, onMedication }: { profile: User
             const connected = connectedApps.includes(app.id)
             return (
               <View key={app.id} style={[g.deviceRow, connected && { borderColor: app.color + '60', backgroundColor: app.color + '05' }]}>
-                <View style={[g.deviceIcon, { backgroundColor: app.color + '18' }]}>
-                  <Text style={{ fontSize: 22 }}>{app.emoji}</Text>
-                </View>
+                <HealthAppLogo id={app.id} size={52} />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={{ fontSize: 15, fontWeight: '800', color: '#222540' }}>{app.name}</Text>
