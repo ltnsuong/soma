@@ -1426,8 +1426,173 @@ function WheelHistory({ history }: { history: WheelSnapshot[] }) {
   )
 }
 
+// ── Rich content for each life domain ─────────────────────
+const DOMAIN_INFO: Record<DomainKey, { about: string; questions: string[]; tips: { emoji: string; text: string }[]; resource?: string }> = {
+  health: {
+    about: 'Physical and mental wellbeing — your energy, fitness, sleep, nutrition, and how your body feels day to day. Health is the foundation everything else is built on.',
+    questions: [
+      'How is your energy level this week — depleted, okay, or strong?',
+      'Are you sleeping 7–9 hours and waking up feeling rested?',
+      'When did you last move your body for at least 20 minutes?',
+      'Are you eating in a way that gives you energy, not just filling hunger?',
+    ],
+    tips: [
+      { emoji: '🚶', text: 'Walk 20 minutes outdoors daily — sunlight + movement is the highest-ROI health habit.' },
+      { emoji: '😴', text: 'Go to bed and wake up at the same time every day — even weekends. Your circadian rhythm matters.' },
+      { emoji: '💧', text: 'Drink 2 litres of water before you reach for coffee or snacks. Dehydration mimics tiredness.' },
+      { emoji: '🩺', text: 'Schedule your annual check-up if you\'ve skipped it. Prevention beats cure every time.' },
+    ],
+    resource: 'Talk to Soma about how you\'re feeling physically — she can help you track patterns and notice what\'s draining you.',
+  },
+  career: {
+    about: 'Your work, professional growth, job satisfaction, and sense of progress. Career fulfilment comes from doing work that challenges you, aligns with your values, and feels meaningful.',
+    questions: [
+      'Do you feel engaged and challenged by your work most days?',
+      'Are you learning and growing, or have you plateaued?',
+      'Does your work align with your deeper values and goals?',
+      'Is the balance between effort and recognition fair to you?',
+    ],
+    tips: [
+      { emoji: '📚', text: 'Block 30 minutes weekly for deliberate learning — a course, book, or skill. Growth compounds.' },
+      { emoji: '🗓️', text: 'Have a career conversation with your manager or mentor this month. Ask: "What should I focus on next?"' },
+      { emoji: '✅', text: 'Keep a "wins log" — write down accomplishments weekly. It builds confidence and updates your résumé naturally.' },
+      { emoji: '🌐', text: 'Nurture your network before you need it — one meaningful outreach per week.' },
+    ],
+    resource: 'Tell Soma about your work — what energises you, what frustrates you. She builds a picture of your career over time.',
+  },
+  finance: {
+    about: 'Your financial security, savings habits, and freedom from money stress. Financial health isn\'t about wealth — it\'s about feeling in control and having a cushion for life\'s surprises.',
+    questions: [
+      'Do you know where your money goes each month?',
+      'Do you have an emergency fund covering 3–6 months of expenses?',
+      'Are you saving something — even a little — toward your future self?',
+      'Does money stress take up mental space you\'d rather use elsewhere?',
+    ],
+    tips: [
+      { emoji: '📊', text: 'Track expenses for 14 days — even roughly. Awareness alone changes behaviour.' },
+      { emoji: '🛡️', text: 'Build a ₹/$/€ 1,000 starter emergency fund first — it breaks the "debt spiral" for most people.' },
+      { emoji: '⚙️', text: 'Automate savings on payday. "Pay yourself first" beats willpower every time.' },
+      { emoji: '📉', text: 'List your debts by interest rate. Attack the highest-rate debt first (avalanche method).' },
+    ],
+    resource: 'Share your financial worries with Soma — she can help you think through priorities without judgment.',
+  },
+  relationship: {
+    about: 'Your romantic relationship — its depth, trust, communication, and how emotionally safe and loved you feel. Healthy love is built through daily attention, not grand gestures.',
+    questions: [
+      'Do you feel emotionally safe being fully yourself with your partner?',
+      'Are you expressing your needs clearly, and listening to theirs?',
+      'When did you last do something that made your partner feel truly seen?',
+      'Are there patterns — arguments, distance — that keep repeating?',
+    ],
+    tips: [
+      { emoji: '🗣️', text: 'Practice "bids for connection" — respond to your partner\'s small moments of reaching out. Gottman research shows these matter most.' },
+      { emoji: '❤️', text: 'Learn your partner\'s love language and speak it intentionally this week.' },
+      { emoji: '🚫', text: 'In conflict, pause before reacting. A 20-second breath prevents 80% of escalations.' },
+      { emoji: '📅', text: 'Schedule a date night — recurring, protected time signals that the relationship is a priority.' },
+    ],
+    resource: 'Soma is a judgment-free space to talk through relationship patterns, fears, or hopes.',
+  },
+  family: {
+    about: 'Your bonds with parents, siblings, children, and extended family — the quality of connection, love, and the weight of any unresolved tensions. Family shapes us deeply.',
+    questions: [
+      'How connected do you feel to the family members who matter most to you?',
+      'Are there tensions or unsaid things that have built up over time?',
+      'Are you making time for the people in your family who need you — or you need?',
+      'What does "healthy family" mean to you, and how close are you to it?',
+    ],
+    tips: [
+      { emoji: '📞', text: 'Call one family member this week just to check in — not to share news, but to listen.' },
+      { emoji: '🍽️', text: 'Share a meal together — research consistently shows shared meals strengthen family bonds.' },
+      { emoji: '✍️', text: 'Write a letter (or voice note) to a family member you appreciate. Say it out loud.' },
+      { emoji: '🧘', text: 'Set gentle limits with family dynamics that drain you. Boundaries are acts of love, not rejection.' },
+    ],
+    resource: 'Tell Soma about your family — she remembers details across conversations and can help you think through complex dynamics.',
+  },
+  growth: {
+    about: 'Your personal development, self-awareness, learning, and progress toward becoming who you want to be. Growth means choosing discomfort over comfort — on purpose.',
+    questions: [
+      'What are you actively learning or working to improve right now?',
+      'Are you challenging yourself, or staying safely in your comfort zone?',
+      'Are your daily actions moving you toward your goals, or just filling time?',
+      'When did you last do something that genuinely stretched you?',
+    ],
+    tips: [
+      { emoji: '📖', text: 'Read 10 pages of a non-fiction book daily. That\'s 12+ books per year without effort.' },
+      { emoji: '🎯', text: 'Pick one skill to develop this month — just one. Depth beats breadth for growth.' },
+      { emoji: '📓', text: 'Keep a learning journal: "What did I learn today? What will I do differently?" — even one line.' },
+      { emoji: '🙋', text: 'Seek feedback from someone you respect. External mirrors are the fastest path to self-awareness.' },
+    ],
+    resource: 'Share your goals with Soma — she tracks what you\'re working toward and reflects your progress back to you.',
+  },
+  hobby: {
+    about: 'Your hobbies, creativity, play, and activities that bring you joy for their own sake — with no performance pressure or outcome required. Play is not optional; it restores the rest of life.',
+    questions: [
+      'When did you last do something purely for the joy of it — no productivity, no goal?',
+      'Do you have hobbies that fully absorb you and make you lose track of time?',
+      'Are you nurturing your creative side, even in small ways?',
+      'Are you giving yourself permission to be a beginner at something?',
+    ],
+    tips: [
+      { emoji: '🗓️', text: 'Schedule "play time" like any other commitment — fun that\'s planned actually happens.' },
+      { emoji: '🎨', text: 'Try one new creative activity this month — drawing, cooking, music, writing. Outcome doesn\'t matter.' },
+      { emoji: '✅', text: 'Say yes to a spontaneous social plan this week. Novelty is the antidote to routine fatigue.' },
+      { emoji: '📵', text: 'Do a hobby without your phone nearby. Full presence is what makes it restorative.' },
+    ],
+    resource: 'Tell Soma about what you enjoy — your hobbies automatically appear in your dating profile and matching.',
+  },
+  purpose: {
+    about: 'Your sense of meaning, direction, and contribution — your "why." Purpose isn\'t found; it\'s built through action, reflection, and paying attention to what moves you.',
+    questions: [
+      'What makes you feel most alive and like you\'re exactly where you should be?',
+      'Are your daily actions — work, relationships, habits — aligned with what you value most?',
+      'What kind of impact do you want to have, and are you moving toward it?',
+      'If you had all the time and money you needed, what would you spend your energy on?',
+    ],
+    tips: [
+      { emoji: '✍️', text: 'Write your personal mission in one sentence: "I use [strength] to [impact] for [who]." Revisit it monthly.' },
+      { emoji: '🤝', text: 'Volunteer for one cause you care about — purpose often lives where your skills meet the world\'s needs.' },
+      { emoji: '🔍', text: 'Notice what you talk about with energy and what you do without being asked. That\'s a signal.' },
+      { emoji: '🌅', text: 'Start your day with a "why" — one sentence about why today matters. It changes how you show up.' },
+    ],
+    resource: 'Soma\'s deepest conversations are about meaning and purpose. Share what you\'re wrestling with.',
+  },
+  mind: {
+    about: 'Your mental health, emotional regulation, stress levels, focus, and inner peace. The mind is the lens through which you experience everything — it deserves the most care.',
+    questions: [
+      'How is your stress level right now — manageable, elevated, or overwhelming?',
+      'Do you have practices that calm and restore your mind, or are you running on empty?',
+      'Are you being kind to yourself — as kind as you\'d be to a good friend?',
+      'Are you carrying anything you haven\'t talked about with anyone?',
+    ],
+    tips: [
+      { emoji: '🧘', text: 'Meditate for 5 minutes daily — just notice your breath. Even this tiny practice reshapes the brain over weeks.' },
+      { emoji: '✍️', text: 'Write 3 sentences each morning — whatever\'s in your head. No filter, no goal. It clears mental clutter.' },
+      { emoji: '📵', text: 'Take 1 hour offline each day — social media is engineered to amplify anxiety. Your nervous system needs recovery.' },
+      { emoji: '🗣️', text: 'Talk to someone — a friend, therapist, or Soma. Unexpressed emotion compounds. Saying it out loud helps.' },
+    ],
+    resource: 'Your mental wellbeing matters more than any other life area. Soma is always here — talk as much as you need.',
+  },
+  environment: {
+    about: 'Your home and living environment — how safe, comfortable, organised, and restorative your physical space feels. Your environment shapes your mood, energy, and behaviour constantly.',
+    questions: [
+      'Does your home feel like a sanctuary — a place that restores you?',
+      'Is clutter or disorganisation quietly draining your energy?',
+      'Do you feel physically safe and secure where you live?',
+      'Does your space reflect who you are and how you want to feel?',
+    ],
+    tips: [
+      { emoji: '🧹', text: 'Declutter one drawer or surface today. Small order creates a surprising sense of calm.' },
+      { emoji: '🌿', text: 'Add one plant or improve natural light — both measurably improve mood and focus.' },
+      { emoji: '🕯️', text: 'Design a morning and evening routine anchored to your home — transitions need ritual.' },
+      { emoji: '🎵', text: 'Curate your sonic environment — music, silence, or ambient sound changes your state more than you think.' },
+    ],
+    resource: 'Tell Soma about your living situation — she can help you think through what changes would most improve your everyday.',
+  },
+}
+
 function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => void }) {
   const [selectedDomain, setSelectedDomain] = useState<DomainKey | null>(null)
+  const [expandedInfo, setExpandedInfo] = useState<DomainKey | null>(null)
   const [wheel, setWheel] = useState<WheelAssessment | undefined>(profile.wheel)
   const [assessing, setAssessing] = useState(false)
   const [manual, setManual] = useState<Partial<Record<DomainKey, number>>>(profile.manualScores || {})
@@ -1529,21 +1694,64 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                 {typeof manual[d.key] === 'number' && <Text style={{ fontSize: 11, fontWeight: '800', color: d.color, marginLeft: 4 }}>{manual[d.key]}/10</Text>}
               </View>
 
-              {items.length === 0
-                ? <Text style={g.lbEmpty}>💭 Talk to Soma about your {d.label.toLowerCase()} to build this area.</Text>
-                : (
-                  <>
-                    <View style={{ gap: 8 }}>
-                      {items.slice(0, 3).map((m, i) => (
-                        <View key={i} style={g.lbItem}>
-                          <View style={[g.lbDot, { backgroundColor: d.color }]} />
-                          <Text style={g.lbItemTxt}>{m.content}</Text>
-                        </View>
-                      ))}
+              {/* About this area */}
+              <Text style={g.lbAbout}>{DOMAIN_INFO[d.key].about}</Text>
+
+              {/* Memories from conversations */}
+              {items.length > 0 && (
+                <View style={{ gap: 6, marginBottom: 10 }}>
+                  <Text style={g.lbSectionLabel}>WHAT YOU'VE SHARED</Text>
+                  {items.slice(0, 3).map((m, i) => (
+                    <View key={i} style={g.lbItem}>
+                      <View style={[g.lbDot, { backgroundColor: d.color }]} />
+                      <Text style={g.lbItemTxt}>{m.content}</Text>
                     </View>
-                    {items.length > 3 && <Text style={[g.lbEmpty, { marginTop: 8 }]}>+{items.length - 3} more...</Text>}
-                  </>
-                )}
+                  ))}
+                  {items.length > 3 && <Text style={[g.lbEmpty, { marginTop: 4 }]}>+{items.length - 3} more entries</Text>}
+                </View>
+              )}
+
+              {/* Expand/collapse: questions + tips */}
+              <TouchableOpacity
+                style={[g.lbInfoToggle, { borderColor: d.color + '50' }]}
+                onPress={() => setExpandedInfo(expandedInfo === d.key ? null : d.key)}
+              >
+                <Text style={[g.lbInfoToggleTxt, { color: d.color }]}>
+                  {expandedInfo === d.key ? '▲ Hide tips & questions' : '▼ Tips & reflection questions'}
+                </Text>
+              </TouchableOpacity>
+
+              {expandedInfo === d.key && (
+                <View style={{ marginTop: 12 }}>
+                  {/* Reflection questions */}
+                  <Text style={g.lbSectionLabel}>REFLECT ON THIS</Text>
+                  {DOMAIN_INFO[d.key].questions.map((q, i) => (
+                    <View key={i} style={g.lbQuestion}>
+                      <Text style={[g.lbQNum, { backgroundColor: d.color }]}>{i + 1}</Text>
+                      <Text style={g.lbQTxt}>{q}</Text>
+                    </View>
+                  ))}
+
+                  {/* Tips */}
+                  <Text style={[g.lbSectionLabel, { marginTop: 14 }]}>PRACTICAL TIPS</Text>
+                  {DOMAIN_INFO[d.key].tips.map((tip, i) => (
+                    <View key={i} style={g.lbTipRow}>
+                      <Text style={{ fontSize: 20, width: 32 }}>{tip.emoji}</Text>
+                      <Text style={g.lbTipTxt}>{tip.text}</Text>
+                    </View>
+                  ))}
+
+                  {/* Soma invite */}
+                  <View style={[g.lbSomaInvite, { borderColor: d.color + '40', backgroundColor: d.color + '08' }]}>
+                    <Text style={{ fontSize: 14 }}>✦</Text>
+                    <Text style={[g.lbSomaInviteTxt, { color: d.color }]}>{DOMAIN_INFO[d.key].resource || `Talk to Soma about your ${d.label.toLowerCase()} to build this area.`}</Text>
+                  </View>
+                </View>
+              )}
+
+              {items.length === 0 && expandedInfo !== d.key && (
+                <Text style={g.lbEmpty}>💭 Tap "Tips & reflection questions" to explore this area — or talk to Soma about it.</Text>
+              )}
             </View>
           )
         })}
@@ -4232,6 +4440,17 @@ const g = StyleSheet.create({
   lbItem: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   lbDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   lbItemTxt: { color: '#222540', fontSize: 14, lineHeight: 21, flex: 1 },
+  lbAbout: { color: '#555', fontSize: 13.5, lineHeight: 21, marginBottom: 12 },
+  lbSectionLabel: { fontSize: 10, fontWeight: '800', color: '#9A9DB2', letterSpacing: 1.2, marginBottom: 8 },
+  lbInfoToggle: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignSelf: 'flex-start' as const, marginTop: 4 },
+  lbInfoToggleTxt: { fontSize: 12, fontWeight: '700' },
+  lbQuestion: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, gap: 10, marginBottom: 8 },
+  lbQNum: { color: '#fff', fontSize: 10, fontWeight: '800', textAlign: 'center' as const, lineHeight: 20, width: 20, height: 20, borderRadius: 10 },
+  lbQTxt: { flex: 1, color: '#444', fontSize: 13.5, lineHeight: 21 },
+  lbTipRow: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, gap: 10, marginBottom: 10 },
+  lbTipTxt: { flex: 1, color: '#333', fontSize: 13.5, lineHeight: 21 },
+  lbSomaInvite: { flexDirection: 'row' as const, gap: 8, alignItems: 'flex-start' as const, borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 8 },
+  lbSomaInviteTxt: { flex: 1, fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
   suggestCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#7B6EF650', borderLeftWidth: 3, borderLeftColor: '#7B6EF6', ...shadowMd },
   suggestTxt: { color: '#222540', fontSize: 15, lineHeight: 23, marginTop: 8, fontStyle: 'italic' },
   circleCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E9E6F2', ...shadowSm },
