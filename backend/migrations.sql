@@ -78,3 +78,9 @@ CREATE POLICY "Users can update their own profile" ON profiles
 -- 3. Use SUPABASE_SERVICE_KEY (service_role) for backend auth
 -- 4. Store JWT_SECRET in .env (min 32 chars)
 -- 5. Configure EMAIL_* for nodemailer (Gmail: use App Password, not account password)
+
+-- Social login columns (added for Google OAuth support)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);

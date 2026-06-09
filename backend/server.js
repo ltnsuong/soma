@@ -212,11 +212,73 @@ app.post('/auth/password-reset', async (req, res) => {
   }
 })
 
-// SOCIAL LOGIN (Google, Apple, Facebook) — Placeholder
+// SOCIAL LOGIN — Google (ID token verification)
+// The app sends the Google ID token it received from expo-auth-session.
+// We verify it with Google's tokeninfo endpoint, then find-or-create the user.
 app.post('/auth/social', async (req, res) => {
   const { provider, token } = req.body
-  // TODO: Verify token with provider, create or find user, return JWT
-  res.status(501).json({ error: 'Social login not yet implemented. Add provider SDK.' })
+  if (!provider || !token) return res.status(400).json({ error: 'provider and token required' })
+
+  if (provider === 'google') {
+    try {
+      // Verify the ID token with Google
+      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`)
+      if (!googleRes.ok) return res.status(401).json({ error: 'Invalid Google token' })
+      const payload = await googleRes.json()
+
+      // Must have a valid audience (your Google client ID) and a sub (user ID)
+      if (!payload.sub || payload.error) return res.status(401).json({ error: 'Invalid Google token payload' })
+
+      const email = payload.email
+      const name  = payload.name || payload.email.split('@')[0]
+      const googleId = payload.sub
+      const avatar = payload.picture || ''
+
+      if (!email) return res.status(400).json({ error: 'Google account has no email' })
+
+      // Find existing user by google_id or email
+      let { data: user } = await supabase
+        .from('users')
+        .select('id, email, name, premium')
+        .or(`google_id.eq.${googleId},email.eq.${email}`)
+        .maybeSingle()
+
+      if (user) {
+        // Update google_id + avatar if missing
+        await supabase
+          .from('users')
+          .update({ google_id: googleId, avatar, verified: true })
+          .eq('id', user.id)
+      } else {
+        // Create new user — no password needed for social login
+        const { data: newUser, error: createErr } = await supabase
+          .from('users')
+          .insert({ email, name, google_id: googleId, avatar, verified: true, premium: false })
+          .select()
+          .single()
+        if (createErr) return res.status(500).json({ error: createErr.message })
+        user = newUser
+      }
+
+      const { accessToken, refreshToken } = generateTokens(user.id, email)
+      return res.json({
+        user: { id: user.id, email, name: user.name || name, premium: user.premium || false },
+        accessToken,
+        refreshToken,
+        isNew: !user,
+      })
+    } catch (err) {
+      console.error('[Google OAuth]', err)
+      return res.status(500).json({ error: err.message })
+    }
+  }
+
+  // Apple — placeholder (needs Apple JWT verification)
+  if (provider === 'apple') {
+    return res.status(501).json({ error: 'Apple login coming soon' })
+  }
+
+  return res.status(400).json({ error: `Unsupported provider: ${provider}` })
 })
 
 // GET CURRENT USER (protected)

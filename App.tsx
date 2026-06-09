@@ -1157,18 +1157,40 @@ function Register({ onDone }: { onDone: (name: string) => void }) {
   })
   useEffect(() => {
     if (gResponse?.type !== 'success') return
-    const token = gResponse.authentication?.accessToken
-    if (!token) return
+    const accessToken = gResponse.authentication?.accessToken
+    const idToken = gResponse.authentication?.idToken
+    if (!accessToken && !idToken) return
     setLoading(true)
-    fetch('https://www.googleapis.com/userinfo/v2/me', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then((info: any) => {
+    ;(async () => {
+      try {
+        // Prefer backend auth with idToken (gives us real JWT + Supabase user)
+        if (idToken && BACKEND_URL && !BACKEND_URL.includes('localhost')) {
+          const res = await fetch(`${BACKEND_URL}/auth/social`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: 'google', token: idToken }),
+          })
+          const data = await res.json()
+          if (res.ok && data.accessToken) {
+            await auth.saveTokens(data.accessToken, data.refreshToken)
+            const userName = data.user?.name || 'Friend'
+            DB.register(userName)
+            onDone(userName)
+            return
+          }
+        }
+        // Fallback: fetch profile from Google directly (dev / no backend)
+        const info = await fetch('https://www.googleapis.com/userinfo/v2/me',
+          { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.json())
         const userName = info.name || info.given_name || (info.email ? String(info.email).split('@')[0] : 'Friend')
         DB.register(userName)
         onDone(userName)
-      })
-      .catch(() => alert('Google sign-in failed while fetching your profile. Please try again.'))
-      .finally(() => setLoading(false))
+      } catch {
+        alert('Google sign-in failed. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [gResponse])
 
   const handleSocial = (provider: string) => {
