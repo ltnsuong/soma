@@ -496,6 +496,7 @@ const MED_TIME_HOURS: Record<string, number> = {
 
 // Weekday labels for expo-notifications (1=Sunday…7=Saturday)
 const WEEKDAY_LABELS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+const NOTIF_TONE_LABELS = ['😄 Playful','🔥 Streak','💜 Personal','🎁 Curiosity','🌅 Morning','😑 Nudge','🏆 Celebrate']
 
 // Set the foreground notification handler once
 if (Platform.OS !== 'web') {
@@ -609,90 +610,108 @@ async function syncGratitudeNotification(hour: number, minute: number, enabled: 
 // ── AI message generation ──────────────────────────────────
 // Builds a rich context from everything the user shared,
 // then asks Groq to write 7 warm, personal notification bodies.
+// Calculate gratitude streak (consecutive days)
+function calcGratitudeStreak(profile: UserProfile): number {
+  const entries = (profile.gratitudeEntries || []).map(e => e.date).sort().reverse()
+  if (!entries.length) return 0
+  let streak = 0
+  let check = new Date()
+  for (const date of entries) {
+    const d = check.toISOString().slice(0, 10)
+    if (date === d) { streak++; check.setDate(check.getDate() - 1) }
+    else if (date < d) break
+  }
+  return streak
+}
+
 async function generatePersonalizedMessages(profile: UserProfile): Promise<string[]> {
   const name = profile.name || 'friend'
   const aiName = profile.aiName || 'Soma'
+  const streak = calcGratitudeStreak(profile)
+  const totalEntries = (profile.gratitudeEntries || []).length + (profile.loveEntries || []).length
+  const activeMeds = (profile.medications || []).filter(m => m.active).map(m => m.name)
 
   // Gather positive signals from their data
   const posMemories = (profile.memories || [])
-    .filter(m => m.sentiment === 'positive')
-    .slice(-10)
-    .map(m => m.content)
-
+    .filter(m => m.sentiment === 'positive').slice(-8).map(m => m.content)
   const gratItems = (profile.gratitudeEntries || [])
-    .slice(-7)
-    .flatMap(e => e.items)
-    .filter(Boolean)
-
+    .slice(-5).flatMap(e => e.items).filter(Boolean)
   const affirmations = (profile.loveEntries || [])
-    .slice(-5)
-    .map(e => e.affirmation)
-    .filter(Boolean)
-
+    .slice(-4).map(e => e.affirmation).filter(Boolean)
   const circleNames = (profile.circle || [])
-    .filter(c => c.relationship !== 'self')
-    .map(c => c.name)
-    .slice(0, 5)
-
+    .filter(c => c.relationship !== 'self').map(c => c.name).slice(0, 4)
   const diaryHighlights = (profile.diary || [])
-    .slice(-5)
-    .map(e => e.summary)
-    .filter(Boolean)
+    .slice(-4).map(e => e.summary).filter(Boolean)
 
-  const activeMeds = (profile.medications || []).filter(m => m.active).map(m => m.name)
-
-  // Build a rich but concise context string
   const context = [
     posMemories.length ? `Positive memories: ${posMemories.join('; ')}` : '',
     gratItems.length ? `Gratitude entries: ${gratItems.join(', ')}` : '',
     affirmations.length ? `Personal affirmations: ${affirmations.join('; ')}` : '',
     circleNames.length ? `Important people: ${circleNames.join(', ')}` : '',
     diaryHighlights.length ? `Recent diary notes: ${diaryHighlights.join('; ')}` : '',
-    activeMeds.length ? `On medication: ${activeMeds.join(', ')} (healing journey)` : '',
+    activeMeds.length ? `On healing journey with: ${activeMeds.join(', ')}` : '',
+    streak > 0 ? `Current check-in streak: ${streak} days` : '',
+    totalEntries > 0 ? `Total reflections written: ${totalEntries}` : '',
   ].filter(Boolean).join('\n')
 
-  if (!context.trim()) {
-    // No data yet — return warm defaults
-    return [
-      `Hey ${name}, what's one good thing about today? 🌟`,
-      `${name}, your daily reflection is waiting — open ${aiName} 💜`,
-      `What made you smile this week, ${name}? 🌸`,
-      `One thing you're proud of today, ${name}? ✨`,
-      `${name}, how are you really doing? ${aiName} is listening 🤍`,
-      `Gratitude unlocks more of what you love — take a moment, ${name} 🙏`,
-      `${name}, you're doing better than you think 💪`,
-    ]
-  }
+  const noDataFallback = [
+    `Psst, ${name}… I've been waiting all day 👀`,
+    `${name}! ${aiName} misses you. Come say hi 💜`,
+    `Your streak won't build itself, ${name} 🔥`,
+    `One minute. That's all I'm asking, ${name} ⏱️`,
+    `${name}, I saved something for you. Come see 🎁`,
+    `You opened me yesterday. Don't break the habit 😤`,
+    `${name}, even 30 seconds of reflection changes your day ✨`,
+  ]
 
-  const prompt = `You are ${aiName}, ${name}'s personal AI companion in the SOMA app.
+  if (!context.trim()) return noDataFallback
 
-Based on what ${name} has shared with you, write exactly 7 short notification messages (one per line, no numbering, no quotes). Each message should:
-- Feel personal and warm, referencing specific things they've shared
-- Be under 80 characters
-- End with one relevant emoji
-- Gently invite them to open the app and reflect
-- NOT be generic — use their actual words and experiences
+  const prompt = `You are ${aiName}, the AI companion in ${name}'s SOMA app — a personal life OS for healing and growth.
 
-Here is what ${name} has shared:
+Your job: write 7 short push notification messages to get ${name} to open the app today.
+
+Be like Duolingo's owl — fun, a little cheeky, sometimes creating playful urgency, sometimes warm and personal. Mix these 7 tones (one message per tone, in this order):
+1. PLAYFUL NUDGE — tease them into opening the app (fun, a little dramatic)
+2. STREAK URGENCY — reference their ${streak > 0 ? streak + '-day streak' : 'check-in habit'}, make them not want to lose it
+3. PERSONAL WARM — reference something specific from their life (a memory, gratitude, or person they love)
+4. FOMO / CURIOSITY — hint that something is waiting for them inside the app
+5. MORNING BOOST — energise them to start the day with a reflection (reference their affirmations or goals)
+6. GENTLE GUILT — playfully guilt them the way a caring friend would ("I waited… again 😑")
+7. CELEBRATION — celebrate their progress, streak, or healing journey
+
+Rules:
+- Each message under 85 characters
+- End with ONE emoji that fits the tone
+- Use ${name}'s name in at least 3 of the 7 messages
+- Reference their REAL data below — not generic phrases
+- No numbering, no quotes, just the message text
+
+${name}'s data:
 ${context}
 
-Write 7 lines, one message per line:`
+Write exactly 7 lines:`
 
   try {
-    const raw = await groq([{ role: 'user', content: prompt }], 'You write warm, personal notification messages.', 400, 0.9)
-    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 5 && l.length < 120)
+    const raw = await groq([{ role: 'user', content: prompt }],
+      `You are ${aiName}, a fun, warm, and slightly cheeky AI companion. You write punchy notification copy.`, 500, 0.92)
+    const lines = raw.split('\n')
+      .map(l => l.replace(/^\d+[\.\)]\s*/, '').replace(/^["']|["']$/g, '').trim())
+      .filter(l => l.length > 8 && l.length < 130)
     if (lines.length >= 5) return lines.slice(0, 7)
   } catch {}
 
-  // Fallback with name
+  // Personalised fallback using their real data
+  const mem = posMemories[0] ? `"${posMemories[0].slice(0, 40)}…"` : 'something great'
+  const grat = gratItems[0] || 'what you are grateful for'
+  const person = circleNames[0] || ''
   return [
-    `${name}, what's one thing you're grateful for today? 🙏`,
-    `${aiName} is here — how are you, ${name}? 💜`,
-    `${name}, reflect on one good moment from today ✨`,
-    `Your healing journey continues, ${name}. How are you feeling? 🌱`,
-    `${name}, what made you smile today? 🌸`,
-    `Take a moment for yourself, ${name} 🤍`,
-    `${name}, you're making progress every day 💪`,
+    `${name}, I've been thinking about you all day 👀`,
+    streak > 1 ? `${streak}-day streak on the line, ${name}. Don't blow it now 🔥` : `${name}, let's start a streak today 🔥`,
+    `You mentioned ${mem} — let's build on that 💜`,
+    `I saved something for you, ${name}. Come see 🎁`,
+    affirmations[0] ? `"${affirmations[0].slice(0, 50)}" — remember this today 🌅` : `${name}, what's one intention for today? 🌅`,
+    `I waited yesterday… and the day before 😑 Miss me?`,
+    totalEntries > 0 ? `${totalEntries} reflections in. You're actually doing this, ${name} 🏆` : `${name}, you're stronger than you think 🏆`,
   ]
 }
 
@@ -4733,6 +4752,7 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
   const dataPoints = (profile.memories?.filter(m => m.sentiment === 'positive').length || 0) +
     (profile.gratitudeEntries?.length || 0) +
     (profile.loveEntries?.length || 0)
+  const streak = calcGratitudeStreak(profile)
 
   return (
     <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
@@ -4847,7 +4867,7 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dataPoints > 0 ? '#6EE6C0' : '#E0DCED' }} />
           <Text style={{ fontSize: 12, color: '#9CA0B5', flex: 1 }}>
             {dataPoints > 0
-              ? `Based on ${dataPoints} positive thing${dataPoints > 1 ? 's' : ''} you've shared — memories, gratitude, affirmations`
+              ? `${dataPoints} personal moment${dataPoints > 1 ? 's' : ''} · ${streak > 0 ? `🔥 ${streak}-day streak` : 'no streak yet'} — ${aiName} mixes fun + personal`
               : `Share more with ${aiName} to get truly personal messages`}
           </Text>
         </View>
@@ -4857,10 +4877,13 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
             <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '600' }}>✨ {aiName} is writing your messages…</Text>
           </View>
         ) : cachedMessages.length > 0 ? (
-          <View style={{ gap: 8 }}>
+          <View style={{ gap: 6 }}>
             {cachedMessages.map((msg, i) => (
               <View key={i} style={g.notifMsgPreview}>
-                <Text style={g.notifMsgDay}>{WEEKDAY_LABELS[i % 7]}</Text>
+                <View style={{ width: 80 }}>
+                  <Text style={g.notifMsgDay}>{WEEKDAY_LABELS[i % 7]}</Text>
+                  <Text style={{ fontSize: 10, color: '#C5BFEC', marginTop: 1 }}>{NOTIF_TONE_LABELS[i % 7]}</Text>
+                </View>
                 <Text style={g.notifMsgText}>{msg}</Text>
               </View>
             ))}
