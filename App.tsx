@@ -1314,15 +1314,9 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   )
 }
 
-// SOMA brand mark — the S-in-O monogram, crisp at any size.
-function SomaLogo({ size = 64, color = '#7B6EF6' }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 400 400">
-      <SvgCircle cx={200} cy={200} r={122} fill="none" stroke={color} strokeWidth={19} />
-      <SvgPath d="M 306 166 L 184 166 C 163 166 156 190 184 199 C 210 207 248 208 248 235 L 152 235"
-        fill="none" stroke={color} strokeWidth={24} strokeLinecap="square" strokeLinejoin="miter" />
-    </Svg>
-  )
+// SOMA brand mark — the glowing app icon, rounded like an app tile.
+function SomaMark({ size = 56 }: { size?: number }) {
+  return <Image source={require('./assets/icon.png')} style={{ width: size, height: size, borderRadius: size * 0.26 }} />
 }
 
 function Splash() {
@@ -1337,7 +1331,7 @@ function Splash() {
   return (
     <View style={g.screen}>
       <Animated.View style={{ opacity: fade, transform: [{ translateY: rise }], alignItems: 'center' }}>
-        <SomaLogo size={92} />
+        <SomaMark size={108} />
         <Text style={[g.logo, { marginTop: 16 }]}>SOMA</Text>
         <Text style={g.logoSub}>Know yourself before knowing each other.</Text>
       </Animated.View>
@@ -1464,7 +1458,7 @@ function Register({ onDone }: { onDone: (name: string) => void }) {
     return (
       <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
         <View style={{ alignItems: 'center', marginBottom: 40 }}>
-          <View style={{ marginBottom: 14 }}><SomaLogo size={68} /></View>
+          <View style={{ marginBottom: 14 }}><SomaMark size={80} /></View>
           <Text style={g.logo}>Save your story</Text>
           <Text style={g.logoSub}>Keep your conversations with Soma and build your life.</Text>
         </View>
@@ -2608,7 +2602,7 @@ function ProfileBuilder({ profile, onDone }: { profile: UserProfile; onDone: () 
     return (
       <View style={g.screen}>
         <View style={g.centerWrap}>
-          <Animated.View style={[g.bigOrb, { transform: [{ scale: pulse }] }]}><SomaLogo size={56} /></Animated.View>
+          <Animated.View style={{ transform: [{ scale: pulse }], marginBottom: 24 }}><SomaMark size={116} /></Animated.View>
           <Text style={g.startTitle}>Building your profile...</Text>
           <Text style={g.startSub}>Soma is understanding your love language,{'\n'}attachment style, and what you need in love.</Text>
         </View>
@@ -2670,7 +2664,7 @@ function MyProfile({ profile, onBack, onBuild }: { profile: UserProfile; onBack:
           <View style={{ flex: 1 }} />
         </View>
         <View style={g.centerWrap}>
-          <View style={g.bigOrb}><SomaLogo size={56} /></View>
+          <View style={{ marginBottom: 24 }}><SomaMark size={116} /></View>
           <Text style={g.startTitle}>Build your{'\n'}dating profile.</Text>
           <Text style={g.startSub}>Soma will interview you by voice about your love language, attachment style, and what you need in love — then write your profile for you.</Text>
           <TouchableOpacity style={g.primaryBtn} onPress={onBuild}><Text style={g.primaryBtnTxt}>✦  Start the interview</Text></TouchableOpacity>
@@ -3773,12 +3767,12 @@ JSON only:` }], 'You are Soma writing a caring weekly reflection. Return only JS
       <View style={{ height: 20 }} />
       {loading ? (
         <View style={[g.centerWrap, { paddingTop: 60 }]}>
-          <View style={g.bigOrb}><SomaLogo size={56} /></View>
+          <View style={{ marginBottom: 24 }}><SomaMark size={116} /></View>
           <Text style={g.startSub}>Soma is reflecting on{'\n'}everything you've shared...</Text>
         </View>
       ) : !insight ? (
         <View style={[g.centerWrap, { paddingTop: 60 }]}>
-          <SomaLogo size={56} />
+          <SomaMark size={88} />
           <Text style={[g.startSub, { marginTop: 20 }]}>Not enough yet.{'\n'}Talk to Soma a few times to unlock insights.</Text>
         </View>
       ) : (
@@ -5349,7 +5343,9 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
       </View>
       <View style={[g.stgGroup, { padding: 20, marginTop: 20 }]}>
         <View style={{ alignItems: 'center', marginBottom: 20 }}>
-          <View style={g.settingsCompanionOrb}><SomaLogo size={32} color="#7B6EF6" /></View>
+          {profile.aiPhoto
+            ? <Image source={{ uri: profile.aiPhoto }} style={{ width: 72, height: 72, borderRadius: 20 }} />
+            : <SomaMark size={72} />}
           <Text style={[g.stgLabel, { marginTop: 10, textAlign: 'center' }]}>{profile.aiName || 'Soma'}</Text>
         </View>
         <Text style={g.settingsInputLabel}>Companion name</Text>
@@ -5467,7 +5463,7 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
 
       {/* Footer */}
       <View style={g.settingsFooter}>
-        <SomaLogo size={24} color="#C5BFEC" />
+        <SomaMark size={28} />
         <Text style={g.settingsFooterTxt}>Account ID: {profile.name?.toLowerCase().replace(/\s/g, '') || 'soma'}_{profile.conversations || 0}{'\n'}v0.1  ·  SOMA</Text>
       </View>
     </ScrollView>
