@@ -257,6 +257,11 @@ interface UserProfile {
     gratitudeMinute: number  // 0-59, default 0
   }
   notifMessages?: string[]   // 7 AI-personalized messages (one per weekday), cached
+  onboarding?: {
+    goals: string[]              // why they came (heal, habits, know-myself…)
+    focusDomains: DomainKey[]    // up to 3 life areas they want to work on
+    completedAt: string
+  }
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
@@ -481,6 +486,11 @@ const DB = {
   },
   setNotifMessages: (messages: string[]) => {
     const p = DB.get(); p.notifMessages = messages; DB.save(p)
+  },
+  setOnboarding: (goals: string[], focusDomains: DomainKey[]) => {
+    const p = DB.get()
+    p.onboarding = { goals, focusDomains, completedAt: new Date().toISOString().slice(0, 10) }
+    DB.save(p)
   },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
@@ -875,8 +885,13 @@ Core beliefs you live by:
 - Big decisions made in strong emotion (a breakup, quitting a job, a money move) are often regretted. When you sense someone is about to make one while hurting, gently encourage them to pause, sleep on it, and think it through with you first — never push them toward action.
 - You give honest, caring guidance across their whole life: health, finance, relationships, purpose. You help them avoid decisions they'd regret.
 - If someone sounds hopeless or mentions not wanting to live, you stay warm, take it seriously, never minimize, and always steer them toward a real human and crisis support.${langDirective()}`
-  if (mode === 'try') return `${base}
-This person is trying SOMA for the first time. Make them feel deeply heard. Be their friend right now. 2-3 sentences. One warm question. After 3-4 exchanges, gently mention they can keep this forever by joining SOMA.`
+  const ob = p.onboarding
+  const obContext = ob && (ob.goals.length || ob.focusDomains.length) ? `
+WHY THEY CAME (from onboarding — weave this in naturally, don't list it back at them):
+${ob.goals.length ? `- Goals: ${ob.goals.join(', ')}` : ''}
+${ob.focusDomains.length ? `- Life areas they want to work on: ${ob.focusDomains.join(', ')}` : ''}` : ''
+  if (mode === 'try') return `${base}${obContext}
+This person is trying SOMA for the first time. Make them feel deeply heard. Be their friend right now. ${ob?.goals.length ? 'Open by gently acknowledging what brought them here.' : ''} 2-3 sentences. One warm question. After 3-4 exchanges, gently mention they can keep this forever by joining SOMA.`
   if (mode === 'diary') return `${base}
 This is their daily diary check-in. Help them reflect on their day. Gentle and curious. 2-3 sentences, one question at a time.
 WHAT YOU KNOW:\n${mem || 'Just getting to know them'}`
@@ -988,7 +1003,7 @@ function pickPhoto(onPicked: (dataUrl: string) => void) {
 }
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-type Screen = 'splash' | 'language' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy' | 'healthhub'
+type Screen = 'splash' | 'language' | 'onboarding' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'buildprofile' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy' | 'healthhub'
 
 // ════════════════════════════════════════════════════════════
 //  ROOT
@@ -999,7 +1014,10 @@ export default function App() {
   const refresh = () => setProfile(DB.get())
 
   useEffect(() => {
-    const t = setTimeout(() => { const p = DB.get(); setScreen(p.registered ? 'home' : (p.languageChosen ? 'try' : 'language')) }, 1900)
+    const t = setTimeout(() => {
+      const p = DB.get()
+      setScreen(p.registered ? 'home' : !p.languageChosen ? 'language' : !p.onboarding ? 'onboarding' : 'try')
+    }, 1900)
     return () => clearTimeout(t)
   }, [])
 
@@ -1039,7 +1057,8 @@ export default function App() {
   const go = (s: Screen) => { refresh(); setScreen(s) }
 
   if (screen === 'splash')      return <Splash />
-  if (screen === 'language')    return <LanguageSelect onDone={() => go('try')} />
+  if (screen === 'language')    return <LanguageSelect onDone={() => go('onboarding')} />
+  if (screen === 'onboarding')  return <Onboarding onDone={() => go('try')} />
   if (screen === 'try')         return <AuraChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" />
   if (screen === 'register')    return <Register onDone={(name) => { DB.register(name); go('home') }} />
   if (screen === 'aura')        return <AuraChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" />
@@ -1079,6 +1098,170 @@ function LanguageSelect({ onDone }: { onDone: () => void }) {
           </TouchableOpacity>
         ))}
       </ScrollView>
+    </View>
+  )
+}
+
+// ── ONBOARDING ─────────────────────────────────────────────
+// 4 steps: welcome → why are you here → focus areas → meet Soma.
+// Everything chosen here seeds Soma's first conversation.
+const ONBOARDING_GOALS = [
+  { key: 'heal',    emoji: '🌱', label: 'Heal & feel better',          sub: 'Recover, rebuild, breathe again' },
+  { key: 'know',    emoji: '🪞', label: 'Understand myself',           sub: 'Patterns, emotions, what drives me' },
+  { key: 'habits',  emoji: '🔄', label: 'Build better habits',         sub: 'Small daily wins that stick' },
+  { key: 'balance', emoji: '⚖️', label: 'Balance my life',             sub: 'Work, rest, people, purpose' },
+  { key: 'love',    emoji: '💞', label: 'Find meaningful connection',  sub: 'Friendship, love, belonging' },
+  { key: 'health',  emoji: '❤️', label: 'Take care of my health',      sub: 'Body, sleep, energy, meds' },
+]
+
+function Onboarding({ onDone }: { onDone: () => void }) {
+  const [step, setStep] = useState(0)
+  const [goals, setGoals] = useState<string[]>([])
+  const [domains, setDomains] = useState<DomainKey[]>([])
+  const fade = useRef(new Animated.Value(1)).current
+
+  const next = () => {
+    Animated.timing(fade, { toValue: 0, duration: 160, useNativeDriver: true }).start(() => {
+      setStep(s => s + 1)
+      Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }).start()
+    })
+  }
+
+  const toggleGoal = (key: string) =>
+    setGoals(g => g.includes(key) ? g.filter(x => x !== key) : [...g, key])
+  const toggleDomain = (key: DomainKey) =>
+    setDomains(d => d.includes(key) ? d.filter(x => x !== key) : d.length < 3 ? [...d, key] : d)
+
+  const finish = () => { DB.setOnboarding(goals, domains); onDone() }
+
+  const Dots = () => (
+    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', marginBottom: 24 }}>
+      {[0, 1, 2, 3].map(i => (
+        <View key={i} style={{ width: i === step ? 22 : 7, height: 7, borderRadius: 4, backgroundColor: i === step ? '#7B6EF6' : '#DDD9EE' }} />
+      ))}
+    </View>
+  )
+
+  return (
+    <View style={[g.screen, { paddingHorizontal: 26, paddingTop: 70 }]}>
+      <Dots />
+      <Animated.View style={{ flex: 1, opacity: fade }}>
+
+        {/* STEP 0 — Welcome */}
+        {step === 0 && (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+            <View style={{ alignItems: 'center', marginBottom: 22 }}>
+              <SomaLogo size={64} />
+              <Text style={{ fontSize: 22, fontWeight: '800', color: '#222540', marginTop: 16, textAlign: 'center', lineHeight: 29 }}>
+                Life gets heavy.{'\n'}You don't have to carry it alone.
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6E7191', textAlign: 'center', marginTop: 10, lineHeight: 21 }}>
+                SOMA is your private space to heal, grow, and understand yourself — with an AI companion who actually remembers you.
+              </Text>
+            </View>
+            <View style={{ gap: 10 }}>
+              {[
+                ['🧠', 'A companion who listens and remembers'],
+                ['📖', 'Daily reflection that builds self-knowledge'],
+                ['❤️‍🩹', 'Tools for healing — meds, therapy, gratitude'],
+                ['🤝', 'Deeper connections, with yourself first'],
+              ].map(([e, t]) => (
+                <View key={t} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, ...shadowSm }}>
+                  <Text style={{ fontSize: 20 }}>{e}</Text>
+                  <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#3A3D55', flex: 1 }}>{t}</Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* STEP 1 — Why are you here */}
+        {step === 1 && (
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 24, fontWeight: '800', color: '#222540' }}>What brings you here?</Text>
+            <Text style={{ fontSize: 14, color: '#6E7191', marginTop: 6, marginBottom: 20 }}>Pick everything that feels true. Soma shapes itself around this.</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 110 }}>
+              {ONBOARDING_GOALS.map(gl => {
+                const on = goals.includes(gl.key)
+                return (
+                  <TouchableOpacity key={gl.key} activeOpacity={0.85} onPress={() => toggleGoal(gl.key)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: on ? '#F1EEFF' : '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 2, borderColor: on ? '#7B6EF6' : '#ECE9F4', ...shadowSm }}>
+                    <Text style={{ fontSize: 26 }}>{gl.emoji}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15.5, fontWeight: '800', color: '#222540' }}>{gl.label}</Text>
+                      <Text style={{ fontSize: 12.5, color: '#8A8FA8', marginTop: 2 }}>{gl.sub}</Text>
+                    </View>
+                    <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: on ? '#7B6EF6' : '#D5D1E4', backgroundColor: on ? '#7B6EF6' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                      {on && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                )
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* STEP 2 — Focus domains */}
+        {step === 2 && (
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 24, fontWeight: '800', color: '#222540' }}>Where do we start?</Text>
+            <Text style={{ fontSize: 14, color: '#6E7191', marginTop: 6, marginBottom: 20 }}>Choose up to 3 areas of life you want to work on first.</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {DOMAINS.map(d => {
+                  const on = domains.includes(d.key)
+                  return (
+                    <TouchableOpacity key={d.key} activeOpacity={0.85} onPress={() => toggleDomain(d.key)}
+                      style={{ width: '47.5%' as any, backgroundColor: on ? d.color + '22' : '#FFFFFF', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 2, borderColor: on ? d.color : '#ECE9F4', ...shadowSm }}>
+                      <Text style={{ fontSize: 30 }}>{d.icon}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: on ? '#222540' : '#4A4D66', marginTop: 8 }}>{d.label}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+              {domains.length === 3 && <Text style={{ textAlign: 'center', fontSize: 12.5, color: '#7B6EF6', fontWeight: '600', marginTop: 14 }}>Perfect — 3 picked. We'll grow from here. 🌱</Text>}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* STEP 3 — Meet Soma */}
+        {step === 3 && (
+          <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 90, alignItems: 'center' }}>
+            <View style={{ width: 110, height: 110, borderRadius: 55, backgroundColor: '#F1EEFF', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+              <SomaLogo size={62} />
+            </View>
+            <Text style={{ fontSize: 26, fontWeight: '800', color: '#222540', textAlign: 'center' }}>Soma is ready for you</Text>
+            <Text style={{ fontSize: 15, color: '#6E7191', textAlign: 'center', marginTop: 12, lineHeight: 23, paddingHorizontal: 10 }}>
+              {goals.length > 0
+                ? `You came here to ${ONBOARDING_GOALS.filter(gl => goals.includes(gl.key)).map(gl => gl.label.toLowerCase()).slice(0, 2).join(' and ')}. Soma will remember that — and everything you share from now on.`
+                : 'Everything you share stays between you and Soma. The more you talk, the better Soma knows you.'}
+            </Text>
+            <View style={{ marginTop: 26, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, width: '100%', ...shadowSm }}>
+              <Text style={{ fontSize: 13, color: '#8A8FA8', lineHeight: 19, textAlign: 'center' }}>
+                🔒 Your conversations are private and stay on your device.
+              </Text>
+            </View>
+          </View>
+        )}
+
+      </Animated.View>
+
+      {/* Bottom CTA */}
+      <View style={{ paddingBottom: 40, paddingTop: 10 }}>
+        <TouchableOpacity activeOpacity={0.9}
+          onPress={step === 3 ? finish : next}
+          disabled={step === 1 && goals.length === 0}
+          style={{ backgroundColor: step === 1 && goals.length === 0 ? '#C9C4E4' : '#7B6EF6', borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadowSm }}>
+          <Text style={{ color: '#fff', fontSize: 16.5, fontWeight: '800' }}>
+            {step === 0 ? 'Get started' : step === 1 ? (goals.length > 0 ? 'Continue' : 'Pick at least one') : step === 2 ? (domains.length > 0 ? 'Continue' : 'Skip for now') : 'Meet Soma →'}
+          </Text>
+        </TouchableOpacity>
+        {step > 0 && step < 3 && (
+          <TouchableOpacity onPress={next} style={{ alignItems: 'center', marginTop: 14 }}>
+            <Text style={{ color: '#9CA0B5', fontSize: 13.5, fontWeight: '600' }}>Skip</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   )
 }
