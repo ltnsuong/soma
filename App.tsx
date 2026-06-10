@@ -1672,7 +1672,10 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
 
         {!started ? (
           <View style={g.centerWrap}>
-            <Animated.View style={[g.bigOrb, { transform: [{ scale: pulse }] }]}><SomaLogo size={56} /></Animated.View>
+            <Animated.View style={{ transform: [{ scale: pulse }], marginBottom: 24 }}>
+              <Image source={p.aiPhoto ? { uri: p.aiPhoto } : require('./assets/icon.png')}
+                style={{ width: 132, height: 132, borderRadius: 34 }} />
+            </Animated.View>
             <Text style={g.startTitle}>{mode === 'try' ? 'Talk to Soma.' : isDiary ? 'How was\nyour day?' : `Hi ${p.name}.`}</Text>
             <Text style={g.startSub}>
               {mode === 'try' ? 'Before you decide anything, just talk.\nShare what is on your mind. Soma is here\nas your friend, right now.'
