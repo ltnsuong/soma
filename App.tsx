@@ -257,6 +257,11 @@ interface UserProfile {
     gratitudeMinute: number  // 0-59, default 0
   }
   notifMessages?: string[]   // 7 AI-personalized messages (one per weekday), cached
+  voiceSettings?: {
+    voiceName?: string        // chosen system voice (undefined = best available)
+    rate: number              // 0.8 calm · 0.95 natural · 1.1 lively
+    pitch: number
+  }
   onboarding?: {
     goals: string[]              // why they came (heal, habits, know-myself…)
     focusDomains: DomainKey[]    // up to 3 life areas they want to work on
@@ -486,6 +491,9 @@ const DB = {
   },
   setNotifMessages: (messages: string[]) => {
     const p = DB.get(); p.notifMessages = messages; DB.save(p)
+  },
+  setVoiceSettings: (settings: NonNullable<UserProfile['voiceSettings']>) => {
+    const p = DB.get(); p.voiceSettings = settings; DB.save(p)
   },
   setOnboarding: (goals: string[], focusDomains: DomainKey[]) => {
     const p = DB.get()
@@ -971,18 +979,60 @@ JSON only:` }], 'You are a thoughtful, discreet relationship psychologist. Retur
 }
 
 // ── SPEECH ─────────────────────────────────────────────────
+// Voices load asynchronously on web — cache them and refresh on voiceschanged.
+let cachedVoices: SpeechSynthesisVoice[] = []
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  cachedVoices = window.speechSynthesis.getVoices()
+  window.speechSynthesis.onvoiceschanged = () => { cachedVoices = window.speechSynthesis.getVoices() }
+}
+
+function getVoices(): SpeechSynthesisVoice[] {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return []
+  if (!cachedVoices.length) cachedVoices = window.speechSynthesis.getVoices()
+  return cachedVoices
+}
+
+// macOS/iOS novelty voices — funny, not companion material
+const NOVELTY_VOICES = /albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|grandma|grandpa|eddy|flo|reed|rocko|sandy|shelley/i
+
+// Voices for the app's language, best quality first (local/premium voices on top)
+function voicesForLang(lang: string): SpeechSynthesisVoice[] {
+  const all = getVoices().filter(v => !NOVELTY_VOICES.test(v.name))
+  const prefix = (lang || 'en').slice(0, 2).toLowerCase()
+  const match = all.filter(v => v.lang.toLowerCase().startsWith(prefix))
+  const pool = match.length ? match : all.filter(v => v.lang.toLowerCase().startsWith('en'))
+  // Premium/natural voices first, then local, then the rest
+  const score = (v: SpeechSynthesisVoice) =>
+    (/premium|enhanced|natural|neural/i.test(v.name) ? 4 : 0) +
+    (/samantha|karen|moira|daniel|serena|allison|ava|zoe|tom/i.test(v.name) ? 2 : 0) +
+    (v.localService ? 1 : 0)
+  return [...pool].sort((a, b) => score(b) - score(a))
+}
+
+const DEFAULT_VOICE_RATE = 0.95
+const DEFAULT_VOICE_PITCH = 1.0
+
 function speak(t: string) {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
   window.speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(t); u.rate = 0.91; u.pitch = 1.05
-  const v = window.speechSynthesis.getVoices().find(x => x.name.includes('Samantha') || x.name.includes('Karen') || x.lang === 'en-US')
-  if (v) u.voice = v
+  const p = DB.get()
+  const vs = p.voiceSettings
+  const u = new SpeechSynthesisUtterance(t)
+  u.rate = vs?.rate ?? DEFAULT_VOICE_RATE
+  u.pitch = vs?.pitch ?? DEFAULT_VOICE_PITCH
+  u.lang = p.language || 'en'
+  const ranked = voicesForLang(p.language || 'en')
+  const chosen = vs?.voiceName ? ranked.find(v => v.name === vs.voiceName) : undefined
+  const v = chosen || ranked[0]
+  if (v) { u.voice = v; u.lang = v.lang }
   window.speechSynthesis.speak(u)
 }
+
 function listen(onResult: (t: string) => void, onEnd: () => void) {
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   if (!SR) { alert('Use Chrome for voice'); return }
-  const r = new SR(); r.lang = 'en-US'; r.interimResults = false
+  const lang = DB.get().language || 'en'
+  const r = new SR(); r.lang = lang === 'en' ? 'en-US' : lang; r.interimResults = false
   r.onresult = (e: any) => onResult(e.results[0][0].transcript)
   r.onend = onEnd; r.onerror = onEnd; r.start()
 }
@@ -1151,7 +1201,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         {step === 0 && (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
             <View style={{ alignItems: 'center', marginBottom: 22 }}>
-              <SomaLogo size={64} />
+              <Image source={require('./assets/icon.png')} style={{ width: 76, height: 76, borderRadius: 20 }} />
               <Text style={{ fontSize: 22, fontWeight: '800', color: '#222540', marginTop: 16, textAlign: 'center', lineHeight: 29 }}>
                 Life gets heavy.{'\n'}You don't have to carry it alone.
               </Text>
@@ -1227,9 +1277,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         {/* STEP 3 — Meet Soma */}
         {step === 3 && (
           <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 90, alignItems: 'center' }}>
-            <View style={{ width: 110, height: 110, borderRadius: 55, backgroundColor: '#F1EEFF', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-              <SomaLogo size={62} />
-            </View>
+            <Image source={require('./assets/icon.png')} style={{ width: 116, height: 116, borderRadius: 30, marginBottom: 24 }} />
             <Text style={{ fontSize: 26, fontWeight: '800', color: '#222540', textAlign: 'center' }}>Soma is ready for you</Text>
             <Text style={{ fontSize: 15, color: '#6E7191', textAlign: 'center', marginTop: 12, lineHeight: 23, paddingHorizontal: 10 }}>
               {goals.length > 0
@@ -5126,8 +5174,123 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
   )
 }
 
+// ════════════════════════════════════════════════════════════
+//  VOICE SETTINGS PANEL — pick Soma's voice + speaking style
+// ════════════════════════════════════════════════════════════
+const VOICE_STYLES = [
+  { key: 'calm',    label: '🌙 Calm',    sub: 'Slow and soothing',  rate: 0.82, pitch: 0.95 },
+  { key: 'natural', label: '🌿 Natural', sub: 'Easy, friendly pace', rate: 0.95, pitch: 1.0 },
+  { key: 'lively',  label: '☀️ Lively',  sub: 'Bright and upbeat',  rate: 1.08, pitch: 1.1 },
+]
+
+function VoiceSettingsPanel({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const vs = profile.voiceSettings ?? { voiceName: undefined, rate: DEFAULT_VOICE_RATE, pitch: DEFAULT_VOICE_PITCH }
+  const [voiceName, setVoiceName] = useState<string | undefined>(vs.voiceName)
+  const [rate, setRate] = useState(vs.rate)
+  const [pitch, setPitch] = useState(vs.pitch)
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const aiName = profile.aiName || 'Soma'
+
+  // Voices can arrive late on web — poll briefly until they show up
+  useEffect(() => {
+    const load = () => setVoices(voicesForLang(profile.language || 'en'))
+    load()
+    const t = setInterval(() => { if (!getVoices().length) return; load(); clearInterval(t) }, 300)
+    return () => clearInterval(t)
+  }, [])
+
+  const preview = (name?: string, r?: number, pt?: number) => {
+    DB.setVoiceSettings({ voiceName: name, rate: r ?? rate, pitch: pt ?? pitch })
+    speak(`Hi, I'm ${aiName}. This is how I sound.`)
+  }
+
+  const pickVoice = (name?: string) => {
+    setVoiceName(name)
+    DB.setVoiceSettings({ voiceName: name, rate, pitch })
+    onRefresh()
+    preview(name)
+  }
+
+  const pickStyle = (r: number, pt: number) => {
+    setRate(r); setPitch(pt)
+    DB.setVoiceSettings({ voiceName, rate: r, pitch: pt })
+    onRefresh()
+    preview(voiceName, r, pt)
+  }
+
+  const activeStyle = VOICE_STYLES.find(s => Math.abs(s.rate - rate) < 0.04)?.key
+
+  return (
+    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
+      <View style={g.stgHeader}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+        <Text style={g.stgHeaderTitle}>{aiName}'s voice</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Speaking style */}
+      <Text style={g.stgSec}>Speaking style</Text>
+      <View style={[g.stgGroup, { padding: 14 }]}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {VOICE_STYLES.map(s => {
+            const on = activeStyle === s.key
+            return (
+              <TouchableOpacity key={s.key} onPress={() => pickStyle(s.rate, s.pitch)}
+                style={{ flex: 1, backgroundColor: on ? '#F1EEFF' : '#FAF9FD', borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 2, borderColor: on ? '#7B6EF6' : '#ECE9F4' }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#222540' }}>{s.label}</Text>
+                <Text style={{ fontSize: 10.5, color: '#8A8FA8', marginTop: 4, textAlign: 'center' }}>{s.sub}</Text>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+      </View>
+
+      {/* Voice list */}
+      <Text style={g.stgSec}>Voice</Text>
+      <View style={g.stgGroup}>
+        <TouchableOpacity onPress={() => pickVoice(undefined)}
+          style={[g.notifRow, !voiceName && { backgroundColor: '#F8F6FF' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={g.notifRowTitle}>✨ Best available</Text>
+            <Text style={g.notifRowSub}>{aiName} picks the highest-quality voice on this device</Text>
+          </View>
+          {!voiceName && <Text style={{ color: '#7B6EF6', fontWeight: '800' }}>✓</Text>}
+        </TouchableOpacity>
+        {voices.length === 0 && (
+          <View style={{ padding: 16 }}>
+            <Text style={g.notifRowSub}>No voices found yet — voices are provided by your device and may take a moment to load.</Text>
+          </View>
+        )}
+        {voices.slice(0, 12).map((v, i) => {
+          const on = voiceName === v.name
+          return (
+            <TouchableOpacity key={v.name} onPress={() => pickVoice(v.name)}
+              style={[g.notifRow, i === Math.min(voices.length, 12) - 1 && { borderBottomWidth: 0 }, on && { backgroundColor: '#F8F6FF' }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={g.notifRowTitle}>{v.name.replace(/\s*\(.*\)\s*/g, '')}</Text>
+                <Text style={g.notifRowSub}>{v.lang}{v.localService ? ' · on-device' : ''}{/premium|enhanced|natural|neural/i.test(v.name) ? ' · ⭐ high quality' : ''}</Text>
+              </View>
+              {on ? <Text style={{ color: '#7B6EF6', fontWeight: '800' }}>✓</Text> : <Text style={{ color: '#C5BFEC', fontSize: 18 }}>▷</Text>}
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+
+      {/* Hear it */}
+      <View style={{ marginHorizontal: 20, marginTop: 16 }}>
+        <TouchableOpacity onPress={() => preview(voiceName)} style={g.settingsSaveBtn}>
+          <Text style={g.settingsSaveTxt}>🔊 Hear {aiName}</Text>
+        </TouchableOpacity>
+        <Text style={[g.notifRowSub, { textAlign: 'center', marginTop: 12 }]}>
+          Tap any voice to hear it. Voices come from your device — phones usually have more natural ones than browsers.
+        </Text>
+      </View>
+    </ScrollView>
+  )
+}
+
 function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void }) {
-  type Panel = null | 'language' | 'companion' | 'safety' | 'notifications'
+  type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice'
   const [panel, setPanel] = useState<Panel>(null)
   const [aiName, setAiName] = useState(profile.aiName || 'Soma')
   const [tcName, setTcName] = useState(profile.trustedContact?.name || '')
@@ -5229,6 +5392,9 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
   // ── Sub-screen: Notifications ────────────────────────────
   if (panel === 'notifications') return <NotificationSettingsPanel profile={profile} onBack={back} onRefresh={onRefresh} />
 
+  // ── Sub-screen: Voice ─────────────────────────────────────
+  if (panel === 'voice') return <VoiceSettingsPanel profile={profile} onBack={back} onRefresh={onRefresh} />
+
   // ── Main settings list ────────────────────────────────────
   return (
     <ScrollView style={[g.screen, { backgroundColor: '#F5F4FA' }]} contentContainerStyle={{ paddingBottom: 80 }}>
@@ -5260,6 +5426,7 @@ function Settings({ profile, onBack, onRefresh, onReset }: { profile: UserProfil
       <Text style={g.stgSec}>Your companion</Text>
       <View style={g.stgGroup}>
         <StgRow icon="🌟" label="Name" value={profile.aiName || 'Soma'} onPress={() => setPanel('companion')} />
+        <StgRow icon="🔊" label="Voice" value={profile.voiceSettings?.voiceName?.replace(/\s*\(.*\)\s*/g, '') || 'Best available'} onPress={() => setPanel('voice')} />
         <StgRow icon="🖼" label="Photo" value={profile.aiPhoto ? 'Set' : 'Not set'} onPress={changePipPhoto} last />
       </View>
 
