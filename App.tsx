@@ -2737,6 +2737,44 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
         </View>
       </View>
 
+      {/* Mood trend */}
+      {(profile.moodLogs || []).length > 0 && (() => {
+        const MOOD_COLORS = ['#F66E8E', '#F6A86E', '#F6E86E', '#6EE6C0', '#7B6EF6']
+        const MOOD_LABELS = ['Rough', 'Meh', 'Okay', 'Good', 'Great']
+        const days = Array.from({ length: 14 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (13 - i))
+          return d.toISOString().slice(0, 10)
+        })
+        const logs = profile.moodLogs || []
+        return (
+          <View style={{ paddingHorizontal: 24, marginTop: 8, marginBottom: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#6E7191', letterSpacing: 0.8, marginBottom: 12 }}>MOOD — LAST 14 DAYS</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 52 }}>
+              {days.map(day => {
+                const log = logs.find(l => l.date === day)
+                const color = log ? MOOD_COLORS[log.mood - 1] : '#E8E6F2'
+                const h = log ? 10 + (log.mood - 1) * 9 : 6
+                return (
+                  <View key={day} style={{ alignItems: 'center', gap: 3 }}>
+                    <View style={{ width: 16, height: h, borderRadius: 4, backgroundColor: color }} />
+                    {log && <Text style={{ fontSize: 8, color: '#9A9DB2' }}>{new Date(day).getDate()}</Text>}
+                    {!log && <View style={{ height: 10 }} />}
+                  </View>
+                )
+              })}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+              {MOOD_COLORS.map((c, i) => (
+                <View key={c} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c }} />
+                  <Text style={{ fontSize: 10, color: '#9A9DB2' }}>{MOOD_LABELS[i]}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )
+      })()}
+
       <WheelHistory history={hist} />
       <View style={{ height: 40 }} />
     </ScrollView>
