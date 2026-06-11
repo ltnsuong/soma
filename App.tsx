@@ -9,7 +9,17 @@ import * as WebBrowser from 'expo-web-browser'
 import * as Google from 'expo-auth-session/providers/google'
 import * as Notifications from 'expo-notifications'
 import * as Location from 'expo-location'
+import * as Haptics from 'expo-haptics'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
+
+// Safe haptic helpers — no-op on web where haptics aren't supported
+const haptic = {
+  light: () => { if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}) },
+  medium: () => { if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}) },
+  heavy: () => { if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {}) },
+  success: () => { if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}) },
+  error: () => { if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {}) },
+}
 
 WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app reopens
 
@@ -1930,6 +1940,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     { emoji: '😊', label: 'Great', val: 5 },
   ]
   const saveMood = (val: 1|2|3|4|5) => {
+    haptic.light()
     setMoodPicked(val)
     DB.addMoodLog(val, moodNote || undefined)
     setMoodExpanded(false)
@@ -3392,11 +3403,12 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   const currentScore = ranked[index].score
   const currentShared = ranked[index].shared
   const currentPsych = ranked[index].psych
-  const pass = () => { if (index < activeRanked.length - 1) setIndex(index + 1); else setIndex(0) }
+  const pass = () => { haptic.light(); if (index < activeRanked.length - 1) setIndex(index + 1); else setIndex(0) }
 
   const like = () => {
     // Daily like limit
-    if (DB.likesLeft() <= 0) { setShowPaywall(true); return }
+    if (DB.likesLeft() <= 0) { setShowPaywall(true); haptic.error(); return }
+    haptic.medium()
     DB.useLike()
     setLikesLeft(DB.likesLeft())
     const pick = activeRanked[Math.min(index, activeRanked.length - 1)].c
@@ -3419,6 +3431,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     }
     // ✨ Immediate match! AI agents start talking right away
     analytics.track('match_created', { with: pick.name })
+    haptic.success()
     setStep('matched')
     // Auto-start the matching conversation immediately
     setTimeout(() => runMatch(), 100)
@@ -4319,6 +4332,7 @@ function ThankfulDiary({ profile, onBack, onRefresh }: { profile: UserProfile; o
       `You are ${aiName}, a warm and emotionally intelligent companion. The user shared these 3 things they're grateful for today:\n1. ${items[0]}\n2. ${items[1]}\n3. ${items[2]}\nWrite a short (2-3 sentences), heartfelt reflection that honours what they shared. Be warm, personal, not generic.${langDirective()}`
     }], 0.8).catch(() => '')
     DB.addGratitude(items, note)
+    haptic.success()
     setSomaNote(note); setSaved(true); setSaving(false); onRefresh()
   }
 
@@ -4472,6 +4486,7 @@ function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; on
   }
 
   const save = () => {
+    haptic.success()
     DB.addLoveEntry(affirmation, checks, note.trim() || undefined)
     setSaved(true); onRefresh()
   }
