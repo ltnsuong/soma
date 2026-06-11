@@ -630,6 +630,17 @@ async function syncGratitudeNotification(hour: number, minute: number, enabled: 
 // Builds a rich context from everything the user shared,
 // then asks Groq to write 7 warm, personal notification bodies.
 // Calculate gratitude streak (consecutive days)
+function calcActivityStreak(profile: UserProfile): number {
+  const days = new Set<string>()
+  profile.diary.forEach(e => { if (e.date) days.add(e.date.slice(0, 10)) })
+  profile.gratitudeEntries?.forEach(e => { if (e.date) days.add(e.date.slice(0, 10)) })
+  profile.loveEntries?.forEach(e => { if (e.date) days.add(e.date.slice(0, 10)) })
+  let streak = 0
+  const d = new Date()
+  while (days.has(d.toISOString().slice(0, 10))) { streak++; d.setDate(d.getDate() - 1) }
+  return streak
+}
+
 function calcGratitudeStreak(profile: UserProfile): number {
   const entries = (profile.gratitudeEntries || []).map(e => e.date).sort().reverse()
   if (!entries.length) return 0
@@ -905,7 +916,7 @@ const datingApi = {
     return data.results || []
   },
 
-  like: async (targetId: string): Promise<boolean> => {
+  like: async (targetId: string): Promise<{ matched: boolean }> => {
     const res = await fetch(`${BACKEND_URL}/dating/like`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
@@ -913,7 +924,16 @@ const datingApi = {
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Like failed')
-    return !!data.matched
+    return { matched: !!data.matched }
+  },
+
+  matches: async (): Promise<NearbyUser[]> => {
+    const res = await fetch(`${BACKEND_URL}/dating/matches`, {
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Matches fetch failed')
+    return data.matches || []
   },
 }
 
@@ -1792,21 +1812,48 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
 
 // ── HOME ───────────────────────────────────────────────────
 function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void }) {
-  const scoreByDomain = (d: DomainKey) => profile.memories.filter(m => m.domain === d).length
   const totalMem = profile.memories.length
   const homeScore = (k: DomainKey) => {
     const m = profile.manualScores?.[k]
     return typeof m === 'number' ? m * 10 : (profile.wheel?.scores?.[k]?.score ?? domainWellbeing(profile.memories, k))
   }
+  const streak = calcActivityStreak(profile)
+
+  const focusDomain = profile.onboarding?.focusDomains?.[0]
+  const focusLabel = focusDomain ? DOMAINS.find(d => d.key === focusDomain)?.label : null
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
   return (
     <ScrollView style={g.screen} contentContainerStyle={g.homePad}>
       <View style={g.homeHeader}>
         <View>
-          <Text style={g.greeting}>{profile.name ? `Hello, ${profile.name}` : 'Welcome'}</Text>
+          <Text style={g.greeting}>{profile.name ? `${greeting}, ${profile.name}` : greeting}</Text>
           <Text style={g.greetDate}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
         </View>
-        <TouchableOpacity onPress={() => go('settings')} onLongPress={onReset}><Text style={g.logoSm}>⚙</Text></TouchableOpacity>
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          {streak > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,160,40,0.13)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+              <Text style={{ fontSize: 14 }}>🔥</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#F59E0B', marginLeft: 4 }}>{streak} day{streak !== 1 ? 's' : ''}</Text>
+            </View>
+          )}
+          <TouchableOpacity onPress={() => go('settings')} onLongPress={onReset}><Text style={g.logoSm}>⚙</Text></TouchableOpacity>
+        </View>
       </View>
+
+      {/* Daily focus card */}
+      {focusLabel && (
+        <TouchableOpacity style={{ backgroundColor: 'rgba(123,110,246,0.08)', borderRadius: 16, padding: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }} onPress={() => go('aura')}>
+          <Text style={{ fontSize: 22 }}>{DOMAINS.find(d => d.key === focusDomain)?.icon || '✦'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B6EF6', letterSpacing: 0.8, marginBottom: 2 }}>TODAY'S FOCUS</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#222540' }}>{focusLabel}</Text>
+            <Text style={{ fontSize: 12, color: '#6E7191', marginTop: 1 }}>Talk to Soma about it →</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
 
       {/* Circle of Life — the hero of the home screen */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -3118,7 +3165,20 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     setLiked([...liked, pick])
     // Real user? Record the like on the backend (mutual likes become matches)
     const realId = (pick as any).realUserId
-    if (realId && datingApi.authed()) datingApi.like(realId).catch(() => {})
+    if (realId && datingApi.authed()) {
+      datingApi.like(realId).then(res => {
+        if (res.matched) {
+          DB.upsertConnection({
+            id: `real_${realId}`,
+            name: pick.name, age: pick.age, photo: pick.photo,
+            color: '#7B6EF6', bio: pick.bio || '',
+            loveLanguage: (pick as any).loveLanguage || '',
+            attachment: (pick as any).attachment || '',
+            messages: [], matchScore: Math.round(currentScore),
+          })
+        }
+      }).catch(() => {})
+    }
     // ✨ Immediate match! AI agents start talking right away
     analytics.track('match_created', { with: pick.name })
     setStep('matched')
@@ -3737,6 +3797,25 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
   const ref = useRef<ScrollView>(null)
   const conns = DB.get().connections
   const conn = conns.find(c => c.id === openId)
+
+  // Sync real backend matches into local connections on mount
+  useEffect(() => {
+    if (!datingApi.authed()) return
+    datingApi.matches().then(matches => {
+      matches.forEach(m => {
+        const existing = DB.getConnection(`real_${m.userId}`)
+        DB.upsertConnection({
+          id: `real_${m.userId}`,
+          name: m.name, age: m.age, photo: m.photo,
+          color: '#7B6EF6', bio: m.bio || '',
+          loveLanguage: m.loveLanguage || '', attachment: m.attachment || '',
+          messages: existing?.messages || [],
+          matchScore: m.compatibility,
+        })
+      })
+      if (matches.length > 0) onRefresh()
+    }).catch(() => {})
+  }, [])
 
   const open = (c: Connection) => { setOpenId(c.id); setMsgs(c.messages) }
   const send = async (text: string) => {
