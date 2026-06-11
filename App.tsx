@@ -269,6 +269,7 @@ interface UserProfile {
     completedAt: string
   }
   somaMessage?: { text: string; date: string }  // cached daily proactive message from Soma
+  moodLogs?: { date: string; mood: 1|2|3|4|5; note?: string }[]  // daily mood check-ins
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
@@ -505,6 +506,14 @@ const DB = {
   setSomaMessage: (text: string) => {
     const p = DB.get()
     p.somaMessage = { text, date: new Date().toISOString().slice(0, 10) }
+    DB.save(p)
+  },
+  addMoodLog: (mood: 1|2|3|4|5, note?: string) => {
+    const p = DB.get()
+    const today = new Date().toISOString().slice(0, 10)
+    const logs = (p.moodLogs || []).filter(l => l.date !== today)
+    logs.unshift({ date: today, mood, note })
+    p.moodLogs = logs.slice(0, 365)
     DB.save(p)
   },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
@@ -1887,15 +1896,44 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary }: {
 // ── HOME ───────────────────────────────────────────────────
 function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void }) {
   const totalMem = profile.memories.length
+  const recentMoodScore = (() => {
+    const logs = profile.moodLogs || []
+    if (!logs.length) return null
+    const recent = logs.slice(0, 7)
+    const avg = recent.reduce((s, l) => s + l.mood, 0) / recent.length
+    return Math.round((avg / 5) * 100)
+  })()
   const homeScore = (k: DomainKey) => {
     const m = profile.manualScores?.[k]
-    return typeof m === 'number' ? m * 10 : (profile.wheel?.scores?.[k]?.score ?? domainWellbeing(profile.memories, k))
+    if (typeof m === 'number') return m * 10
+    const base = profile.wheel?.scores?.[k]?.score ?? domainWellbeing(profile.memories, k)
+    if (k === 'mind' && recentMoodScore !== null) return Math.round((base + recentMoodScore) / 2)
+    return base
   }
   const streak = calcActivityStreak(profile)
   const focusDomain = profile.onboarding?.focusDomains?.[0]
   const focusLabel = focusDomain ? DOMAINS.find(d => d.key === focusDomain)?.label : null
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
+  // Mood check-in
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayMood = (profile.moodLogs || []).find(l => l.date === todayStr)
+  const [moodPicked, setMoodPicked] = useState<number | null>(todayMood?.mood ?? null)
+  const [moodNote, setMoodNote] = useState('')
+  const [moodExpanded, setMoodExpanded] = useState(false)
+  const MOODS: { emoji: string; label: string; val: 1|2|3|4|5 }[] = [
+    { emoji: '😔', label: 'Rough', val: 1 },
+    { emoji: '😕', label: 'Meh', val: 2 },
+    { emoji: '😐', label: 'Okay', val: 3 },
+    { emoji: '🙂', label: 'Good', val: 4 },
+    { emoji: '😊', label: 'Great', val: 5 },
+  ]
+  const saveMood = (val: 1|2|3|4|5) => {
+    setMoodPicked(val)
+    DB.addMoodLog(val, moodNote || undefined)
+    setMoodExpanded(false)
+  }
 
   // Soma daily proactive message
   const [somaMsg, setSomaMsg] = useState<string | null>(null)
@@ -1947,6 +1985,33 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       )}
 
 
+      {/* Mood check-in */}
+      <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 14, marginBottom: 14, shadowColor: '#7B6EF6', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moodPicked ? 0 : 10 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#9A9DB2', letterSpacing: 0.8 }}>HOW ARE YOU FEELING?</Text>
+          {moodPicked && <Text style={{ fontSize: 12, color: '#22C55E', fontWeight: '600' }}>✓ Logged</Text>}
+        </View>
+        {!moodPicked && (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            {MOODS.map(m => (
+              <TouchableOpacity key={m.val} onPress={() => saveMood(m.val)} style={{ alignItems: 'center', gap: 3 }}>
+                <Text style={{ fontSize: 28 }}>{m.emoji}</Text>
+                <Text style={{ fontSize: 10, color: '#9A9DB2', fontWeight: '500' }}>{m.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        {moodPicked && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 24 }}>{MOODS.find(m => m.val === moodPicked)?.emoji}</Text>
+            <Text style={{ fontSize: 14, color: '#222540', fontWeight: '500' }}>{MOODS.find(m => m.val === moodPicked)?.label}</Text>
+            <TouchableOpacity onPress={() => { setMoodPicked(null); DB.addMoodLog(3) }} style={{ marginLeft: 'auto' }}>
+              <Text style={{ fontSize: 12, color: '#C4BBFB' }}>Change</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
       {/* Soma morning message card */}
       {somaMsg && !somaMsgDismissed && (
         <TouchableOpacity onPress={() => go('aura')} style={{ backgroundColor: '#fff', borderRadius: 18, padding: 16, marginBottom: 16, flexDirection: 'row', gap: 12, shadowColor: '#7B6EF6', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } }}>
@@ -1991,6 +2056,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
         const medLog = (profile.medLogs || []).find(l => l.date === todayStr)
         const medsDone = activeMeds.length > 0 && activeMeds.every(m => medLog?.doses?.[m.id] !== undefined)
         const rituals = [
+          { icon: '💭', label: 'Mood', done: !!moodPicked, screen: 'home' as Screen },
           { icon: '📖', label: 'Diary', done: diaryToday, screen: 'diary' as Screen },
           { icon: '🌸', label: 'Love Yourself', done: loveToday, screen: 'loveyourself' as Screen },
           { icon: '🙏', label: 'Gratitude', done: gratToday, screen: 'gratitude' as Screen },
@@ -2005,7 +2071,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
             </View>
             <View style={{ backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', shadowColor: '#7B6EF6', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } }}>
               {rituals.map((r, i) => (
-                <TouchableOpacity key={r.label} onPress={() => go(r.screen)} style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: i < rituals.length - 1 ? 1 : 0, borderBottomColor: '#F0F0F5', gap: 12 }}>
+                <TouchableOpacity key={r.label} onPress={() => r.screen === 'home' ? undefined : go(r.screen)} style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: i < rituals.length - 1 ? 1 : 0, borderBottomColor: '#F0F0F5', gap: 12 }}>
                   <Text style={{ fontSize: 20, width: 28, textAlign: 'center' }}>{r.icon}</Text>
                   <Text style={{ flex: 1, fontSize: 15, fontWeight: '500', color: '#222540' }}>{r.label}</Text>
                   <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: r.done ? '#22C55E' : '#F0F0F5', alignItems: 'center', justifyContent: 'center' }}>
