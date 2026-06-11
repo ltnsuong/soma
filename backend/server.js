@@ -434,6 +434,144 @@ app.get('/matches', auth, async (req, res) => {
   }
 })
 
+// ════════════════════════════════════════════════════════════
+// REAL GEO MATCHING — dating profiles, nearby search, likes, matches
+// ════════════════════════════════════════════════════════════
+
+// Round coordinates to ~1 km so exact homes are never stored
+const roundCoord = (n) => Math.round(Number(n) * 100) / 100
+
+// Compatibility score from shared signals (0–100)
+function compatibility(me, them) {
+  let score = 50
+  const myInterests = new Set((me.interests || []).map(s => s.toLowerCase()))
+  const shared = (them.interests || []).filter(i => myInterests.has(i.toLowerCase())).length
+  score += Math.min(shared * 8, 24)
+  if (me.love_language && me.love_language === them.love_language) score += 10
+  // Secure attachment pairs well with everything; anxious+avoidant is the hard pairing
+  if (me.attachment === 'Secure' || them.attachment === 'Secure') score += 8
+  else if ((me.attachment === 'Anxious' && them.attachment === 'Avoidant') ||
+           (me.attachment === 'Avoidant' && them.attachment === 'Anxious')) score -= 6
+  if (me.looking_for && me.looking_for === them.looking_for) score += 8
+  return Math.max(10, Math.min(99, score))
+}
+
+// UPSERT my dating profile (+ rounded location)
+app.put('/dating/profile', auth, async (req, res) => {
+  try {
+    const { name, age, photo, bio, interests, values, loveLanguage, attachment, lookingFor, work, lat, lng, city } = req.body
+    if (!name) return res.status(400).json({ error: 'Name required' })
+    const row = {
+      user_id: req.user.userId,
+      name, age: age || null, photo: photo || '', bio: bio || '',
+      interests: interests || [], values: values || [],
+      love_language: loveLanguage || '', attachment: attachment || '',
+      looking_for: lookingFor || '', work: work || '',
+      lat: lat != null ? roundCoord(lat) : null,
+      lng: lng != null ? roundCoord(lng) : null,
+      city: city || '',
+      active: true,
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('dating_profiles').upsert(row, { onConflict: 'user_id' })
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// NEARBY — real users within radius km, sorted by distance, with compatibility
+app.get('/dating/nearby', auth, async (req, res) => {
+  try {
+    const radius = Math.min(Number(req.query.radius) || 50, 500)
+    const { data: me } = await supabase.from('dating_profiles').select('*').eq('user_id', req.user.userId).single()
+    if (!me || me.lat == null) return res.status(400).json({ error: 'Set your profile and location first' })
+
+    // People I already liked — don't show them again
+    const { data: likedRows } = await supabase.from('dating_likes').select('target_id').eq('liker_id', req.user.userId)
+    const likedIds = new Set((likedRows || []).map(r => r.target_id))
+
+    const { data: rows, error } = await supabase.rpc('nearby_profiles', {
+      p_user_id: req.user.userId, p_lat: me.lat, p_lng: me.lng, p_radius_km: radius, p_limit: 50,
+    })
+    if (error) return res.status(500).json({ error: error.message })
+
+    const results = (rows || [])
+      .filter(r => !likedIds.has(r.user_id))
+      .map(r => ({
+        userId: r.user_id, name: r.name, age: r.age, photo: r.photo, bio: r.bio,
+        interests: r.interests, values: r.values, loveLanguage: r.love_language,
+        attachment: r.attachment, work: r.work, city: r.city,
+        distanceKm: Math.round(r.distance_km * 10) / 10,
+        compatibility: compatibility(me, r),
+      }))
+      .sort((a, b) => b.compatibility - a.compatibility || a.distanceKm - b.distanceKm)
+    res.json({ results })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// LIKE someone — creates a match when it's mutual
+app.post('/dating/like', auth, async (req, res) => {
+  try {
+    const { targetId } = req.body
+    if (!targetId) return res.status(400).json({ error: 'targetId required' })
+    if (targetId === req.user.userId) return res.status(400).json({ error: 'Cannot like yourself' })
+
+    await supabase.from('dating_likes').upsert(
+      { liker_id: req.user.userId, target_id: targetId },
+      { onConflict: 'liker_id,target_id' }
+    )
+
+    // Mutual?
+    const { data: reciprocal } = await supabase.from('dating_likes')
+      .select('liker_id').eq('liker_id', targetId).eq('target_id', req.user.userId).maybeSingle()
+
+    if (reciprocal) {
+      const [a, b] = [req.user.userId, targetId].sort()
+      await supabase.from('dating_matches').upsert({ user_a: a, user_b: b }, { onConflict: 'user_a,user_b' })
+      return res.json({ matched: true })
+    }
+    res.json({ matched: false })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// MY MATCHES — mutual likes with their profiles
+app.get('/dating/matches', auth, async (req, res) => {
+  try {
+    const uid = req.user.userId
+    const { data: ms } = await supabase.from('dating_matches')
+      .select('user_a, user_b, created_at')
+      .or(`user_a.eq.${uid},user_b.eq.${uid}`)
+    const otherIds = (ms || []).map(m => m.user_a === uid ? m.user_b : m.user_a)
+    if (!otherIds.length) return res.json({ matches: [] })
+    const { data: profiles } = await supabase.from('dating_profiles')
+      .select('user_id, name, age, photo, bio, city').in('user_id', otherIds)
+    res.json({ matches: profiles || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// WHO LIKED ME (premium feature — gated client-side)
+app.get('/dating/liked-you', auth, async (req, res) => {
+  try {
+    const { data: rows } = await supabase.from('dating_likes')
+      .select('liker_id').eq('target_id', req.user.userId)
+    const ids = (rows || []).map(r => r.liker_id)
+    if (!ids.length) return res.json({ likedYou: [] })
+    const { data: profiles } = await supabase.from('dating_profiles')
+      .select('user_id, name, age, photo, city').in('user_id', ids)
+    res.json({ likedYou: profiles || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Privacy policy
 app.get('/privacy', (req, res) => {
   res.setHeader('Content-Type', 'text/html')

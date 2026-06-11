@@ -8,6 +8,7 @@ import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path 
 import * as WebBrowser from 'expo-web-browser'
 import * as Google from 'expo-auth-session/providers/google'
 import * as Notifications from 'expo-notifications'
+import * as Location from 'expo-location'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
 
 WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app reopens
@@ -843,6 +844,91 @@ const auth = {
     if (!res.ok) throw new Error(data.error || 'Password reset failed')
     return data
   },
+}
+
+// ════════════════════════════════════════════════════════════
+// GEO LOCATION + REAL MATCHING API
+// ════════════════════════════════════════════════════════════
+
+// Get approximate device location. Web → browser API, native → expo-location.
+async function getApproxLocation(): Promise<{ lat: number; lng: number } | null> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) return null
+      return await new Promise(resolve => {
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
+        )
+      })
+    }
+    const { status } = await Location.requestForegroundPermissionsAsync()
+    if (status !== 'granted') return null
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })
+    return { lat: pos.coords.latitude, lng: pos.coords.longitude }
+  } catch { return null }
+}
+
+// Real user returned by the backend nearby search
+interface NearbyUser {
+  userId: string; name: string; age: number; photo: string; bio: string
+  interests: string[]; values: string[]; loveLanguage: string; attachment: string
+  work: string; city: string; distanceKm: number; compatibility: number
+}
+
+const datingApi = {
+  authed: () => !!auth.getToken() && !!BACKEND_URL && !BACKEND_URL.includes('localhost'),
+
+  saveProfile: async (p: UserProfile, loc: { lat: number; lng: number } | null) => {
+    const d = p.dating
+    const res = await fetch(`${BACKEND_URL}/dating/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+      body: JSON.stringify({
+        name: p.name, age: Number(d.age) || null, photo: d.photo, bio: d.bio,
+        interests: d.interests, values: d.relationshipValues,
+        loveLanguage: d.loveLanguage, attachment: d.attachment,
+        lookingFor: d.lookingFor, work: d.work,
+        lat: loc?.lat, lng: loc?.lng, city: d.location,
+      }),
+    })
+    if (!res.ok) throw new Error((await res.json()).error || 'Profile save failed')
+  },
+
+  nearby: async (radiusKm = 50): Promise<NearbyUser[]> => {
+    const res = await fetch(`${BACKEND_URL}/dating/nearby?radius=${radiusKm}`, {
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Nearby search failed')
+    return data.results || []
+  },
+
+  like: async (targetId: string): Promise<boolean> => {
+    const res = await fetch(`${BACKEND_URL}/dating/like`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+      body: JSON.stringify({ targetId }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Like failed')
+    return !!data.matched
+  },
+}
+
+// Map a real backend user into the Candidate card shape used by the UI
+function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string } {
+  return {
+    realUserId: u.userId,
+    name: u.name, age: u.age || 0, emoji: '💜', color: '#7B6EF6',
+    photo: u.photo || '', location: u.city || 'Nearby',
+    distance: `${u.distanceKm} km`, height: '', weight: '',
+    bio: u.bio || '', values: u.values || [], interests: u.interests || [],
+    agentName: 'their Soma', loveLanguage: u.loveLanguage || '', attachment: u.attachment || '',
+    intimacy: '', work: u.work || '', children: '', pets: '',
+    tags: (u.interests || []).slice(0, 5).map(i => ({ icon: '✨', label: i })),
+  }
 }
 
 // ── MICRO-INTERACTIONS: Animated Press Button ───────────────
@@ -2902,6 +2988,9 @@ function MeetPeople({ profile, onBack, onMyProfile }: { profile: UserProfile; on
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [browseTab, setBrowseTab] = useState<'for-you' | 'nearby'>('for-you')
   const [userLocation] = useState({ lat: 34.0522, lng: -118.2437 }) // Mock LA location
+  // Real users from the backend (live when logged in + backend deployed)
+  const [realNearby, setRealNearby] = useState<NearbyUser[]>([])
+  const [realStatus, setRealStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
   const [index, setIndex] = useState(0)
   const [liked, setLiked] = useState<Candidate[]>([])
   const [likesLeft, setLikesLeft] = useState(DB.likesLeft())
@@ -2992,20 +3081,46 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     }, totalDelay)
   }
 
-  const current = ranked[index].c
+  // Load real nearby users when the Nearby tab opens (requires login + deployed backend)
+  useEffect(() => {
+    if (browseTab !== 'nearby' || realStatus !== 'idle') return
+    if (!datingApi.authed()) { setRealStatus('unavailable'); return }
+    setRealStatus('loading')
+    ;(async () => {
+      try {
+        const loc = await getApproxLocation()
+        if (loc) await datingApi.saveProfile(profile, loc).catch(() => {})
+        setRealNearby(await datingApi.nearby(50))
+        setRealStatus('ready')
+      } catch { setRealStatus('unavailable') }
+    })()
+  }, [browseTab])
+
+  const realRanked = realNearby.map(u => {
+    const c = nearbyToCandidate(u)
+    return { c, score: u.compatibility, shared: (c.interests || []).slice(0, 3), psych: { attach: 0, love: 0, note: `${u.distanceKm} km away` } }
+  })
+  const useReal = browseTab === 'nearby' && realStatus === 'ready' && realRanked.length > 0
+  const activeRanked = useReal ? realRanked : ranked
+
+  const current = activeRanked[Math.min(index, activeRanked.length - 1)].c
   const currentScore = ranked[index].score
   const currentShared = ranked[index].shared
   const currentPsych = ranked[index].psych
-  const pass = () => { if (index < ranked.length - 1) setIndex(index + 1); else setIndex(0) }
+  const pass = () => { if (index < activeRanked.length - 1) setIndex(index + 1); else setIndex(0) }
 
   const like = () => {
     // Daily like limit
     if (DB.likesLeft() <= 0) { setShowPaywall(true); return }
     DB.useLike()
     setLikesLeft(DB.likesLeft())
-    setLiked([...liked, ranked[index].c])
+    const pick = activeRanked[Math.min(index, activeRanked.length - 1)].c
+    setLiked([...liked, pick])
+    // Real user? Record the like on the backend (mutual likes become matches)
+    const realId = (pick as any).realUserId
+    if (realId && datingApi.authed()) datingApi.like(realId).catch(() => {})
     // ✨ Immediate match! AI agents start talking right away
-    analytics.track('match_created', { with: ranked[index].c.name })
+    analytics.track('match_created', { with: pick.name })
     setStep('matched')
     // Auto-start the matching conversation immediately
     setTimeout(() => runMatch(), 100)
@@ -3219,19 +3334,21 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   }
 
   if (step === 'browse') {
-    // Filter candidates based on tab
-    const filteredRanked = browseTab === 'nearby'
-      ? [...CANDIDATES]
-          .filter(c => {
-            // Mock distance calculation (would use real geolocation in production)
-            const distance = Math.sqrt(Math.pow(c.lat - userLocation.lat, 2) + Math.pow(c.lng - userLocation.lng, 2)) * 111 // km
-            return distance < 25 // Within 25km
-          })
-          .map(c => ({ c, ...alignmentScore(profile, c) }))
-          .sort((a, b) => a.score - b.score) // Sort by distance (ascending)
-      : [...CANDIDATES]
-          .map(c => ({ c, ...alignmentScore(profile, c) }))
-          .sort((a, b) => b.score - a.score) // Sort by alignment (descending)
+    // Nearby tab: real users from the backend when available, demo profiles otherwise
+    const filteredRanked = useReal
+      ? realRanked
+      : browseTab === 'nearby'
+        ? [...CANDIDATES]
+            .filter(c => {
+              // Mock distance calculation (demo profiles until backend is live)
+              const distance = Math.sqrt(Math.pow((c as any).lat - userLocation.lat, 2) + Math.pow((c as any).lng - userLocation.lng, 2)) * 111 // km
+              return distance < 25 // Within 25km
+            })
+            .map(c => ({ c, ...alignmentScore(profile, c) }))
+            .sort((a, b) => a.score - b.score) // Sort by distance (ascending)
+        : [...CANDIDATES]
+            .map(c => ({ c, ...alignmentScore(profile, c) }))
+            .sort((a, b) => b.score - a.score) // Sort by alignment (descending)
 
     const browseIndex = Math.min(index, filteredRanked.length - 1)
     const currentBrowse = filteredRanked[browseIndex]?.c
@@ -3258,6 +3375,19 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           </View>
           <TouchableOpacity style={g.dMe} onPress={() => setStep('profile')}><Text style={g.dMeTxt}>Me</Text></TouchableOpacity>
         </View>
+
+        {/* Live status for the Nearby tab */}
+        {browseTab === 'nearby' && (
+          <View style={{ paddingHorizontal: 20, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: useReal ? '#34C759' : realStatus === 'loading' ? '#F6C26E' : '#C5BFEC' }} />
+            <Text style={{ fontSize: 12, color: '#6E7191', fontWeight: '600' }}>
+              {useReal ? `LIVE — ${realRanked.length} real ${realRanked.length === 1 ? 'person' : 'people'} near you`
+                : realStatus === 'loading' ? 'Finding real people near you…'
+                : realStatus === 'ready' ? 'No one nearby yet — showing example profiles'
+                : 'Demo profiles — sign in to meet real people nearby'}
+            </Text>
+          </View>
+        )}
 
         <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           {/* Full-bleed real photo */}

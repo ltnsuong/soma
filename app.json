@@ -33,6 +33,12 @@
     "plugins": [
       "expo-web-browser",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SOMA uses your approximate location to show real people nearby. Your exact position is never shared."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
