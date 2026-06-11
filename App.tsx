@@ -268,6 +268,7 @@ interface UserProfile {
     focusDomains: DomainKey[]    // up to 3 life areas they want to work on
     completedAt: string
   }
+  somaMessage?: { text: string; date: string }  // cached daily proactive message from Soma
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
@@ -501,6 +502,11 @@ const DB = {
     p.onboarding = { goals, focusDomains, completedAt: new Date().toISOString().slice(0, 10) }
     DB.save(p)
   },
+  setSomaMessage: (text: string) => {
+    const p = DB.get()
+    p.somaMessage = { text, date: new Date().toISOString().slice(0, 10) }
+    DB.save(p)
+  },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
 
@@ -639,6 +645,27 @@ function calcActivityStreak(profile: UserProfile): number {
   const d = new Date()
   while (days.has(d.toISOString().slice(0, 10))) { streak++; d.setDate(d.getDate() - 1) }
   return streak
+}
+
+async function generateSomaDailyMessage(profile: UserProfile): Promise<string> {
+  const name = profile.name || 'friend'
+  const aiName = profile.aiName || 'Soma'
+  const hour = new Date().getHours()
+  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+  const streak = calcActivityStreak(profile)
+  const recentMem = profile.memories.slice(0, 5).map(m => m.content).join('; ')
+  const goals = profile.onboarding?.goals?.join(', ') || ''
+  const focus = profile.onboarding?.focusDomains?.[0] || ''
+  const focusLabel = focus ? (DOMAINS.find(d => d.key === focus)?.label || focus) : ''
+  const ctx = [
+    recentMem && `Recent: ${recentMem}`,
+    goals && `Goals: ${goals}`,
+    focusLabel && `Focus area: ${focusLabel}`,
+    streak > 1 && `${streak}-day streak`,
+  ].filter(Boolean).join('. ')
+  const prompt = `Write a warm, personal ${timeOfDay} message to ${name} as ${aiName}, their AI companion. Be specific, caring, under 40 words. Reference their life if you know it. End with one gentle open question or encouragement. No quotes, no "Good ${timeOfDay}" opener — jump straight in. Context: ${ctx || 'new user'}`
+  const reply = await groq([{ role: 'user', content: prompt }], `You are ${aiName}, a warm AI life companion. Write in first person as ${aiName}.`, 80, 0.9)
+  return reply || `Thinking of you today, ${name}. What's one thing on your mind right now?`
 }
 
 function calcGratitudeStreak(profile: UserProfile): number {
@@ -949,6 +976,53 @@ function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string } {
     intimacy: '', work: u.work || '', children: '', pets: '',
     tags: (u.interests || []).slice(0, 5).map(i => ({ icon: '✨', label: i })),
   }
+}
+
+// ── MATCH CONFETTI ─────────────────────────────────────────
+const CONFETTI_COLORS = ['#7B6EF6', '#F6A86E', '#6EE6C0', '#F66E8E', '#F6E86E', '#6ECFF6', '#A89BFA']
+function MatchConfetti() {
+  const particles = useRef(
+    Array.from({ length: 18 }, (_, i) => ({
+      x: new Animated.Value(Math.random()),
+      y: new Animated.Value(0),
+      op: new Animated.Value(1),
+      rot: new Animated.Value(0),
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      size: 7 + Math.random() * 7,
+      startX: 0.1 + Math.random() * 0.8,
+    }))
+  ).current
+  useEffect(() => {
+    const anims = particles.map(p =>
+      Animated.parallel([
+        Animated.timing(p.y, { toValue: 1, duration: 1400 + Math.random() * 600, useNativeDriver: true }),
+        Animated.timing(p.op, { toValue: 0, duration: 1600 + Math.random() * 400, useNativeDriver: true }),
+        Animated.timing(p.rot, { toValue: 1, duration: 1200 + Math.random() * 800, useNativeDriver: true }),
+      ])
+    )
+    Animated.stagger(60, anims).start()
+  }, [])
+  const W = 340, H = 280
+  return (
+    <View style={{ width: W, height: H, position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+      {particles.map((p, i) => {
+        const tx = p.y.interpolate({ inputRange: [0, 1], outputRange: [0, (Math.random() - 0.5) * 120] })
+        const ty = p.y.interpolate({ inputRange: [0, 1], outputRange: [0, -H * 0.85] })
+        const rotate = p.rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${(Math.random() > 0.5 ? 1 : -1) * 540}deg`] })
+        return (
+          <Animated.View key={i} style={{
+            position: 'absolute',
+            left: p.startX * W, top: H * 0.7,
+            width: p.size, height: p.size,
+            borderRadius: Math.random() > 0.5 ? p.size / 2 : 2,
+            backgroundColor: p.color,
+            opacity: p.op,
+            transform: [{ translateX: tx }, { translateY: ty }, { rotate }],
+          }} />
+        )
+      })}
+    </View>
+  )
 }
 
 // ── MICRO-INTERACTIONS: Animated Press Button ───────────────
@@ -1818,11 +1892,29 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     return typeof m === 'number' ? m * 10 : (profile.wheel?.scores?.[k]?.score ?? domainWellbeing(profile.memories, k))
   }
   const streak = calcActivityStreak(profile)
-
   const focusDomain = profile.onboarding?.focusDomains?.[0]
   const focusLabel = focusDomain ? DOMAINS.find(d => d.key === focusDomain)?.label : null
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
+  // Soma daily proactive message
+  const [somaMsg, setSomaMsg] = useState<string | null>(null)
+  const [somaMsgDismissed, setSomaMsgDismissed] = useState(false)
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const cached = profile.somaMessage
+    if (cached?.date === today) { setSomaMsg(cached.text); return }
+    if (profile.conversations < 1 && !profile.memories.length) return // too early
+    generateSomaDailyMessage(profile).then(msg => {
+      DB.setSomaMessage(msg)
+      setSomaMsg(msg)
+    }).catch(() => {})
+  }, [])
+
+  // Unread badge: connections with last message from AI not yet replied to
+  const unreadCount = profile.connections.filter(c =>
+    c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant'
+  ).length
 
   return (
     <ScrollView style={g.screen} contentContainerStyle={g.homePad}>
@@ -1855,6 +1947,21 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       )}
 
 
+      {/* Soma morning message card */}
+      {somaMsg && !somaMsgDismissed && (
+        <TouchableOpacity onPress={() => go('aura')} style={{ backgroundColor: '#fff', borderRadius: 18, padding: 16, marginBottom: 16, flexDirection: 'row', gap: 12, shadowColor: '#7B6EF6', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } }}>
+          <SomaMark size={40} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B6EF6', letterSpacing: 0.8, marginBottom: 4 }}>{profile.aiName?.toUpperCase() || 'SOMA'}</Text>
+            <Text style={{ fontSize: 14, color: '#222540', lineHeight: 20 }}>{somaMsg}</Text>
+            <Text style={{ fontSize: 12, color: '#9A9DB2', marginTop: 6 }}>Tap to reply →</Text>
+          </View>
+          <TouchableOpacity onPress={e => { e.stopPropagation?.(); setSomaMsgDismissed(true) }} style={{ padding: 4 }}>
+            <Text style={{ fontSize: 16, color: '#C4BBFB' }}>×</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
+
       {/* Circle of Life — the hero of the home screen */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Text style={g.secLabel}>CIRCLE OF LIFE</Text>
@@ -1874,40 +1981,60 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
         <Text style={g.arrow}>→</Text>
       </TouchableOpacity>
 
-      {/* Quick row: Diary · Insights */}
-      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
-        <TouchableOpacity style={[g.diaryCard, { flex: 1, marginBottom: 0 }]} onPress={() => go('diary')}>
-          <Text style={{ fontSize: 20 }}>📖</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={g.diaryTitle}>Diary</Text>
-            <Text style={g.diarySub} numberOfLines={1}>{profile.diary.length > 0 ? `${profile.diary.length} entries` : 'Reflect today'}</Text>
+      {/* Daily rituals card */}
+      {(() => {
+        const todayStr = new Date().toISOString().slice(0, 10)
+        const diaryToday = profile.diary.some(e => e.date?.slice(0, 10) === todayStr)
+        const loveToday = profile.loveEntries?.some(e => e.date?.slice(0, 10) === todayStr) ?? false
+        const gratToday = profile.gratitudeEntries?.some(e => e.date?.slice(0, 10) === todayStr) ?? false
+        const activeMeds = (profile.medications || []).filter(m => m.active)
+        const medLog = (profile.medLogs || []).find(l => l.date === todayStr)
+        const medsDone = activeMeds.length > 0 && activeMeds.every(m => medLog?.doses?.[m.id] !== undefined)
+        const rituals = [
+          { icon: '📖', label: 'Diary', done: diaryToday, screen: 'diary' as Screen },
+          { icon: '🌸', label: 'Love Yourself', done: loveToday, screen: 'loveyourself' as Screen },
+          { icon: '🙏', label: 'Gratitude', done: gratToday, screen: 'gratitude' as Screen },
+          ...(activeMeds.length > 0 ? [{ icon: '💊', label: 'Medications', done: medsDone, screen: 'medication' as Screen }] : []),
+        ]
+        const doneCount = rituals.filter(r => r.done).length
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={g.secLabel}>TODAY</Text>
+              <Text style={{ fontSize: 12, color: doneCount === rituals.length ? '#22C55E' : '#9A9DB2', fontWeight: '600' }}>{doneCount}/{rituals.length} done</Text>
+            </View>
+            <View style={{ backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', shadowColor: '#7B6EF6', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } }}>
+              {rituals.map((r, i) => (
+                <TouchableOpacity key={r.label} onPress={() => go(r.screen)} style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: i < rituals.length - 1 ? 1 : 0, borderBottomColor: '#F0F0F5', gap: 12 }}>
+                  <Text style={{ fontSize: 20, width: 28, textAlign: 'center' }}>{r.icon}</Text>
+                  <Text style={{ flex: 1, fontSize: 15, fontWeight: '500', color: '#222540' }}>{r.label}</Text>
+                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: r.done ? '#22C55E' : '#F0F0F5', alignItems: 'center', justifyContent: 'center' }}>
+                    {r.done && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>✓</Text>}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+              <TouchableOpacity style={[g.diaryCard, { flex: 1, marginBottom: 0 }]} onPress={() => go('insights')}>
+                <Text style={{ fontSize: 18 }}>✦</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={g.diaryTitle}>Weekly Insights</Text>
+                  <Text style={g.diarySub} numberOfLines={1}>Soma's reflection</Text>
+                </View>
+              </TouchableOpacity>
+              {profile.diary.length > 0 && (
+                <TouchableOpacity style={[g.diaryCard, { flex: 1, marginBottom: 0 }]} onPress={() => go('diaryhistory')}>
+                  <Text style={{ fontSize: 18 }}>📖</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={g.diaryTitle}>Diary History</Text>
+                    <Text style={g.diarySub} numberOfLines={1}>{profile.diary.length} entries</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={[g.diaryCard, { flex: 1, marginBottom: 0 }]} onPress={() => go('insights')}>
-          <Text style={{ fontSize: 20 }}>✦</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={g.diaryTitle}>Insights</Text>
-            <Text style={g.diarySub} numberOfLines={1}>Your week</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-      {profile.diary.length > 0 && (
-        <TouchableOpacity onPress={() => go('diaryhistory')}><Text style={[g.secLabel, { color: '#7B6EF6', marginBottom: 12 }]}>View diary history →</Text></TouchableOpacity>
-      )}
-
-      {/* Love & Gratitude row */}
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 20 }}>
-        <TouchableOpacity style={g.loveCard} onPress={() => go('loveyourself')}>
-          <Text style={g.loveCardEmoji}>🌸</Text>
-          <Text style={g.loveCardTitle}>Love Yourself</Text>
-          <Text style={g.loveCardSub}>{(profile.loveEntries?.length ?? 0) > 0 ? `${profile.loveEntries!.length} day streak` : 'Daily ritual'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={g.gratCard} onPress={() => go('gratitude')}>
-          <Text style={g.loveCardEmoji}>🙏</Text>
-          <Text style={g.loveCardTitle}>Thankful Diary</Text>
-          <Text style={g.loveCardSub}>{(profile.gratitudeEntries?.length ?? 0) > 0 ? `${profile.gratitudeEntries!.length} entries` : '3 things daily'}</Text>
-        </TouchableOpacity>
-      </View>
+        )
+      })()}
 
       {/* Healing Path row */}
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
@@ -1959,7 +2086,14 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       {/* Dating sub-row: Connections · Who liked you */}
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
         <TouchableOpacity style={[g.diaryCard, { flex: 1, marginBottom: 0 }]} onPress={() => go('connections')}>
-          <Text style={{ fontSize: 20 }}>💬</Text>
+          <View style={{ position: 'relative' }}>
+            <Text style={{ fontSize: 20 }}>💬</Text>
+            {unreadCount > 0 && (
+              <View style={{ position: 'absolute', top: -4, right: -6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#F66E8E', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>{unreadCount}</Text>
+              </View>
+            )}
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={g.diaryTitle}>Chats</Text>
             <Text style={g.diarySub} numberOfLines={1}>{(profile.connections?.length ?? 0) > 0 ? `${profile.connections.length} active` : 'No matches yet'}</Text>
@@ -3636,7 +3770,8 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
       {/* MATCHED */}
       {step === 'matched' && (
         <>
-          <View style={g.matchedBanner}>
+          <View style={[g.matchedBanner, { overflow: 'hidden' }]}>
+            <MatchConfetti />
             <Text style={{ fontSize: 40 }}>💜</Text>
             <Text style={g.matchedTitle}>It's a match!</Text>
             <Text style={g.matchedSub}>You and {candidate.name} liked each other.</Text>
