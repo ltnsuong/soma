@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>Soma — Your AI Life Companion</title>
+    <meta name="description" content="Your personal AI companion for growth, reflection and building the life you want." />
+    <meta name="theme-color" content="#0F0A2E" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Soma" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mysoma.site/" />
+    <meta property="og:title" content="Soma — Your AI Life Companion" />
+    <meta property="og:description" content="The best version of you starts with knowing yourself. Your personal AI companion for growth, reflection and building the life you want." />
+    <meta property="og:image" content="https://mysoma.site/og-image.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Soma — Your AI Life Companion" />
+    <meta name="twitter:description" content="The best version of you starts with knowing yourself." />
+    <meta name="twitter:image" content="https://mysoma.site/og-image.png" />
+
+    <!-- Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <style id="expo-reset">
+      html, body { height: 100%; margin: 0; }
+      body { overflow: hidden; background-color: #0F0A2E; }
+      #root { display: flex; height: 100%; flex: 1; }
+
+      * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        box-sizing: border-box;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Button press & hover effect */
+      [data-focusable="true"] {
+        transition: transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.12s ease;
+      }
+      [data-focusable="true"]:hover { opacity: 0.92; }
+      [data-focusable="true"]:active {
+        transform: scale(0.96) !important;
+        opacity: 0.80;
+      }
+
+      /* Remove tap highlight on mobile */
+      * { -webkit-tap-highlight-color: transparent; }
+
+      /* Smooth momentum scrolling on iOS */
+      * { -webkit-overflow-scrolling: touch; }
+
+      /* Hide scrollbars but keep scroll functionality */
+      ::-webkit-scrollbar { display: none; }
+      * { scrollbar-width: none; }
+
+      /* Desktop: center app in phone-frame style */
+      @media (min-width: 600px) {
+        body {
+          display: flex;
+          justify-content: center;
+          background: radial-gradient(ellipse at 50% 0%, #1a0f4f 0%, #0A0720 60%);
+          overflow: hidden;
+        }
+        #root {
+          max-width: 430px;
+          width: 100%;
+          box-shadow: 0 0 120px rgba(123, 110, 246, 0.2),
+                      0 0 0 1px rgba(123, 110, 246, 0.1);
+          border-radius: 0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

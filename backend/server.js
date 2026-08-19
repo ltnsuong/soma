@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import WebSocket from 'ws'
 
 dotenv.config()
@@ -23,7 +23,10 @@ const allowedOrigins = (process.env.CORS_ORIGINS || process.env.APP_URL || '')
   .split(',').map(o => o.trim()).filter(Boolean)
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || allowedOrigins.includes(origin)) {
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') ||
+        origin.includes('mysomaapp') || origin.includes('ysomaapp') ||
+        origin.includes('mysoma.site') ||
+        allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
       callback(new Error('CORS not allowed'))
@@ -37,12 +40,14 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   realtime: { transport: WebSocket }
 })
 
-// Email transporter (configure with your email service)
-const emailer = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-})
+async function sendEmail({ to, subject, html }) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️  RESEND_API_KEY not set — email skipped:', subject)
+    return
+  }
+  const r = new Resend(process.env.RESEND_API_KEY)
+  await r.emails.send({ from: process.env.EMAIL_FROM || 'SOMA <noreply@mysomaapp.com>', to, subject, html })
+}
 
 // JWT helpers
 const generateTokens = (userId, email) => {
@@ -70,20 +75,40 @@ const auth = (req, res, next) => {
 // ════════════════════════════════════════════════════════════
 
 // SIGNUP
+const sendVerificationEmail = async (userId, email, name) => {
+  const appUrl = process.env.APP_URL || 'https://mysoma.site'
+  const token = jwt.sign({ userId, purpose: 'verify' }, process.env.JWT_SECRET, { expiresIn: '48h' })
+  const link = `${appUrl}/?verify=${token}`
+  await sendEmail({
+    to: email,
+    subject: 'Confirm your SOMA account',
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:40px 32px;color:#1A1A2E;background:#fff">
+      <div style="text-align:center;margin-bottom:32px">
+        <div style="display:inline-block;background:#7B6EF6;border-radius:16px;padding:14px 20px">
+          <span style="font-size:24px;font-weight:900;color:#fff;letter-spacing:-0.5px">SOMA</span>
+        </div>
+      </div>
+      <h2 style="font-size:22px;font-weight:800;margin:0 0 8px">Hi ${name} 👋</h2>
+      <p style="color:#444;line-height:1.6;margin:0 0 24px">You're one step away from SOMA. Confirm your email to activate your account.</p>
+      <div style="text-align:center;margin:32px 0">
+        <a href="${link}" style="display:inline-block;background:#7B6EF6;color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px">Confirm my email</a>
+      </div>
+      <p style="color:#888;font-size:12px;margin-top:32px;line-height:1.6">This link expires in 48 hours. If you didn't create a SOMA account, you can safely ignore this email.<br><br>Or copy this link: <a href="${link}" style="color:#7B6EF6">${link}</a></p>
+    </div>`
+  })
+}
+
 app.post('/auth/signup', async (req, res) => {
   const { email, name, password } = req.body
   if (!email || !name || !password) return res.status(400).json({ error: 'Missing fields' })
   if (password.length < 8) return res.status(400).json({ error: 'Password must be 8+ chars' })
 
   try {
-    // Check if user exists
     const { data: existing } = await supabase.from('users').select('id').eq('email', email).single()
     if (existing) return res.status(409).json({ error: 'Email already registered' })
 
-    // Hash password
     const hash = await bcrypt.hash(password, 10)
 
-    // Create user
     const { data: user, error } = await supabase
       .from('users')
       .insert({ email, name, password_hash: hash, verified: false })
@@ -92,25 +117,10 @@ app.post('/auth/signup', async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message })
 
-    // Generate verification token
-    const verifyToken = jwt.sign({ userId: user.id, email }, process.env.JWT_SECRET, { expiresIn: '24h' })
-    const verifyLink = `${process.env.APP_URL}/?verify=${verifyToken}`
+    // Send verification email — don't block if it fails
+    sendVerificationEmail(user.id, email, name).catch(() => {})
 
-    // Try to send verification email (optional, for testing can skip)
-    try {
-      if (process.env.EMAIL_USER && !process.env.EMAIL_USER.includes('your-email')) {
-        await emailer.sendMail({
-          to: email,
-          subject: 'Verify your SOMA account',
-          html: `<p>Hi ${name},</p><p>Click <a href="${verifyLink}">here</a> to verify your email and activate your SOMA account.</p><p>This link expires in 24 hours.</p>`
-        })
-      }
-    } catch (emailErr) {
-      console.warn('⚠️  Email sending skipped (configure EMAIL_* in .env for production):', emailErr.message)
-    }
-
-    const { accessToken, refreshToken } = generateTokens(user.id, email)
-    res.json({ user: { id: user.id, email, name }, accessToken, refreshToken, message: 'Signup successful! Email verification skipped for testing.' })
+    res.json({ message: 'Account created — check your email to confirm', needsVerification: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -128,6 +138,8 @@ app.post('/auth/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash)
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' })
 
+    if (!user.verified) return res.status(403).json({ error: 'Please verify your email first', needsVerification: true, email })
+
     const { accessToken, refreshToken } = generateTokens(user.id, email)
     res.json({ user: { id: user.id, email, name: user.name }, accessToken, refreshToken })
   } catch (err) {
@@ -135,17 +147,56 @@ app.post('/auth/login', async (req, res) => {
   }
 })
 
-// VERIFY EMAIL
+// VERIFY EMAIL (called when user clicks link — token comes from URL ?verify=TOKEN)
 app.post('/auth/verify-email', async (req, res) => {
   const { token } = req.body
   if (!token) return res.status(400).json({ error: 'No token' })
 
   try {
-    const verified = verifyToken(token)
-    if (!verified) return res.status(401).json({ error: 'Invalid or expired token' })
+    const decoded = verifyToken(token)
+    if (!decoded || decoded.purpose !== 'verify') return res.status(401).json({ error: 'Invalid or expired link' })
 
-    await supabase.from('users').update({ verified: true }).eq('id', verified.userId)
-    res.json({ message: 'Email verified' })
+    const { data: user } = await supabase.from('users').select('email, name').eq('id', decoded.userId).single()
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    await supabase.from('users').update({ verified: true }).eq('id', decoded.userId)
+
+    // Send welcome email now that they're verified
+    sendEmail({
+      to: user.email,
+      subject: 'Welcome to SOMA 💜',
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:40px 32px;color:#1A1A2E">
+        <div style="text-align:center;margin-bottom:32px">
+          <div style="display:inline-block;background:#7B6EF6;border-radius:16px;padding:14px 20px">
+            <span style="font-size:24px;font-weight:900;color:#fff">SOMA</span>
+          </div>
+        </div>
+        <h2 style="font-size:22px;font-weight:800;margin:0 0 8px">You're in, ${user.name} ✨</h2>
+        <p style="color:#444;line-height:1.6;margin:0 0 24px">Your account is verified. Meet yourself before meeting others.</p>
+        <div style="text-align:center;margin:32px 0">
+          <a href="${process.env.APP_URL || 'https://mysoma.site'}" style="display:inline-block;background:#7B6EF6;color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px">Open SOMA</a>
+        </div>
+      </div>`
+    }).catch(() => {})
+
+    res.json({ message: 'Email verified — you can now log in' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// RESEND VERIFICATION EMAIL
+app.post('/auth/resend-verification', async (req, res) => {
+  const { email } = req.body
+  if (!email) return res.status(400).json({ error: 'Email required' })
+
+  try {
+    const { data: user } = await supabase.from('users').select('id, name, verified').eq('email', email).single()
+    if (!user) return res.status(404).json({ error: 'No account found' })
+    if (user.verified) return res.json({ message: 'Already verified' })
+
+    await sendVerificationEmail(user.id, email, user.name)
+    res.json({ message: 'Verification email sent' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -180,12 +231,18 @@ app.post('/auth/password-reset-request', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' })
 
     const resetToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' })
-    const resetLink = `${process.env.APP_URL}/?reset=${resetToken}`
+    const appUrl = process.env.APP_URL || 'https://dist-mysomaapp.vercel.app'
+    const resetLink = `${appUrl}/?reset=${resetToken}`
 
-    await emailer.sendMail({
+    await sendEmail({
       to: email,
-      subject: 'SOMA - Reset your password',
-      html: `<p>Hi ${user.name},</p><p>Click <a href="${resetLink}">here</a> to reset your password.</p><p>This link expires in 1 hour.</p><p>If you didn't request this, ignore this email.</p>`
+      subject: 'SOMA — Reset your password',
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;color:#1A1A2E">
+        <h2 style="color:#7B6EF6">Reset your SOMA password</h2>
+        <p>Hi ${user.name}, we received a request to reset your password.</p>
+        <a href="${resetLink}" style="display:inline-block;background:#7B6EF6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">Reset Password</a>
+        <p style="color:#555;font-size:13px;margin-top:24px">This link expires in 1 hour. If you didn't request this, you can safely ignore it.</p>
+      </div>`
     })
 
     res.json({ message: 'Check your email for reset link' })
@@ -286,6 +343,69 @@ app.get('/auth/me', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('id, email, name, verified').eq('id', req.user.userId).single()
     res.json(user)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// PROFILE SYNC — persist full UserProfile to Supabase
+// ════════════════════════════════════════════════════════════
+
+// GET /profile/sync — pull cloud profile for this user
+app.get('/profile/sync', auth, async (req, res) => {
+  try {
+    const { data: row } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', req.user.userId)
+      .maybeSingle()
+    if (!row) return res.json({ profile: null })
+    res.json({ profile: row })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// PUT /profile/sync — push local profile to cloud (upsert)
+app.put('/profile/sync', auth, async (req, res) => {
+  try {
+    const p = req.body
+    if (!p) return res.status(400).json({ error: 'No profile data' })
+
+    const row = {
+      user_id: req.user.userId,
+      name: p.name || null,
+      language: p.language || 'en',
+      profile_bio: p.profileBio || null,
+      profile_photo: p.profilePhoto || null,
+      dark_mode: p.darkMode || false,
+      ai_name: p.aiName || 'Soma',
+      ai_photo: p.aiPhoto || null,
+      trusted_contact_name: p.trustedContact?.name || null,
+      trusted_contact_phone: p.trustedContact?.phone || null,
+      onboarding: p.onboarding || {},
+      memories: p.memories || [],
+      circle: p.circle || [],
+      diary: p.diary || [],
+      connections: p.connections || [],
+      mood_logs: p.moodLogs || [],
+      gratitude_entries: p.gratitudeEntries || [],
+      love_entries: p.loveEntries || [],
+      life_wheel_history: p.lifeWheelHistory || [],
+      medications: p.medications || [],
+      med_logs: p.medLogs || [],
+      notif_settings: p.notifSettings || {},
+      data: p,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert(row, { onConflict: 'user_id' })
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -435,6 +555,38 @@ app.get('/matches', auth, async (req, res) => {
 })
 
 // ════════════════════════════════════════════════════════════
+// PUSH NOTIFICATIONS — via Expo Push Service (free, no Apple account needed for Android)
+// ════════════════════════════════════════════════════════════
+
+async function sendPush(token, title, body, data = {}) {
+  if (!token || !token.startsWith('ExponentPushToken')) return
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ to: token, title, body, data, sound: 'default', badge: 1 }),
+    })
+  } catch {}
+}
+
+async function getUserPushToken(userId) {
+  const { data } = await supabase.from('users').select('push_token').eq('id', userId).single()
+  return data?.push_token || null
+}
+
+// Save/update device push token for the authenticated user
+app.post('/notifications/token', auth, async (req, res) => {
+  try {
+    const { token } = req.body
+    if (!token) return res.status(400).json({ error: 'token required' })
+    await supabase.from('users').update({ push_token: token }).eq('id', req.user.userId)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
 // REAL GEO MATCHING — dating profiles, nearby search, likes, matches
 // ════════════════════════════════════════════════════════════
 
@@ -459,11 +611,11 @@ function compatibility(me, them) {
 // UPSERT my dating profile (+ rounded location)
 app.put('/dating/profile', auth, async (req, res) => {
   try {
-    const { name, age, photo, bio, interests, values, loveLanguage, attachment, lookingFor, work, lat, lng, city } = req.body
+    const { name, age, photo, photos, bio, interests, values, loveLanguage, attachment, lookingFor, work, lat, lng, city } = req.body
     if (!name) return res.status(400).json({ error: 'Name required' })
     const row = {
       user_id: req.user.userId,
-      name, age: age || null, photo: photo || '', bio: bio || '',
+      name, age: age || null, photo: photo || '', photos: (photos || []).slice(0, 6), bio: bio || '',
       interests: interests || [], values: values || [],
       love_language: loveLanguage || '', attachment: attachment || '',
       looking_for: lookingFor || '', work: work || '',
@@ -492,16 +644,27 @@ app.get('/dating/nearby', auth, async (req, res) => {
     const { data: likedRows } = await supabase.from('dating_likes').select('target_id').eq('liker_id', req.user.userId)
     const likedIds = new Set((likedRows || []).map(r => r.target_id))
 
-    const { data: rows, error } = await supabase.rpc('nearby_profiles', {
+    // Fetch full profiles (incl. photos) for nearby users
+    const { data: nearbyRows, error: rpcErr } = await supabase.rpc('nearby_profiles', {
       p_user_id: req.user.userId, p_lat: me.lat, p_lng: me.lng, p_radius_km: radius, p_limit: 50,
     })
-    if (error) return res.status(500).json({ error: error.message })
+    if (rpcErr) return res.status(500).json({ error: rpcErr.message })
 
-    const results = (rows || [])
+    // RPC doesn't return photos column — fetch it separately
+    const nearbyIds = (nearbyRows || []).map(r => r.user_id)
+    const photosMap = {}
+    if (nearbyIds.length) {
+      const { data: photoRows } = await supabase.from('dating_profiles')
+        .select('user_id, photos').in('user_id', nearbyIds)
+      ;(photoRows || []).forEach(r => { photosMap[r.user_id] = r.photos || [] })
+    }
+
+    const results = (nearbyRows || [])
       .filter(r => !likedIds.has(r.user_id))
       .map(r => ({
-        userId: r.user_id, name: r.name, age: r.age, photo: r.photo, bio: r.bio,
-        interests: r.interests, values: r.values, loveLanguage: r.love_language,
+        userId: r.user_id, name: r.name, age: r.age, photo: r.photo,
+        photos: photosMap[r.user_id] || (r.photo ? [r.photo] : []),
+        bio: r.bio, interests: r.interests, values: r.values, loveLanguage: r.love_language,
         attachment: r.attachment, work: r.work, city: r.city,
         distanceKm: Math.round(r.distance_km * 10) / 10,
         compatibility: compatibility(me, r),
@@ -532,6 +695,17 @@ app.post('/dating/like', auth, async (req, res) => {
     if (reciprocal) {
       const [a, b] = [req.user.userId, targetId].sort()
       await supabase.from('dating_matches').upsert({ user_a: a, user_b: b }, { onConflict: 'user_a,user_b' })
+
+      // Notify both users about the new match (fire-and-forget)
+      const [myName, theirName, myToken, theirToken] = await Promise.all([
+        supabase.from('dating_profiles').select('name').eq('user_id', req.user.userId).single().then(r => r.data?.name || 'Someone'),
+        supabase.from('dating_profiles').select('name').eq('user_id', targetId).single().then(r => r.data?.name || 'Someone'),
+        getUserPushToken(req.user.userId),
+        getUserPushToken(targetId),
+      ])
+      sendPush(theirToken, '🎉 New match!', `You and ${myName} matched on SOMA`, { screen: 'connections' })
+      sendPush(myToken,   '🎉 New match!', `You and ${theirName} matched on SOMA`, { screen: 'connections' })
+
       return res.json({ matched: true })
     }
     res.json({ matched: false })
@@ -572,6 +746,159 @@ app.get('/dating/liked-you', auth, async (req, res) => {
   }
 })
 
+// ════════════════════════════════════════════════════════════
+// REAL-TIME CHAT
+// ════════════════════════════════════════════════════════════
+
+// Helper — verify two users are mutual matches
+async function assertMatch(me, other) {
+  const [a, b] = [me, other].sort()
+  const { data } = await supabase.from('dating_matches')
+    .select('user_a').eq('user_a', a).eq('user_b', b).maybeSingle()
+  return !!data
+}
+
+// GET /chat/unread — unread count per sender (MUST be before /:otherId route)
+app.get('/chat/unread', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const { data, error } = await supabase.from('messages')
+      .select('from_user_id')
+      .eq('to_user_id', me)
+      .is('read_at', null)
+    if (error) return res.status(500).json({ error: error.message })
+    const counts = {}
+    for (const row of (data || [])) {
+      counts[row.from_user_id] = (counts[row.from_user_id] || 0) + 1
+    }
+    res.json({ unread: counts })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /chat/:otherId — message history (last 100), newest last
+app.get('/chat/:otherId', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const other = req.params.otherId
+    if (!(await assertMatch(me, other))) return res.status(403).json({ error: 'Not matched' })
+
+    const { data, error } = await supabase.from('messages')
+      .select('id, from_user_id, content, created_at, read_at')
+      .or(`and(from_user_id.eq.${me},to_user_id.eq.${other}),and(from_user_id.eq.${other},to_user_id.eq.${me})`)
+      .order('created_at', { ascending: true })
+      .limit(100)
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ messages: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /chat/:otherId — send a message
+app.post('/chat/:otherId', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const other = req.params.otherId
+    const { content } = req.body
+    if (!content?.trim()) return res.status(400).json({ error: 'content required' })
+    if (!(await assertMatch(me, other))) return res.status(403).json({ error: 'Not matched' })
+
+    const { data, error } = await supabase.from('messages')
+      .insert({ from_user_id: me, to_user_id: other, content: content.trim() })
+      .select('id, from_user_id, content, created_at')
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ message: data })
+
+    // Notify recipient (fire-and-forget after response sent)
+    const [senderName, recipientToken] = await Promise.all([
+      supabase.from('dating_profiles').select('name').eq('user_id', me).single().then(r => r.data?.name || 'Someone'),
+      getUserPushToken(other),
+    ])
+    sendPush(recipientToken, `💬 ${senderName}`, content.trim().slice(0, 120), { screen: 'connections', fromUserId: me })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// PUT /chat/:otherId/read — mark their messages to me as read
+app.put('/chat/:otherId/read', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const other = req.params.otherId
+    await supabase.from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('from_user_id', other).eq('to_user_id', me).is('read_at', null)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── THERAPIST REPORTS ──────────────────────────────────────
+app.post('/reports/send', auth, async (req, res) => {
+  const { therapistEmail, therapistName, patientName, reportText } = req.body
+  if (!therapistEmail || !reportText) return res.status(400).json({ error: 'Missing therapistEmail or reportText' })
+
+  const htmlBody = `
+    <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2a2a3a;">
+      <div style="text-align:center; margin-bottom: 32px;">
+        <h1 style="font-size:28px; color:#7B6EF6; margin:0;">◈ Soma</h1>
+        <p style="color:#888; font-size:13px; margin-top:4px;">AI Companion — Clinical Summary</p>
+      </div>
+      <p style="color:#555; font-size:14px;">Dear ${therapistName},</p>
+      <p style="color:#555; font-size:14px;">
+        Your patient <strong>${patientName}</strong> has consented to share this Soma-generated emotional summary
+        ahead of your next session. This report is based on their recent mood check-ins, journal entries,
+        and conversations with Soma. It is not a diagnostic tool — please interpret it in the context of
+        your clinical relationship.
+      </p>
+      <div style="background:#F8F7FF; border-left:4px solid #7B6EF6; border-radius:8px; padding:20px; margin:24px 0; white-space:pre-wrap; font-size:14px; line-height:1.7; color:#2a2a3a;">${reportText}</div>
+      <p style="color:#888; font-size:12px; border-top:1px solid #eee; padding-top:16px; margin-top:32px;">
+        This summary was generated by Soma, an AI companion app, and shared with patient consent.
+        Soma is not a medical device. For urgent mental health concerns, follow your standard clinical protocols.
+      </p>
+    </div>
+  `
+
+  try {
+    await sendEmail({ to: therapistEmail, subject: `Soma session summary for ${patientName}`, html: htmlBody })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('Report email error:', err.message)
+    res.status(500).json({ error: 'Failed to send email. Check RESEND_API_KEY in server configuration.' })
+  }
+})
+
+// ── AI PROXY ────────────────────────────────────────────────────────────────
+// Proxies Groq calls so the API key stays server-side and CORS is avoided
+app.post('/ai/chat', async (req, res) => {
+  const { messages, system, maxTokens = 200, temperature = 0.85 } = req.body
+  if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages required' })
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: maxTokens,
+        temperature,
+        messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
+      }),
+    })
+    const data = await response.json()
+    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Groq error' })
+    res.json({ content: data.choices?.[0]?.message?.content ?? '' })
+  } catch (err) {
+    console.error('AI proxy error:', err.message)
+    res.status(500).json({ error: 'AI request failed' })
+  }
+})
+
 // Privacy policy
 app.get('/privacy', (req, res) => {
   res.setHeader('Content-Type', 'text/html')
@@ -586,7 +913,7 @@ const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log(`✅ SOMA backend running at http://localhost:${PORT}`)
   console.log(`🔐 Auth endpoints ready`)
-  console.log(`📧 Email verification enabled (configure EMAIL_* in .env)`)
+  console.log(`📧 Email via Resend (set RESEND_API_KEY in env)`)
   console.log(`🔑 OAuth ready to wire (add provider SDKs)`)
   console.log(`💎 Premium endpoints ready`)
 })

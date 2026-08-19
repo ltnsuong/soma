@@ -124,6 +124,29 @@ CREATE TABLE IF NOT EXISTS dating_matches (
   PRIMARY KEY (user_a, user_b)
 );
 
+-- Push notifications token per user
+ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token TEXT;
+
+-- Photo gallery (up to 6 photos per dating profile)
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS photos TEXT[] DEFAULT '{}';
+
+-- ════════════════════════════════════════════════════════════
+-- REAL-TIME CHAT
+-- ════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content      TEXT NOT NULL,
+  created_at   TIMESTAMP DEFAULT NOW(),
+  read_at      TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_to     ON messages(to_user_id,   created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_from   ON messages(from_user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(to_user_id, read_at) WHERE read_at IS NULL;
+
 -- Haversine distance search: active profiles within p_radius_km of (p_lat, p_lng)
 CREATE OR REPLACE FUNCTION nearby_profiles(
   p_user_id UUID, p_lat DOUBLE PRECISION, p_lng DOUBLE PRECISION,
