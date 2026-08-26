@@ -4,18 +4,28 @@ import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import Stripe from 'stripe'
+import ws from 'ws'
+
+// Set WebSocket globally for Supabase
+globalThis.WebSocket = ws
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import { Resend } from 'resend'
-import WebSocket from 'ws'
+import { bot } from './telegram-bot-auth.js'
+import { stripeService, stripeAnalytics } from './stripe-service.js'
+import { agentService } from './agent-service.js'
 
 dotenv.config()
 
 const app = express()
 app.use(express.json())
+
+// Stripe initialization
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 // CORS - localhost in dev; production origins via CORS_ORIGINS (comma-separated) or APP_URL.
 // Requests with no Origin header (native apps, curl) are always allowed.
@@ -35,9 +45,9 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 
-// Supabase (with ws transport for Node.js 20)
+// Supabase - REST API only
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
-  realtime: { transport: WebSocket }
+  auth: { persistSession: false }
 })
 
 async function sendEmail({ to, subject, html }) {
@@ -473,6 +483,108 @@ app.get('/insights', auth, async (req, res) => {
 })
 
 // ════════════════════════════════════════════════════════════
+// STRIPE PAYMENT INTEGRATION
+// ════════════════════════════════════════════════════════════
+
+// Create Stripe checkout session
+app.post('/stripe/checkout', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('email, stripe_customer_id').eq('id', req.user.userId).single()
+
+    // Get or create Stripe customer
+    const customerId = await stripeService.getOrCreateCustomer(req.user.userId, user.email)
+
+    // Create checkout session
+    const session = await stripeService.createCheckoutSession(
+      customerId,
+      process.env.STRIPE_PREMIUM_PRICE_ID,
+      {
+        successUrl: `${process.env.APP_URL || 'http://localhost:8081'}/premium?success=true`,
+        cancelUrl: `${process.env.APP_URL || 'http://localhost:8081'}/premium?canceled=true`
+      }
+    )
+
+    stripeAnalytics.logPaymentEvent('checkout_session_created', { userId: req.user.userId, sessionId: session.id })
+    res.json({ sessionId: session.id, url: session.url })
+  } catch (err) {
+    console.error('Checkout error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Stripe webhook (handle payment completion)
+app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature']
+  let event
+
+  try {
+    event = stripeService.verifyWebhookSignature(req.body, sig)
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`)
+  }
+
+  try {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+        await stripeService.handleSubscriptionEvent(event.data.object, 'updated')
+        stripeAnalytics.logPaymentEvent('subscription_updated', { subscriptionId: event.data.object.id })
+        break
+
+      case 'customer.subscription.deleted':
+        await stripeService.handleSubscriptionEvent(event.data.object, 'deleted')
+        stripeAnalytics.logPaymentEvent('subscription_cancelled', { subscriptionId: event.data.object.id })
+        break
+
+      case 'invoice.payment_failed':
+        await stripeService.handlePaymentFailure(event.data.object.subscription, event.data.object.customer)
+        stripeAnalytics.logPaymentEvent('payment_failed', { invoiceId: event.data.object.id })
+        break
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`)
+    }
+  } catch (err) {
+    console.error('Webhook processing error:', err)
+  }
+
+  res.json({ received: true })
+})
+
+// Check subscription status
+app.get('/stripe/subscription', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('stripe_subscription_id, stripe_subscription_status').eq('id', req.user.userId).single()
+
+    if (!user?.stripe_subscription_id) {
+      return res.json({ status: 'no_subscription' })
+    }
+
+    const subscription = await stripeService.getSubscription(user.stripe_subscription_id)
+    const daysUntilRenewal = Math.ceil((subscription.current_period_end * 1000 - Date.now()) / (1000 * 60 * 60 * 24))
+
+    res.json({
+      status: subscription.status,
+      current_period_end: subscription.current_period_end,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+      days_until_renewal: daysUntilRenewal
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Get subscription metrics (admin)
+app.get('/stripe/metrics', auth, async (req, res) => {
+  try {
+    const metrics = await stripeAnalytics.getMetrics()
+    res.json(metrics)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
 // ANALYTICS
 // ════════════════════════════════════════════════════════════
 
@@ -899,6 +1011,146 @@ app.post('/ai/chat', async (req, res) => {
   }
 })
 
+// ════════════════════════════════════════════════════════════
+// AI AGENT SYSTEM
+// ════════════════════════════════════════════════════════════
+
+// Learn from conversation (called after AI chat)
+app.post('/agent/learn', auth, async (req, res) => {
+  try {
+    const { userMessage, aiResponse } = req.body
+    if (!userMessage || !aiResponse) return res.status(400).json({ error: 'Missing messages' })
+
+    const memories = await agentService.learnFromConversation(
+      req.user.userId,
+      userMessage,
+      aiResponse
+    )
+
+    res.json({ learned: memories.length, memories })
+  } catch (err) {
+    console.error('Agent learn error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Build agent profile
+app.post('/agent/build-profile', auth, async (req, res) => {
+  try {
+    const profile = await agentService.buildAgentProfile(req.user.userId)
+    res.json({ profile })
+  } catch (err) {
+    console.error('Build profile error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Get user's agent profile
+app.get('/agent/profile', auth, async (req, res) => {
+  try {
+    const { data: profile } = await supabase
+      .from('agent_profiles')
+      .select('*')
+      .eq('user_id', req.user.userId)
+      .single()
+
+    if (!profile) return res.json({ profile: null })
+    res.json({ profile })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Discover agents to match with
+app.get('/agent/discover', auth, async (req, res) => {
+  try {
+    const matches = await agentService.findMatchingAgents(req.user.userId)
+    res.json({ agents: matches })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Create match with another agent
+app.post('/agent/match', auth, async (req, res) => {
+  try {
+    const { targetAgentId } = req.body
+    if (!targetAgentId) return res.status(400).json({ error: 'targetAgentId required' })
+
+    // Get user's agent
+    const { data: userAgent } = await supabase
+      .from('agent_profiles')
+      .select('id')
+      .eq('user_id', req.user.userId)
+      .single()
+
+    if (!userAgent) return res.status(400).json({ error: 'User has no agent profile' })
+
+    // Create match
+    const score = await agentService.createMatch(userAgent.id, targetAgentId)
+
+    // Generate initial conversation
+    const message = await agentService.generateAgentConversation(userAgent.id, targetAgentId)
+
+    res.json({ matched: true, compatibility: score, initialMessage: message })
+  } catch (err) {
+    console.error('Match error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Get agent matches (conversations)
+app.get('/agent/matches', auth, async (req, res) => {
+  try {
+    const { data: userAgent } = await supabase
+      .from('agent_profiles')
+      .select('id')
+      .eq('user_id', req.user.userId)
+      .single()
+
+    if (!userAgent) return res.json({ matches: [] })
+
+    // Get matches involving this agent
+    const { data: matches } = await supabase
+      .from('agent_matches')
+      .select('*, agent_a:agent_profiles!agent_a_id(*, users(name, photo)), agent_b:agent_profiles!agent_b_id(*, users(name, photo))')
+      .or(`agent_a_id.eq.${userAgent.id},agent_b_id.eq.${userAgent.id}`)
+
+    res.json({ matches })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Get agent conversation with another agent
+app.get('/agent/chat/:matchId', auth, async (req, res) => {
+  try {
+    const { data: messages } = await supabase
+      .from('agent_conversations')
+      .select('*')
+      .eq('match_id', req.params.matchId)
+      .order('created_at', { ascending: true })
+
+    res.json({ messages })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Continue agent conversation
+app.post('/agent/chat/:matchId/continue', auth, async (req, res) => {
+  try {
+    const { lastMessage } = req.body
+    if (!lastMessage) return res.status(400).json({ error: 'lastMessage required' })
+
+    const message = await agentService.continueAgentConversation(req.params.matchId, lastMessage)
+    res.json({ message })
+  } catch (err) {
+    console.error('Continue chat error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Privacy policy
 app.get('/privacy', (req, res) => {
   res.setHeader('Content-Type', 'text/html')
@@ -916,4 +1168,7 @@ app.listen(PORT, () => {
   console.log(`📧 Email via Resend (set RESEND_API_KEY in env)`)
   console.log(`🔑 OAuth ready to wire (add provider SDKs)`)
   console.log(`💎 Premium endpoints ready`)
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    console.log(`🤖 Telegram bot is live and polling for messages`)
+  }
 })
