@@ -6,6 +6,7 @@ import MoodTrackerScreen from './screens/MoodTrackerScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import LanguageScreen from './screens/LanguageScreen'
+import IntroductionScreen from './screens/IntroductionScreen'
 
 const BottomNav = ({ current, setCurrent }) => {
   const tabs = [
@@ -36,6 +37,7 @@ function App() {
   const [screen, setScreen] = useState('auth')
   const [user, setUser] = useState(null)
   const [language, setLanguage] = useState(null)
+  const [showIntro, setShowIntro] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,6 +49,10 @@ function App() {
       if (savedLang) {
         setLanguage(savedLang)
       }
+
+      // Check if intro has been shown
+      const introShown = localStorage.getItem('introShown')
+      setShowIntro(!introShown)
 
       // Check if already authenticated
       const token = getAuthToken()
@@ -91,6 +97,17 @@ function App() {
 
   if (!language) {
     return <LanguageScreen onSelectLanguage={(lang) => setLanguage(lang)} />
+  }
+
+  if (showIntro) {
+    return (
+      <IntroductionScreen
+        onContinue={() => {
+          localStorage.setItem('introShown', 'true')
+          setShowIntro(false)
+        }}
+      />
+    )
   }
 
   if (!user?.authenticated) {
