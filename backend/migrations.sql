@@ -85,20 +85,6 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;
 ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
 
--- Telegram bot support
-ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id BIGINT UNIQUE;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS age INT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT[] DEFAULT '{}';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS attachment_style TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS love_languages TEXT[] DEFAULT '{}';
-CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
-
--- Stripe payment integration
-ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
-CREATE INDEX IF NOT EXISTS idx_users_stripe_customer ON users(stripe_customer_id);
-
 -- ════════════════════════════════════════════════════════════
 -- REAL GEO MATCHING (dating profiles, likes, matches)
 -- ════════════════════════════════════════════════════════════
@@ -160,52 +146,6 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_to     ON messages(to_user_id,   created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_from   ON messages(from_user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(to_user_id, read_at) WHERE read_at IS NULL;
-
--- ════════════════════════════════════════════════════════════
--- TELEGRAM BOT FEATURES
--- ════════════════════════════════════════════════════════════
-
--- Circle (relationships)
-CREATE TABLE IF NOT EXISTS circle (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  relationship_type TEXT NOT NULL, -- 'therapy', 'family', 'friend', 'work', 'romantic'
-  bio TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_circle_user_id ON circle(user_id);
-
--- Memories (auto-extracted from conversations)
-CREATE TABLE IF NOT EXISTS memories (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  domain TEXT NOT NULL, -- 'health', 'finance', 'hobby', 'relationships', 'purpose', 'mind'
-  content TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_memories_user_domain ON memories(user_id, domain);
-
--- Diary entries
-CREATE TABLE IF NOT EXISTS diary_entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  mood TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_diary_user_id ON diary_entries(user_id, created_at DESC);
-
--- Likes (for matching)
-CREATE TABLE IF NOT EXISTS likes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  liker_id BIGINT NOT NULL, -- telegram_id
-  liked_id BIGINT NOT NULL, -- telegram_id
-  created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_likes_liker ON likes(liker_id);
-CREATE INDEX IF NOT EXISTS idx_likes_liked ON likes(liked_id);
 
 -- Haversine distance search: active profiles within p_radius_km of (p_lat, p_lng)
 CREATE OR REPLACE FUNCTION nearby_profiles(
