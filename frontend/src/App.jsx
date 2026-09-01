@@ -42,6 +42,12 @@ function App() {
     const initApp = async () => {
       initTelegram()
 
+      // Restore language preference
+      const savedLang = localStorage.getItem('language')
+      if (savedLang) {
+        setLanguage(savedLang)
+      }
+
       // Check if already authenticated
       const token = getAuthToken()
       if (token) {

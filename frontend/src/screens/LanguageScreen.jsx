@@ -18,6 +18,11 @@ export default function LanguageScreen({ onSelectLanguage }) {
     { code: 'th', name: '🇹🇭 ไทย', nativeName: 'ไทย' },
   ]
 
+  const handleContinue = () => {
+    localStorage.setItem('language', selectedLang)
+    onSelectLanguage(selectedLang)
+  }
+
   return (
     <div className="flex flex-col items-center justify-center h-screen px-6 py-8 bg-gradient-to-b from-purple-50 to-white">
       {/* Header */}
@@ -47,7 +52,7 @@ export default function LanguageScreen({ onSelectLanguage }) {
 
       {/* Continue Button */}
       <button
-        onClick={() => onSelectLanguage(selectedLang)}
+        onClick={handleContinue}
         className="w-full max-w-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition-all"
       >
         Continue →

@@ -71,6 +71,14 @@ export default function ProfileScreen() {
             )}
 
             <div className="space-y-3">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('language')
+                  window.location.reload()
+                }}
+                className="w-full p-3 border rounded-lg text-left hover:bg-gray-50 font-semibold">
+                🌍 Change Language
+              </button>
               <button className="w-full p-3 border rounded-lg text-left hover:bg-gray-50 font-semibold">
                 📝 Edit Profile
               </button>
