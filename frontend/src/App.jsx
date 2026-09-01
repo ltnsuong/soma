@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { initTelegram, getTelegramUser } from './lib/telegram'
 import { telegramLogin, getAuthToken, setAuthToken } from './lib/api'
 import ChatScreen from './screens/ChatScreen'
-import DiscoverScreen from './screens/DiscoverScreen'
-import AgentScreen from './screens/AgentScreen'
+import MoodTrackerScreen from './screens/MoodTrackerScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import LanguageScreen from './screens/LanguageScreen'
@@ -11,8 +10,7 @@ import LanguageScreen from './screens/LanguageScreen'
 const BottomNav = ({ current, setCurrent }) => {
   const tabs = [
     { id: 'chat', icon: '💬', label: 'Chat' },
-    { id: 'discover', icon: '🎲', label: 'Discover' },
-    { id: 'agent', icon: '🤖', label: 'Agent' },
+    { id: 'mood', icon: '📊', label: 'Mood' },
     { id: 'profile', icon: '⚙️', label: 'Profile' },
   ]
 
@@ -94,11 +92,10 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      <div className="flex-1 overflow-y-auto pb-20">
+    <div className="flex flex-col h-screen bg-white overflow-hidden">
+      <div className="flex-1 overflow-y-auto pb-24 safe-area-bottom">
         {screen === 'chat' && <ChatScreen />}
-        {screen === 'discover' && <DiscoverScreen />}
-        {screen === 'agent' && <AgentScreen />}
+        {screen === 'mood' && <MoodTrackerScreen />}
         {screen === 'profile' && <ProfileScreen />}
       </div>
       <BottomNav current={screen} setCurrent={setScreen} />
