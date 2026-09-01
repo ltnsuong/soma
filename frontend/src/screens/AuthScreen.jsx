@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { signup, login, setAuthToken } from '../lib/api'
 
-export default function AuthScreen({ onAuth }) {
+export default function AuthScreen({ onAuth, showBack }) {
   const [mode, setMode] = useState('options') // Start with auth options
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
@@ -35,7 +35,15 @@ export default function AuthScreen({ onAuth }) {
 
   if (mode === 'options') {
     return (
-      <div className="flex flex-col items-center justify-center h-screen px-4 bg-gradient-to-b from-purple-50 to-white">
+      <div className="flex flex-col items-center justify-center h-screen px-4 bg-gradient-to-b from-purple-50 to-white relative">
+        {showBack && (
+          <button
+            onClick={showBack}
+            className="absolute top-6 left-6 text-2xl hover:opacity-70"
+          >
+            ← Back
+          </button>
+        )}
         <div className="text-6xl mb-4">🤖</div>
         <h1 className="text-3xl font-bold mb-2">SOMA</h1>
         <p className="text-gray-500 text-center mb-12">AI Agent Dating</p>

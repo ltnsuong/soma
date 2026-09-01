@@ -5,7 +5,8 @@ import ChatScreen from './screens/ChatScreen'
 import DiscoverScreen from './screens/DiscoverScreen'
 import AgentScreen from './screens/AgentScreen'
 import ProfileScreen from './screens/ProfileScreen'
-import AuthScreen from './screens/AuthScreen'
+import WelcomeScreen from './screens/WelcomeScreen'
+import LanguageScreen from './screens/LanguageScreen'
 
 const BottomNav = ({ current, setCurrent }) => {
   const tabs = [
@@ -36,6 +37,7 @@ const BottomNav = ({ current, setCurrent }) => {
 function App() {
   const [screen, setScreen] = useState('auth')
   const [user, setUser] = useState(null)
+  const [language, setLanguage] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -83,8 +85,12 @@ function App() {
     )
   }
 
+  if (!language) {
+    return <LanguageScreen onSelectLanguage={(lang) => setLanguage(lang)} />
+  }
+
   if (!user?.authenticated) {
-    return <AuthScreen onAuth={(u) => { setUser(u); setScreen('chat') }} />
+    return <WelcomeScreen onAuth={(u) => { setUser(u); setScreen('chat') }} />
   }
 
   return (
