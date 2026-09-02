@@ -349,6 +349,79 @@ app.post('/auth/social', async (req, res) => {
     }
   }
 
+  // Telegram
+  if (provider === 'telegram') {
+    try {
+      const telegramId = token
+      const telegramData = req.body.telegramData || {}
+
+      if (!telegramId) return res.status(400).json({ error: 'Telegram ID required' })
+
+      // Look for existing user by telegram_id
+      let { data: user } = await supabase
+        .from('users')
+        .select('id, email, name, premium, telegram_id')
+        .eq('telegram_id', telegramId)
+        .maybeSingle()
+
+      if (user) {
+        // User exists - update avatar if provided
+        if (telegramData.photo_url) {
+          await supabase
+            .from('users')
+            .update({ avatar: telegramData.photo_url })
+            .eq('id', user.id)
+        }
+      } else {
+        // Create new user
+        const email = telegramData.username
+          ? `${telegramData.username}@telegram.soma`
+          : `user_${telegramId}@telegram.soma`
+
+        const name = telegramData.first_name
+          ? `${telegramData.first_name}${telegramData.last_name ? ' ' + telegramData.last_name : ''}`
+          : `Telegram User ${telegramId.slice(-6)}`
+
+        const { data: newUser, error: createErr } = await supabase
+          .from('users')
+          .insert({
+            telegram_id: telegramId,
+            email,
+            name,
+            avatar: telegramData.photo_url || '',
+            verified: true, // Telegram provides verified identity
+            premium: false,
+          })
+          .select()
+          .single()
+
+        if (createErr) {
+          console.error('[Telegram Signup]', createErr)
+          return res.status(500).json({ error: createErr.message })
+        }
+
+        user = newUser
+      }
+
+      const { accessToken, refreshToken } = generateTokens(user.id, user.email)
+      return res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          premium: user.premium || false,
+          telegram_id: user.telegram_id,
+        },
+        accessToken,
+        refreshToken,
+        isNew: !user,
+      })
+    } catch (err) {
+      console.error('[Telegram Auth]', err)
+      return res.status(500).json({ error: err.message })
+    }
+  }
+
   // Apple — placeholder (needs Apple JWT verification)
   if (provider === 'apple') {
     return res.status(501).json({ error: 'Apple login coming soon' })

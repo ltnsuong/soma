@@ -39,7 +39,16 @@ export const signup = (email, name, password) =>
 export const telegramLogin = (telegramUser) =>
   request('/auth/social', {
     method: 'POST',
-    body: JSON.stringify({ provider: 'telegram', token: telegramUser.id.toString() }),
+    body: JSON.stringify({
+      provider: 'telegram',
+      token: telegramUser.id.toString(),
+      telegramData: {
+        first_name: telegramUser.first_name || '',
+        last_name: telegramUser.last_name || '',
+        username: telegramUser.username || '',
+        photo_url: telegramUser.photo_url || '',
+      },
+    }),
   })
 
 export const login = (email, password) =>
