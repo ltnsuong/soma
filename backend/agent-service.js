@@ -41,7 +41,7 @@ Return ONLY valid JSON, no other text.
 
       const response = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
-        model: 'llama-3.1-8b-instant',
+        model: 'groq/compound-mini',
         max_tokens: 200,
       })
 
@@ -127,7 +127,7 @@ Return valid JSON:
 
       const response = await groq.chat.completions.create({
         messages: [{ role: 'user', content: summaryPrompt }],
-        model: 'llama-3.1-8b-instant',
+        model: 'groq/compound-mini',
         max_tokens: 300,
       })
 
@@ -303,7 +303,7 @@ Start a warm, genuine 1-2 sentence greeting. Be authentic to the person you repr
 
       const response = await groq.chat.completions.create({
         messages: [{ role: 'user', content: context }],
-        model: 'llama-3.1-8b-instant',
+        model: 'groq/compound-mini',
         max_tokens: 150,
       })
 
@@ -365,7 +365,7 @@ Respond naturally and authentically. 1-2 sentences.
 
       const response = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
-        model: 'llama-3.1-8b-instant',
+        model: 'groq/compound-mini',
         max_tokens: 150,
       })
 

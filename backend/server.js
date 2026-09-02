@@ -46,7 +46,7 @@ async function sendEmail({ to, subject, html }) {
     return
   }
   const r = new Resend(process.env.RESEND_API_KEY)
-  await r.emails.send({ from: process.env.EMAIL_FROM || 'SOMA <noreply@mysomaapp.com>', to, subject, html })
+  await r.emails.send({ from: process.env.EMAIL_FROM || 'SOMA <onboarding@resend.dev>', to, subject, html })
 }
 
 // JWT helpers
@@ -67,6 +67,13 @@ const auth = (req, res, next) => {
   const user = verifyToken(token)
   if (!user) return res.status(401).json({ error: 'Invalid token' })
   req.user = user
+  next()
+}
+
+// Like auth but doesn't reject unauthenticated requests — sets req.user if token valid
+const optionalAuth = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (token) { const user = verifyToken(token); if (user) req.user = user }
   next()
 }
 
@@ -267,6 +274,18 @@ app.post('/auth/password-reset', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// TEMP ADMIN: reset password by email (remove after use)
+app.post('/auth/admin-reset', async (req, res) => {
+  const { secret, email, newPassword } = req.body
+  if (secret !== 'soma-admin-2024') return res.status(403).json({ error: 'Forbidden' })
+  try {
+    const hash = await bcrypt.hash(newPassword, 10)
+    const { error } = await supabase.from('users').update({ password_hash: hash, verified: true }).eq('email', email)
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ ok: true, message: `Password reset for ${email}` })
+  } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 // SOCIAL LOGIN — Google (ID token verification)
@@ -876,6 +895,16 @@ app.post('/reports/send', auth, async (req, res) => {
 
 // ── AI PROXY ────────────────────────────────────────────────────────────────
 // Proxies Groq calls so the API key stays server-side and CORS is avoided
+app.get('/ai/models', async (req, res) => {
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` }
+    })
+    const d = await r.json()
+    res.json(d)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 app.post('/ai/chat', async (req, res) => {
   const { messages, system, maxTokens = 200, temperature = 0.85 } = req.body
   if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages required' })
@@ -884,7 +913,7 @@ app.post('/ai/chat', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
         max_tokens: maxTokens,
         temperature,
         messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
@@ -896,6 +925,155 @@ app.post('/ai/chat', async (req, res) => {
   } catch (err) {
     console.error('AI proxy error:', err.message)
     res.status(500).json({ error: 'AI request failed' })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// FRIEND CHAT — direct messaging between any two SOMA users
+// No dating match required; both must be authenticated users
+// ════════════════════════════════════════════════════════════
+
+// GET /friends/chat/:userId — last 100 messages with this user
+app.get('/friends/chat/:userId', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const other = req.params.userId
+    if (me === other) return res.status(400).json({ error: 'Cannot chat with yourself' })
+
+    const { data, error } = await supabase.from('direct_messages')
+      .select('id, from_user_id, content, created_at, read_at')
+      .or(`and(from_user_id.eq.${me},to_user_id.eq.${other}),and(from_user_id.eq.${other},to_user_id.eq.${me})`)
+      .order('created_at', { ascending: true })
+      .limit(100)
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    // Mark incoming as read
+    await supabase.from('direct_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('from_user_id', other).eq('to_user_id', me).is('read_at', null)
+
+    res.json({ messages: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /friends/chat/:userId — send a message
+app.post('/friends/chat/:userId', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const other = req.params.userId
+    const { content } = req.body
+    if (!content?.trim()) return res.status(400).json({ error: 'content required' })
+    if (me === other) return res.status(400).json({ error: 'Cannot chat with yourself' })
+
+    // Verify other user exists
+    const { data: otherUser } = await supabase.from('users').select('id, name').eq('id', other).single()
+    if (!otherUser) return res.status(404).json({ error: 'User not found' })
+
+    const { data, error } = await supabase.from('direct_messages')
+      .insert({ from_user_id: me, to_user_id: other, content: content.trim() })
+      .select('id, from_user_id, content, created_at')
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ message: data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /friends/unread — unread count per sender
+app.get('/friends/unread', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const { data, error } = await supabase.from('direct_messages')
+      .select('from_user_id')
+      .eq('to_user_id', me)
+      .is('read_at', null)
+    if (error) return res.status(500).json({ error: error.message })
+    const counts = {}
+    for (const row of (data || [])) counts[row.from_user_id] = (counts[row.from_user_id] || 0) + 1
+    res.json({ unread: counts })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// DISCOVER — all registered SOMA users (for "For You" tab)
+// ════════════════════════════════════════════════════════════
+app.get('/users/discover', optionalAuth, async (req, res) => {
+  try {
+    const me = req.user?.userId
+    // Get all users (exclude self if authenticated), join dating_profiles if they have one
+    let query = supabase.from('users').select('id, name, created_at').order('created_at', { ascending: false }).limit(100)
+    if (me) query = query.neq('id', me)
+    const { data: users, error } = await query
+    if (error) throw error
+
+    // Also fetch their dating profiles if available
+    const ids = (users || []).map(u => u.id)
+    const { data: profiles } = ids.length
+      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, interests, values, love_language, attachment, work, city').in('user_id', ids)
+      : { data: [] }
+    const profileMap = {}
+    ;(profiles || []).forEach(p => { profileMap[p.user_id] = p })
+
+    const results = (users || []).map(u => {
+      const dp = profileMap[u.id] || {}
+      return {
+        userId: u.id,
+        name: u.name,
+        age: dp.age || null,
+        photo: dp.photo || null,
+        photos: dp.photos || [],
+        bio: dp.bio || null,
+        interests: dp.interests || [],
+        values: dp.values || [],
+        loveLanguage: dp.love_language || null,
+        attachment: dp.attachment || null,
+        work: dp.work || null,
+        city: dp.city || null,
+        hasDatingProfile: !!dp.age,
+        distanceKm: null,
+        compatibility: 50,
+      }
+    })
+    res.json({ results })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// FIND USER BY INVITE CODE
+// code = first 6 chars of user UUID (uppercase)
+// ════════════════════════════════════════════════════════════
+app.get('/users/find', async (req, res) => {
+  const { code, email } = req.query
+  try {
+    let query = supabase.from('users').select('id, name, email')
+    if (email && typeof email === 'string' && email.includes('@')) {
+      query = query.ilike('email', email.trim())
+    } else if (code && typeof code === 'string' && code.length >= 4) {
+      query = query.ilike('id', `${code.toLowerCase().trim().replace(/-/g,'')}%`)
+    } else {
+      return res.status(400).json({ error: 'Provide an email address or a code (min 4 chars)' })
+    }
+    const { data: users, error } = await query.limit(5)
+    if (error) throw error
+    if (!users || users.length === 0) return res.status(404).json({ error: 'No user found' })
+    const results = users.map(u => ({
+      name: u.name,
+      code: u.id.replace(/-/g, '').slice(0, 6).toUpperCase(),
+      userId: u.id,
+      email: u.email
+    }))
+    res.json({ users: results })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
   }
 })
 

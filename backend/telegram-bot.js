@@ -285,7 +285,7 @@ bot.on('message', async (msg) => {
             content: text,
           },
         ],
-        model: 'llama-3.1-8b-instant',
+        model: 'groq/compound-mini',
         max_tokens: 200,
       });
 
@@ -332,7 +332,7 @@ bot.on('message', async (msg) => {
               content: `I want to reflect on my day. Here's what happened: ${text}\n\nGive me a thoughtful, supportive response.`,
             },
           ],
-          model: 'llama-3.1-8b-instant',
+          model: 'groq/compound-mini',
           max_tokens: 200,
         });
 

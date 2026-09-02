@@ -2,10 +2,12 @@ import { useState, useRef, useEffect, useMemo, Component, createContext, useCont
 import {
   View, Text, StyleSheet, TouchableOpacity,
   TextInput, ScrollView, KeyboardAvoidingView,
-  Platform, Animated, Easing, Image, ImageBackground, Switch, Modal, ActivityIndicator
+  Platform, Animated, Easing, Image, ImageBackground, Switch, Modal, ActivityIndicator,
+  useWindowDimensions
 } from 'react-native'
 import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline, Defs, RadialGradient, Stop as SvgStop, Ellipse as SvgEllipse, LinearGradient as SvgLinearGradient } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
+import * as Font from 'expo-font'
 import * as WebBrowser from 'expo-web-browser'
 import * as Google from 'expo-auth-session/providers/google'
 import * as Notifications from 'expo-notifications'
@@ -783,6 +785,7 @@ interface CirclePerson {
   shareReports?: boolean            // patient consent to share reports
   lastReportSent?: string           // ISO date of last report sent
   journey?: BondJourneyData         // gamified relationship journey
+  somaUserId?: string               // Supabase user ID if they have a SOMA account
 }
 interface DiaryEntry { id: string; date: string; mood: string; summary: string; somaReply?: string }
 interface InsightData {
@@ -1022,14 +1025,14 @@ const DB = {
     if (entry) { entry.somaReply = somaReply; DB.save(p) }
   },
   // Circle: add/invite someone, accept invite, send direct message
-  addCircle: (name: string, type: string, context?: string) => {
+  addCircle: (name: string, type: string, context?: string, somaUserId?: string) => {
     const p = DB.get()
     const code = Math.random().toString(36).slice(2, 8).toUpperCase()
     const id = `circle_${Date.now()}`
     p.circle.unshift({
       id, name, type: type as any, inviteCode: code, invitationStatus: 'active',
       relationship: type, context: context || '', sharedInterests: [], lastSeen: new Date().toLocaleDateString(),
-      mentions: 0, messages: [], somaMessages: []
+      mentions: 0, messages: [], somaMessages: [], somaUserId
     })
     DB.save(p)
     return code
@@ -1047,6 +1050,11 @@ const DB = {
     const p = DB.get()
     const c = p.circle.find(x => x.id === circleId)
     if (c) { c.somaMessages.push({ role: 'assistant', content: text }); DB.save(p) }
+  },
+  removeCircle: (circleId: string) => {
+    const p = DB.get()
+    p.circle = p.circle.filter(x => x.id !== circleId)
+    DB.save(p)
   },
   updateCirclePerson: (circleId: string, patch: Partial<CirclePerson>) => {
     const p = DB.get()
@@ -2104,13 +2112,16 @@ const purchaseApi = {
 
 // Map a real backend user into the Candidate card shape used by the UI
 function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string } {
+  const hasProfile = !!(u.bio || u.age)
   return {
     realUserId: u.userId,
     name: u.name, age: u.age || 0, emoji: '💜', color: '#7B6EF6',
     photo: u.photo || '', photos: u.photos?.length ? u.photos : (u.photo ? [u.photo] : []),
-    location: u.city || 'Nearby',
-    distance: `${u.distanceKm} km`, height: '', weight: '',
-    bio: u.bio || '', values: u.values || [], interests: u.interests || [],
+    location: u.city || (u.distanceKm != null ? 'Nearby' : 'On SOMA'),
+    distance: u.distanceKm != null ? `${u.distanceKm} km` : '',
+    height: '', weight: '',
+    bio: u.bio || (hasProfile ? '' : '✨ Just joined SOMA — profile coming soon.'),
+    values: u.values || [], interests: u.interests || [],
     agentName: 'their Soma', loveLanguage: u.loveLanguage || '', attachment: u.attachment || '',
     intimacy: '', work: u.work || '', children: '', pets: '',
     tags: (u.interests || []).slice(0, 5).map(i => ({ icon: '✨', label: i })),
@@ -2442,12 +2453,19 @@ export default function App() {
     }
     if (!document.getElementById('soma-web-styles')) {
       const s = document.createElement('style'); s.id = 'soma-web-styles'
+      // viewport-fit=cover for safe area on notched phones
+      const vp = document.querySelector('meta[name="viewport"]')
+      if (vp) vp.setAttribute('content', 'width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover')
       s.textContent = `
-        *{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+        @font-face{font-family:'Ionicons';src:url('/Ionicons.ttf') format('truetype');font-weight:normal;font-style:normal;font-display:block}
+        *{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+        html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important}
         ::-webkit-scrollbar{display:none}*{scrollbar-width:none}
         [data-focusable="true"]{transition:transform .12s cubic-bezier(.25,.46,.45,.94),opacity .12s ease}
         [data-focusable="true"]:hover{opacity:.88}
         [data-focusable="true"]:active{transform:scale(.96)!important;opacity:.75}
+        input,textarea{font-size:16px!important}
+        .tab-bar-safe{padding-bottom:max(16px,env(safe-area-inset-bottom))!important}
         @media(min-width:600px){body{display:flex!important;justify-content:center;background:radial-gradient(ellipse at 50% -20%,#1e0f5e 0%,#090618 70%)!important;overflow:hidden!important}#root{max-width:430px;width:100%;flex:none!important;box-shadow:0 0 140px rgba(123,110,246,.22),0 0 0 1px rgba(123,110,246,.1)}}
       `
       document.head.appendChild(s)
@@ -2490,7 +2508,7 @@ export default function App() {
     const t = setTimeout(() => {
       startupSync.finally(() => {
         const p = DB.get()
-        setScreen(p.registered ? 'home' : !p.languageChosen ? 'language' : !p.onboarding ? 'onboarding' : 'try')
+        setScreen(!p.languageChosen ? 'language' : !p.onboarding ? 'onboarding' : 'home')
       })
     }, 1900)
     return () => clearTimeout(t)
@@ -2595,7 +2613,7 @@ export default function App() {
   const inner = (() => {
     if (screen === 'splash')      return <Splash />
     if (screen === 'language')    return <LanguageSelect onDone={() => go('onboarding')} />
-    if (screen === 'onboarding')  return <Onboarding onDone={() => { go('home') }} onSignIn={() => go('login')} />
+    if (screen === 'onboarding')  return <Onboarding onDone={() => { go('home') }} onBrowse={() => { const p = DB.get(); p.onboarding = { focusDomains: [] } as any; DB.save(p); go('meetpeople') }} onSignIn={() => go('register')} />
     if (screen === 'try')         return <AuraChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" autoStart={fromOnboarding} />
     if (screen === 'register')    return (
       <RegisterBoundary fallback={<RegisterFallback onDone={(name) => { go('login') }} />}>
@@ -2608,13 +2626,13 @@ export default function App() {
     if (screen === 'verifyemail' && verifyToken) return <VerifyEmailScreen token={verifyToken} onDone={() => go('login')} />
     if (screen === 'aura')        return <AuraChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" />
     if (screen === 'diary')       return <AuraChat mode="diary" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Today's Diary" isDiary />
-    if (screen === 'circle')      return <CircleScreen profile={profile} onBack={() => go('home')} onStartJourney={(id) => { setBondPersonId(id); go('bondjourney') }} onViewInsights={() => go('relinsights')} />
+    if (screen === 'circle')      return <CircleScreen profile={profile} onBack={() => go('home')} onStartJourney={(id) => { setBondPersonId(id); go('bondjourney') }} onViewInsights={() => go('relinsights')} onRefresh={refresh} />
     if (screen === 'bondjourney' && bondPersonId) {
       const bp = profile.circle.find(p => p.id === bondPersonId)
       if (bp) return <BondJourney person={bp} profile={profile} onBack={() => go('circle')} onRefresh={refresh} />
     }
     if (screen === 'lifebalance') return <LifeBalance profile={profile} onBack={() => go('home')} />
-    if (screen === 'meetpeople')  return <MeetPeople profile={profile} onBack={() => go('home')} onMyProfile={() => go('myprofile')} onSynergy={() => go('synergy')} />
+    if (screen === 'meetpeople')  return <MeetPeople profile={profile} onBack={() => go('home')} onMyProfile={() => go('myprofile')} onSynergy={() => go('synergy')} onRegister={() => go('register')} />
     if (screen === 'myprofile')   return <MyProfile profile={profile} onBack={() => go('meetpeople')} />
     if (screen === 'synergy')     return <SynergyScan profile={profile} onBack={() => go('meetpeople')} />
     if (screen === 'connections') return <Connections profile={profile} onBack={() => go('home')} onRefresh={refresh} />
@@ -2654,23 +2672,21 @@ function LanguageSelect({ onDone }: { onDone: () => void }) {
   const [selected, setSelected] = useState(DB.get().language || 'en')
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Scrollable content */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 64 : 48, paddingHorizontal: 20, paddingBottom: 120 }}>
-        {/* Logo + tagline */}
-        <View style={{ alignItems: 'center', marginBottom: 24 }}>
-          <Image source={require('./assets/icon.png')} style={{ width: 72, height: 72, borderRadius: 20, marginBottom: 16 }} />
-          <Text style={{ fontSize: 30, fontWeight: '900', color: '#1A1A2E', textAlign: 'center', letterSpacing: -0.5 }}>SOMA</Text>
+    <View style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 64 : 48, paddingHorizontal: 20, paddingBottom: 140 }}>
+        {/* Logo + title */}
+        <View style={{ alignItems: 'center', marginBottom: 36 }}>
+          <Image source={require('./assets/icon.png')} style={{ width: 80, height: 80, borderRadius: 24, marginBottom: 18 }} />
+          <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', letterSpacing: -0.5 }}>SOMA</Text>
           <Text style={{ fontSize: 14, color: '#7B6EF6', fontWeight: '700', textAlign: 'center', marginTop: 6, letterSpacing: 0.3 }}>
-            {t('ob_tagline')}
+            Know yourself before knowing each other
           </Text>
         </View>
 
-        <Text style={{ fontSize: 22, fontWeight: '800', color: '#1A1A2E', textAlign: 'center', marginBottom: 6 }}>{t('selectLang')}</Text>
-        <Text style={{ fontSize: 14, color: '#9A9DB2', textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 }}>{t('chooseLang')}</Text>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 6 }}>Choose your language</Text>
+        <Text style={{ fontSize: 14, color: '#6B68A0', textAlign: 'center', marginBottom: 24 }}>Select the language you prefer</Text>
 
-        {/* Language rows */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: 10 }}>
           {LANGS.map(l => {
             const on = selected === l.code
             return (
@@ -2680,31 +2696,33 @@ function LanguageSelect({ onDone }: { onDone: () => void }) {
                 onPress={() => setSelected(l.code)}
                 style={{
                   flexDirection: 'row', alignItems: 'center',
-                  backgroundColor: on ? '#F4F2FF' : '#fff',
+                  backgroundColor: on ? 'rgba(123,110,246,0.2)' : 'rgba(255,255,255,0.06)',
                   borderRadius: 16, paddingHorizontal: 18, paddingVertical: 14,
-                  borderWidth: 1.5, borderColor: on ? '#7B6EF6' : '#EBEBEB',
+                  borderWidth: 1.5, borderColor: on ? '#7B6EF6' : 'rgba(255,255,255,0.1)',
                 }}
               >
-                <Text style={{ fontSize: 30, marginRight: 14 }}>{l.flag}</Text>
+                <Text style={{ fontSize: 28, marginRight: 14 }}>{l.flag}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 17, fontWeight: '700', color: on ? '#7B6EF6' : '#1A1A2E' }}>{l.label}</Text>
-                  <Text style={{ fontSize: 13, color: '#9A9DB2', marginTop: 2 }}>{l.name}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: on ? '#A89BFA' : '#E8E5FF' }}>{l.label}</Text>
+                  <Text style={{ fontSize: 13, color: '#6B68A0', marginTop: 2 }}>{l.name}</Text>
                 </View>
-                {on && <Text style={{ fontSize: 18, color: '#7B6EF6', fontWeight: '600' }}>✓</Text>}
+                {on && <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#fff', fontWeight: '700' }}>✓</Text>
+                </View>}
               </TouchableOpacity>
             )
           })}
         </View>
       </ScrollView>
 
-      {/* Continue button — fixed at bottom */}
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 44 : 28, paddingTop: 12, backgroundColor: '#fff' }}>
+      {/* Continue button */}
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 44 : 28, paddingTop: 16, backgroundColor: '#0F0A2E' }}>
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={() => { DB.setLanguage(selected); onDone() }}
-          style={{ height: 56, borderRadius: 28, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.4, shadowRadius: 12, elevation: 5 }}
+          style={{ height: 56, borderRadius: 28, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 }}>{t('continue')}</Text>
+          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>Continue →</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -2723,8 +2741,9 @@ const ONBOARDING_GOALS = [
   { key: 'health',  emoji: '❤️', label: 'Take care of my health',      sub: 'Body, sleep, energy, meds' },
 ]
 
-function Onboarding({ onDone, onSignIn }: { onDone: () => void; onSignIn?: () => void }) {
+function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrowse?: () => void; onSignIn?: () => void }) {
   // phase: 0=welcome, 1-3=voice interview, 4=processing, 5=done
+  const { width: screenW } = useWindowDimensions()
   const [phase, setPhase] = useState(0)
   const [userName, setUserName] = useState('')
   const [answers, setAnswers] = useState(['', '', ''])
@@ -2736,6 +2755,10 @@ function Onboarding({ onDone, onSignIn }: { onDone: () => void; onSignIn?: () =>
   const [sectionConvo, setSectionConvo] = useState<{role:'soma'|'user', text:string}[]>([])
   const [somaGenerating, setSomaGenerating] = useState(false)
   const [followUpCount, setFollowUpCount] = useState(0)
+  const [regEmail, setRegEmail] = useState('')
+  const [regPassword, setRegPassword] = useState('')
+  const [regLoading, setRegLoading] = useState(false)
+  const [regError, setRegError] = useState('')
   const stopListeningRef = useRef<(() => void) | null>(null)
   const sectionConvoRef = useRef<{role:'soma'|'user', text:string}[]>([])
   const convoScrollRef = useRef<ScrollView>(null)
@@ -3013,6 +3036,11 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
           style={{ backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadowSm }}>
           <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>{t('ob_start')}</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={onBrowse ?? onDone}
+          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 16, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,155,250,0.25)' }}>
+          <Text style={{ color: '#A89BFA', fontSize: 16, fontWeight: '700' }}>🌍 Browse profiles first</Text>
+          <Text style={{ color: 'rgba(168,155,250,0.45)', fontSize: 12, marginTop: 2 }}>No account needed</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={onSignIn} style={{ alignItems: 'center', paddingVertical: 8 }}>
           <Text style={{ fontSize: 13, color: '#6B68A0' }}>{t('alreadyAccount')} <Text style={{ color: '#A89BFA', fontWeight: '700' }}>{t('signIn')}</Text></Text>
         </TouchableOpacity>
@@ -3071,17 +3099,132 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
         }
       </TouchableOpacity>
 
-      {/* Start Exploring */}
-      <TouchableOpacity onPress={onDone}
+      {/* Continue to account choice */}
+      <TouchableOpacity onPress={() => setPhase(6)}
         style={{ backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 17, paddingHorizontal: 48, width: '100%', alignItems: 'center', ...shadowSm }}>
-        <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>Start Exploring →</Text>
+        <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>Continue →</Text>
       </TouchableOpacity>
       {!profilePhotoUri && (
-        <TouchableOpacity onPress={onDone} style={{ marginTop: 14, alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Skip for now</Text>
+        <TouchableOpacity onPress={() => setPhase(6)} style={{ marginTop: 14, alignItems: 'center' }}>
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Skip photo</Text>
         </TouchableOpacity>
       )}
     </ScrollView>
+    </View>
+  )
+
+  // Phase 6 — Account choice
+  if (phase === 7) return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 48 }} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity onPress={() => setPhase(6)} style={{ marginBottom: 24 }}>
+          <Text style={{ color: '#A89BFA', fontSize: 15, fontWeight: '600' }}>← Back</Text>
+        </TouchableOpacity>
+
+        <Image source={require('./assets/icon.png')} style={{ width: 60, height: 60, borderRadius: 18, marginBottom: 20, alignSelf: 'center' }} />
+        <Text style={{ fontSize: 26, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', marginBottom: 8, letterSpacing: -0.5 }}>
+          Create your account
+        </Text>
+        <Text style={{ fontSize: 14, color: '#A89BFA', textAlign: 'center', lineHeight: 21, marginBottom: 32 }}>
+          Free forever. Your profile, memories and growth — saved.
+        </Text>
+
+        {regError ? <Text style={{ color: '#FF6B6B', fontSize: 13, textAlign: 'center', marginBottom: 16 }}>{regError}</Text> : null}
+
+        <Text style={{ fontSize: 13, color: '#7B7FA8', fontWeight: '600', marginBottom: 6 }}>Your name</Text>
+        <TextInput
+          value={userName}
+          onChangeText={setUserName}
+          placeholder="e.g. Alex"
+          placeholderTextColor="#4A4870"
+          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(168,155,250,0.2)', paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#E8E5FF', marginBottom: 14 }}
+        />
+
+        <Text style={{ fontSize: 13, color: '#7B7FA8', fontWeight: '600', marginBottom: 6 }}>Email address</Text>
+        <TextInput
+          value={regEmail}
+          onChangeText={setRegEmail}
+          placeholder="you@example.com"
+          placeholderTextColor="#4A4870"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(168,155,250,0.2)', paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#E8E5FF', marginBottom: 14 }}
+        />
+
+        <Text style={{ fontSize: 13, color: '#7B7FA8', fontWeight: '600', marginBottom: 6 }}>Password</Text>
+        <TextInput
+          value={regPassword}
+          onChangeText={setRegPassword}
+          placeholder="••••••••"
+          placeholderTextColor="#4A4870"
+          secureTextEntry
+          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(168,155,250,0.2)', paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#E8E5FF', marginBottom: 28 }}
+        />
+
+        <TouchableOpacity
+          onPress={async () => {
+            if (!userName.trim() || !regEmail.trim() || !regPassword.trim()) {
+              setRegError('Please fill in all fields'); return
+            }
+            if (regPassword.length < 6) {
+              setRegError('Password must be at least 6 characters'); return
+            }
+            setRegError('')
+            setRegLoading(true)
+            try {
+              await auth.signup(regEmail.trim(), userName.trim(), regPassword.trim())
+              DB.setName(userName.trim())
+              alert(`✉️ Almost there!\n\nWe sent a confirmation link to ${regEmail.trim()}. Click it to activate your account, then sign in.`)
+              onDone()
+            } catch (err: any) {
+              setRegError(err.message || 'Signup failed. Please try again.')
+            } finally {
+              setRegLoading(false)
+            }
+          }}
+          disabled={regLoading}
+          style={{ backgroundColor: regLoading ? '#4A4870' : '#7B6EF6', borderRadius: 16, paddingVertical: 17, alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>
+            {regLoading ? 'Creating account...' : 'Create account →'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => onSignIn?.()} style={{ marginTop: 20, alignItems: 'center' }}>
+          <Text style={{ color: '#A89BFA', fontSize: 14, fontWeight: '600' }}>Already have an account? Sign in →</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+
+  if (phase === 6) return (
+    <View style={{ flex: 1, backgroundColor: '#0F0A2E', justifyContent: 'flex-end', padding: 24, paddingBottom: 52 }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 }}>
+        <Image source={require('./assets/icon.png')} style={{ width: 72, height: 72, borderRadius: 22, marginBottom: 24 }} />
+        <Text style={{ fontSize: 26, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', marginBottom: 12, letterSpacing: -0.5 }}>
+          Save your profile?
+        </Text>
+        <Text style={{ fontSize: 15, color: '#A89BFA', textAlign: 'center', lineHeight: 23, marginBottom: 8 }}>
+          Create a free account so Soma remembers everything — your profile, your memories, your growth — forever.
+        </Text>
+      </View>
+
+      <View style={{ gap: 12 }}>
+        {/* Create account */}
+        <TouchableOpacity
+          onPress={() => setPhase(7)}
+          style={{ backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadowSm }}>
+          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>Create free account →</Text>
+        </TouchableOpacity>
+
+        {/* Continue without account */}
+        <TouchableOpacity
+          onPress={onDone}
+          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 16, paddingVertical: 17, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,155,250,0.25)' }}>
+          <Text style={{ color: '#A89BFA', fontSize: 16, fontWeight: '700' }}>Continue without account</Text>
+          <Text style={{ color: 'rgba(168,155,250,0.5)', fontSize: 12, marginTop: 3 }}>You can register later in Settings</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   )
 
@@ -3104,36 +3247,45 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
       <ScrollView
         ref={convoScrollRef}
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingTop: 20, gap: 10 }}
+        contentContainerStyle={{ padding: 16, paddingTop: 20, gap: 10, width: '100%' }}
         showsVerticalScrollIndicator={false}
       >
-        {sectionConvo.map((msg, i) => (
-          <View key={i} style={{
-            alignSelf: msg.role === 'soma' ? 'flex-start' : 'flex-end',
-            flexDirection: msg.role === 'soma' ? 'row' : 'row-reverse',
-            alignItems: 'flex-end',
-            gap: 8,
-            maxWidth: '85%',
-            marginBottom: 2,
-          }}>
-            {msg.role === 'soma' && (
-              <Animated.View style={{ transform: [{ scale: i === sectionConvo.length - 1 && somaThinking ? pulseAnim : new Animated.Value(1) }] }}>
-                <Image source={require('./assets/icon.png')} style={{ width: 30, height: 30, borderRadius: 9 }} />
-              </Animated.View>
-            )}
-            <View style={{
-              backgroundColor: msg.role === 'soma' ? 'rgba(255,255,255,0.08)' : color + '33',
-              borderWidth: 1,
-              borderColor: msg.role === 'soma' ? 'rgba(255,255,255,0.1)' : color + '55',
-              borderRadius: 18,
-              borderBottomLeftRadius: msg.role === 'soma' ? 4 : 18,
-              borderBottomRightRadius: msg.role === 'user' ? 4 : 18,
-              padding: 12, paddingHorizontal: 14,
-            }}>
-              <Text style={{ fontSize: 14, color: '#E8E5FF', lineHeight: 21 }}>{msg.text}</Text>
+        {sectionConvo.map((msg, i) => {
+          const rowW = Math.min(screenW, 430) - 32
+          return (
+            <View key={i} style={{ width: rowW, flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 2 }}>
+              {msg.role === 'soma' ? (
+                <>
+                  <Animated.View style={{ flexShrink: 0, transform: [{ scale: i === sectionConvo.length - 1 && somaThinking ? pulseAnim : new Animated.Value(1) }] }}>
+                    <Image source={require('./assets/icon.png')} style={{ width: 30, height: 30, borderRadius: 9 }} />
+                  </Animated.View>
+                  <View style={{
+                    flex: 1, minWidth: 0,
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+                    borderRadius: 18, borderBottomLeftRadius: 4,
+                    padding: 12, paddingHorizontal: 14,
+                  }}>
+                    <Text style={{ fontSize: 14, color: '#E8E5FF', lineHeight: 21 }}>{msg.text}</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={{ flex: 1 }} />
+                  <View style={{
+                    maxWidth: rowW * 0.75,
+                    backgroundColor: color + '33',
+                    borderWidth: 1, borderColor: color + '55',
+                    borderRadius: 18, borderBottomRightRadius: 4,
+                    padding: 12, paddingHorizontal: 14,
+                  }}>
+                    <Text style={{ fontSize: 14, color: '#E8E5FF', lineHeight: 21 }}>{msg.text}</Text>
+                  </View>
+                </>
+              )}
             </View>
-          </View>
-        ))}
+          )
+        })}
         {somaGenerating && (
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 2 }}>
             <Image source={require('./assets/icon.png')} style={{ width: 30, height: 30, borderRadius: 9 }} />
@@ -4188,13 +4340,13 @@ function MainTabs({ profile, go, onReset }: { profile: UserProfile; go: (s: Scre
     { id: 'outer',  icon: 'compass-outline',  label: t('tab_explore') },
   ]
   const tabBar = (
-    <View style={{
+    <View dataSet={{ class: 'tab-bar-safe' }} style={{
       position: Platform.OS === 'web' ? 'fixed' as any : 'absolute',
       bottom: 0, left: 0, right: 0,
       flexDirection: 'row', alignItems: 'flex-end',
       backgroundColor: theme.bg,
       borderTopWidth: 0.5, borderTopColor: theme.border,
-      paddingBottom: 24, paddingTop: 8, paddingHorizontal: 24,
+      paddingBottom: Platform.OS === 'ios' ? 34 : 16, paddingTop: 8, paddingHorizontal: 24,
     }}>
       {TAB_ITEMS.map(item => {
         const active = tab === item.id
@@ -5531,6 +5683,56 @@ Tone: warm, clinical, concise. Max 350 words. Do NOT invent facts not in the dat
   return raw || 'Unable to generate report — please try again.'
 }
 
+// ── AGENT-TO-AGENT CONVERSATION GENERATOR ──────────────────
+async function generateAgentConversation(
+  person: CirclePerson,
+  profile: UserProfile
+): Promise<{ speaker: 'A' | 'B'; text: string }[]> {
+  const name = person.name
+  const userName = profile.name || 'the user'
+  const aiName = profile.aiName || 'Soma'
+  const rel = person.type
+
+  const mentions = (profile.memories || [])
+    .filter(m => m.content.toLowerCase().includes(name.toLowerCase()))
+    .slice(0, 8).map(m => `- ${m.content}`).join('\n')
+
+  const recentMsgs = (person.messages || [])
+    .slice(-6).map(m => `${m.role === 'user' ? userName : aiName}: ${m.content}`).join('\n')
+
+  const moodLogs = (profile.moodLogs || []).slice(-5)
+  const avgMood = moodLogs.length
+    ? (moodLogs.reduce((s, l) => s + l.mood, 0) / moodLogs.length).toFixed(1)
+    : null
+
+  const prompt = `You are writing a short dialogue between two AI companions:
+- SOMA_A: ${aiName}, the personal AI of ${userName}. Knows ${userName}'s feelings, goals, and inner world.
+- SOMA_B: ${name}'s Soma — an AI representing ${name} (${rel} of ${userName}).
+
+Context about ${userName}:
+- Mood lately: ${avgMood ? `${avgMood}/5` : 'unknown'}
+- What ${userName} has shared about ${name}: ${mentions || 'Not much yet — they are new to each other.'}
+- Recent chat about ${name}: ${recentMsgs || 'None yet.'}
+
+Generate a warm, insightful 6-8 line dialogue. The agents talk ABOUT their users — sharing what they know, noticing what the relationship needs, and offering gentle suggestions. Format STRICTLY as:
+SOMA_A: [line]
+SOMA_B: [line]
+(alternating, starting with SOMA_A)
+
+Be personal, warm, and specific. End with something actionable — one concrete thing the two people could do together.`
+
+  const raw = await groq([{ role: 'user', content: prompt }],
+    'You write warm, insightful dialogues between AI companions. Be specific, not generic. Short sentences.', 500, 0.85)
+
+  if (!raw) return []
+
+  const lines = raw.split('\n').filter(l => l.trim().startsWith('SOMA_A:') || l.trim().startsWith('SOMA_B:'))
+  return lines.map(l => {
+    const isA = l.trim().startsWith('SOMA_A:')
+    return { speaker: isA ? 'A' as const : 'B' as const, text: l.replace(/^SOMA_[AB]:\s*/,'').trim() }
+  })
+}
+
 async function sendTherapistReport(
   authToken: string, therapistEmail: string, therapistName: string,
   patientName: string, reportText: string
@@ -6424,7 +6626,7 @@ function MomentsStrip({ profile, onPost, onView }: { profile: UserProfile; onPos
 // ════════════════════════════════════════════════════════════
 //  CIRCLE SCREEN
 // ════════════════════════════════════════════════════════════
-function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { profile: UserProfile; onBack: () => void; onStartJourney?: (personId: string) => void; onViewInsights?: () => void }) {
+function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefresh }: { profile: UserProfile; onBack: () => void; onStartJourney?: (personId: string) => void; onViewInsights?: () => void; onRefresh?: () => void }) {
   const { t } = useT()
   const [openChat, setOpenChat] = useState<string | null>(null)
   const [msgs, setMsgs] = useState<ChatMessage[]>([])
@@ -6446,6 +6648,57 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
   const [nudgeText, setNudgeText] = useState('')
   const [nudgeLoading, setNudgeLoading] = useState(false)
   const [nudgeCopied, setNudgeCopied] = useState(false)
+
+  const [agentModal, setAgentModal] = useState<{ person: CirclePerson } | null>(null)
+  const [agentLines, setAgentLines] = useState<{ speaker: 'A' | 'B'; text: string }[]>([])
+  const [agentLoading, setAgentLoading] = useState(false)
+
+  const openAgentChat = async (p: CirclePerson) => {
+    setAgentModal({ person: p }); setAgentLines([]); setAgentLoading(true)
+    const lines = await generateAgentConversation(p, profile)
+    setAgentLines(lines); setAgentLoading(false)
+  }
+
+  const [findModal, setFindModal] = useState(false)
+  const [findCode, setFindCode] = useState('')
+  const [findLoading, setFindLoading] = useState(false)
+  const [findResults, setFindResults] = useState<{ name: string; code: string; userId: string }[]>([])
+  const [findError, setFindError] = useState('')
+
+  const [addModal, setAddModal] = useState(false)
+  const [addName, setAddName] = useState('')
+  const [addType, setAddType] = useState<'friend' | 'family' | 'romantic' | 'work' | 'therapy'>('friend')
+  const [addContext, setAddContext] = useState('')
+
+  const submitAddPerson = () => {
+    if (!addName.trim()) return
+    DB.addCircle(addName.trim(), addType, addContext.trim())
+    setAddModal(false); setAddName(''); setAddType('friend'); setAddContext('')
+    onRefresh?.()
+  }
+
+  const lookupCode = async () => {
+    if (!findCode.trim()) return
+    setFindLoading(true); setFindError(''); setFindResults([])
+    try {
+      const val = findCode.trim()
+      const isEmail = val.includes('@')
+      const param = isEmail ? `email=${encodeURIComponent(val)}` : `code=${encodeURIComponent(val)}`
+      const res = await fetch(`${BACKEND_URL}/users/find?${param}`)
+      const data = await res.json()
+      if (!res.ok) { setFindError(data.error || 'Not found'); return }
+      setFindResults(data.users || [])
+      if ((data.users || []).length === 0) setFindError('No user found.')
+    } catch { setFindError('Could not connect. Try again.') }
+    finally { setFindLoading(false) }
+  }
+
+  const addFromFind = (user: { name: string; code: string; userId: string }) => {
+    DB.addCircle(user.name, 'friend', '', user.userId)
+    setFindModal(false); setFindCode(''); setFindResults([])
+    onRefresh?.()
+    alert(`✅ ${user.name} added to your Circle!\n\nTap their name to start a real conversation.`)
+  }
 
   const scores = useMemo(() =>
     Object.fromEntries(profile.circle.map(p => [p.id, circleHealth(p, profile)])),
@@ -6500,14 +6753,83 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
   const typeIcon: Record<string, string> = { therapy: '🩺', family: '👨‍👩‍👧', friend: '🤝', work: '💼', romantic: '💕' }
   const typeLabel: Record<string, string> = { therapy: 'Therapy & Support', family: 'Family', friend: 'Friends', work: 'Work', romantic: 'Romantic' }
 
-  const openMsg = (p: CirclePerson) => { setOpenChat(p.id); setMsgs(p.messages); setInput('') }
+  const [realMsgs, setRealMsgs] = useState<{ id: string; from_user_id: string; content: string; created_at: string }[]>([])
+  const pollRef = useRef<any>(null)
+  const myId = (() => { try { return auth?.chat?.myId() ?? null } catch { return null } })()
+
+  const [somaPanel, setSomaPanel] = useState(false)
+  const [somaAdvice, setSomaAdvice] = useState('')
+  const [somaAdviceLoading, setSomaAdviceLoading] = useState(false)
+
+  const askSomaAboutChat = async (p: CirclePerson, msgs: { from_user_id: string; content: string }[]) => {
+    setSomaPanel(true); setSomaAdvice(''); setSomaAdviceLoading(true)
+    const convo = msgs.slice(-10).map(m =>
+      `${m.from_user_id === myId ? (profile.name || 'Me') : p.name}: ${m.content}`
+    ).join('\n')
+    const prompt = `You are Soma, the personal AI of ${profile.name || 'the user'}. They are having a conversation with their ${p.type} named ${p.name}.
+
+Recent conversation:
+${convo || '(no messages yet)'}
+
+Give ${profile.name || 'them'} 2-3 short, warm, personal insights:
+1. What is the emotional tone of this conversation?
+2. One thing they could say to deepen the connection right now
+3. One thing to be mindful of
+
+Be specific and human. Under 120 words total.`
+    const reply = await groq([{ role: 'user', content: prompt }],
+      `You are Soma, a wise and warm AI companion. Give concise, personal insights about a conversation.${langDirective()}`, 200, 0.8)
+    setSomaAdvice(reply || 'I see a real connection here. Keep being authentic — that\'s what matters most.')
+    setSomaAdviceLoading(false)
+  }
+
+  const loadRealMsgs = async (userId: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/friends/chat/${userId}`, {
+        headers: { Authorization: `Bearer ${auth.getToken()}` }
+      })
+      if (res.ok) { const d = await res.json(); setRealMsgs(d.messages || []) }
+    } catch {}
+  }
+
+  const openMsg = (p: CirclePerson) => {
+    setOpenChat(p.id); setInput('')
+    if (p.somaUserId && auth.getToken()) {
+      setRealMsgs([])
+      loadRealMsgs(p.somaUserId)
+      if (pollRef.current) clearInterval(pollRef.current)
+      pollRef.current = setInterval(() => loadRealMsgs(p.somaUserId!), 4000)
+    } else {
+      setMsgs(p.messages)
+    }
+  }
 
   const send = async (text: string) => {
     if (!text.trim() || loading || !openChat) return
     const p = profile.circle.find(x => x.id === openChat)
     if (!p) return
+    setInput('')
+
+    // Real chat with a SOMA user
+    if (p.somaUserId && auth.getToken()) {
+      setLoading(true)
+      try {
+        const res = await fetch(`${BACKEND_URL}/friends/chat/${p.somaUserId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+          body: JSON.stringify({ content: text.trim() })
+        })
+        if (res.ok) { await loadRealMsgs(p.somaUserId) }
+        else { const d = await res.json(); alert(d.error || 'Failed to send') }
+      } catch { alert('Could not send. Check your connection.') }
+      setLoading(false)
+      setTimeout(() => msgRef.current?.scrollToEnd({ animated: true }), 100)
+      return
+    }
+
+    // Local Soma-mediated chat
     const updated = [...msgs, { role: 'user' as const, content: text.trim() }]
-    setMsgs(updated); setInput(''); setLoading(true); DB.messageCircle(openChat, text.trim(), true)
+    setMsgs(updated); setLoading(true); DB.messageCircle(openChat, text.trim(), true)
     const context = somaCircleContext(p.type as any, p.name) + langDirective()
     const reply = await groq(updated.map(m => ({ role: m.role, content: m.content })), context, 100)
     const final = [...updated, { role: 'assistant' as const, content: reply || 'I hear you. Tell me more.' }]
@@ -6518,21 +6840,74 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
   if (openChat) {
     const p = profile.circle.find(x => x.id === openChat)
     if (!p) return null
+    const isRealChat = !!(p.somaUserId && auth.getToken())
     return (
       <KeyboardAvoidingView style={[g.screen, { backgroundColor: t.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={g.chatHeader}>
-          <TouchableOpacity style={g.dBack} onPress={() => setOpenChat(null)}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
+          <TouchableOpacity style={g.dBack} onPress={() => { setOpenChat(null); setSomaPanel(false); if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={g.chatName}>{p.name}</Text>
-            <Text style={g.chatStatus}>{p.type}</Text>
+            <Text style={g.chatStatus}>{isRealChat ? '🟢 Direct message' : p.type}</Text>
           </View>
+          <TouchableOpacity
+            onPress={() => { setSomaPanel(!somaPanel); if (!somaPanel) askSomaAboutChat(p, isRealChat ? realMsgs : msgs.map(m => ({ from_user_id: m.role === 'user' ? myId || '' : '', content: m.content }))) }}
+            style={{ backgroundColor: '#7B6EF620', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#7B6EF640' }}>
+            <Text style={{ color: '#A89BFA', fontSize: 12, fontWeight: '700' }}>✦ Soma</Text>
+          </TouchableOpacity>
         </View>
-        <ScrollView ref={msgRef} style={{ flex: 1 }} contentContainerStyle={g.msgList} showsVerticalScrollIndicator={false}>
-          {msgs.map((m, i) => <Bubble key={i} msg={m} />)}
-          {loading && <Typing />}
-        </ScrollView>
+
+        {/* Soma insight panel */}
+        {somaPanel && (
+          <View style={{ backgroundColor: '#0F0A2E', borderBottomWidth: 1, borderBottomColor: '#7B6EF630', padding: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ color: '#A89BFA', fontSize: 13, fontWeight: '700' }}>✦ Soma's insight</Text>
+              <TouchableOpacity onPress={() => setSomaPanel(false)}><Text style={{ color: '#A89BFA', fontSize: 18 }}>×</Text></TouchableOpacity>
+            </View>
+            {somaAdviceLoading
+              ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><ActivityIndicator color="#7B6EF6" size="small" /><Text style={{ color: '#A89BFA', fontSize: 13 }}>Reading the conversation…</Text></View>
+              : <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 21 }}>{somaAdvice}</Text>
+            }
+            {!somaAdviceLoading && (
+              <TouchableOpacity onPress={() => askSomaAboutChat(p, isRealChat ? realMsgs : msgs.map(m => ({ from_user_id: m.role === 'user' ? myId || '' : '', content: m.content })))}
+                style={{ marginTop: 10, alignSelf: 'flex-start' }}>
+                <Text style={{ color: '#7B6EF6', fontSize: 12, fontWeight: '600' }}>↻ Refresh</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {isRealChat ? (
+          <ScrollView ref={msgRef} style={{ flex: 1 }} contentContainerStyle={g.msgList} showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => msgRef.current?.scrollToEnd({ animated: false })}>
+            {realMsgs.length === 0 && !loading && (
+              <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                <Text style={{ fontSize: 32, marginBottom: 12 }}>💬</Text>
+                <Text style={{ color: t.textSub, fontSize: 14, textAlign: 'center' }}>Start your conversation with {p.name}.</Text>
+              </View>
+            )}
+            {realMsgs.map((m, i) => {
+              const isMe = m.from_user_id === myId
+              return (
+                <View key={m.id || i} style={{ flexDirection: isMe ? 'row-reverse' : 'row', marginBottom: 10, alignItems: 'flex-end', gap: 8 }}>
+                  {!isMe && <View style={[g.avatar, { width: 28, height: 28, borderRadius: 14 }]}><Text style={[g.avatarTxt, { fontSize: 12 }]}>{p.name.charAt(0)}</Text></View>}
+                  <View style={{ maxWidth: '75%', backgroundColor: isMe ? '#7B6EF6' : t.card, borderRadius: 18, borderBottomRightRadius: isMe ? 4 : 18, borderBottomLeftRadius: isMe ? 18 : 4, padding: 12, borderWidth: isMe ? 0 : 1, borderColor: t.border }}>
+                    <Text style={{ color: isMe ? '#fff' : t.text, fontSize: 15, lineHeight: 21 }}>{m.content}</Text>
+                    <Text style={{ color: isMe ? 'rgba(255,255,255,0.6)' : t.textTertiary, fontSize: 10, marginTop: 4, textAlign: isMe ? 'right' : 'left' }}>
+                      {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+              )
+            })}
+            {loading && <Typing />}
+          </ScrollView>
+        ) : (
+          <ScrollView ref={msgRef} style={{ flex: 1 }} contentContainerStyle={g.msgList} showsVerticalScrollIndicator={false}>
+            {msgs.map((m, i) => <Bubble key={i} msg={m} />)}
+            {loading && <Typing />}
+          </ScrollView>
+        )}
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
+          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={isRealChat ? `Message ${p.name}...` : `Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
           <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -6577,14 +6952,20 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
         </View>
       )}
 
-      <TouchableOpacity
-        style={[g.primaryBtn, profile.circle.length >= 20 && { opacity: 0.4 }]}
-        onPress={() => profile.circle.length < 20
-          ? alert('Invite: You can add people manually or accept invitations they send. Each connection gets a unique invite code in Settings.')
-          : alert('Your circle is full (20 people max). Remove someone first.')}
-      >
-        <Text style={g.primaryBtnTxt}>+ Invite someone to your circle</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 0 }}>
+        <TouchableOpacity
+          style={[g.primaryBtn, { flex: 1 }, profile.circle.length >= 20 && { opacity: 0.4 }]}
+          onPress={() => profile.circle.length < 20 ? setAddModal(true) : alert('Your circle is full (20 people max). Remove someone first.')}
+        >
+          <Text style={g.primaryBtnTxt}>+ Add someone</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[g.primaryBtn, { flex: 1, backgroundColor: '#10B98120', borderWidth: 1, borderColor: '#10B98140' }]}
+          onPress={() => { setFindModal(true); setFindCode(''); setFindResults([]); setFindError('') }}
+        >
+          <Text style={[g.primaryBtnTxt, { color: '#10B981' }]}>🔍 Find by code</Text>
+        </TouchableOpacity>
+      </View>
       <View style={{ height: 16 }} />
 
       {/* Needs Attention */}
@@ -6656,6 +7037,17 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
                       <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', paddingVertical: 4 }}>📋 Report</Text>
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity onPress={() => openAgentChat(p)} style={{ paddingLeft: 4 }}>
+                    <Text style={{ fontSize: 12, color: '#A89BFA', fontWeight: '600', paddingVertical: 4 }}>🤖 Chat</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => {
+                    if (confirm(`Remove ${p.name} from your Circle?`)) {
+                      DB.removeCircle(p.id)
+                      onRefresh?.()
+                    }
+                  }} style={{ paddingLeft: 4 }}>
+                    <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', paddingVertical: 4 }}>✕ Remove</Text>
+                  </TouchableOpacity>
                 </View>
                 )
               })}
@@ -6669,7 +7061,7 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
       <Modal visible={!!nudgeModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setNudgeModal(null)}>
         <View style={[g.screen, { backgroundColor: t.bg, padding: 28, justifyContent: 'center' }]}>
           <Text style={[g.logo, { fontSize: 20, marginBottom: 4 }]}>✦ Message idea</Text>
-          <Text style={[g.logoSub, { marginBottom: 24 }]}>For {nudgeModal?.person.name} — written by Soma, sent by you</Text>
+          <Text style={[g.logoSub, { marginBottom: 24 }]}>For {nudgeModal?.person.name} — edit and send</Text>
 
           {nudgeLoading ? (
             <View style={{ alignItems: 'center', paddingVertical: 32 }}>
@@ -6677,13 +7069,39 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
               <Text style={{ color: t.textTertiary, marginTop: 12 }}>Soma is thinking…</Text>
             </View>
           ) : (
-            <View style={{ backgroundColor: t.card, borderRadius: 18, padding: 20, borderWidth: 1, borderColor: t.border, marginBottom: 20 }}>
-              <Text style={{ fontSize: 15, color: t.text, lineHeight: 24 }}>{nudgeText}</Text>
-            </View>
+            <TextInput
+              style={{ backgroundColor: t.card, borderRadius: 18, padding: 20, borderWidth: 1, borderColor: t.border, marginBottom: 20, fontSize: 15, color: t.text, lineHeight: 24, minHeight: 100, textAlignVertical: 'top' }}
+              value={nudgeText}
+              onChangeText={setNudgeText}
+              multiline
+              placeholder="Write a message…"
+              placeholderTextColor={t.textTertiary}
+            />
           )}
 
-          <TouchableOpacity style={[g.primaryBtn, { marginBottom: 12, opacity: nudgeLoading ? 0.4 : 1 }]} onPress={copyNudge} disabled={nudgeLoading}>
-            <Text style={g.primaryBtnTxt}>{nudgeCopied ? '✓ Copied!' : 'Copy message'}</Text>
+          {nudgeModal?.person.somaUserId ? (
+            <TouchableOpacity
+              style={[g.primaryBtn, { marginBottom: 12, opacity: nudgeLoading || !nudgeText.trim() ? 0.4 : 1 }]}
+              disabled={nudgeLoading || !nudgeText.trim()}
+              onPress={async () => {
+                const p = nudgeModal!.person
+                if (!p.somaUserId || !nudgeText.trim()) return
+                try {
+                  await fetch(`${BACKEND_URL}/friends/chat/${p.somaUserId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+                    body: JSON.stringify({ content: nudgeText.trim() })
+                  })
+                  setNudgeModal(null)
+                  alert(`✅ Message sent to ${p.name}!`)
+                } catch { alert('Could not send. Check your connection.') }
+              }}>
+              <Text style={g.primaryBtnTxt}>Send to {nudgeModal.person.name} on SOMA</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <TouchableOpacity style={[nudgeModal?.person.somaUserId ? g.secondaryBtn : g.primaryBtn, { marginBottom: 12, opacity: nudgeLoading ? 0.4 : 1 }]} onPress={copyNudge} disabled={nudgeLoading}>
+            <Text style={nudgeModal?.person.somaUserId ? g.secondaryBtnTxt : g.primaryBtnTxt}>{nudgeCopied ? '✓ Copied!' : 'Copy message'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[g.secondaryBtn, { marginBottom: 12 }]} onPress={() => openNudge(nudgeModal!.person)}>
             <Text style={g.secondaryBtnTxt}>↺ Try another</Text>
@@ -6759,6 +7177,212 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights }: { pro
           )}
           <View style={{ height: 60 }} />
         </ScrollView>
+      </Modal>
+
+      {/* Agent-to-Agent Conversation Modal */}
+      <Modal visible={!!agentModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setAgentModal(null)}>
+        <View style={[g.screen, { backgroundColor: t.bg }]}>
+          <View style={{ padding: 24, paddingTop: 32 }}>
+            <TouchableOpacity onPress={() => setAgentModal(null)} style={{ marginBottom: 8 }}>
+              <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Close</Text>
+            </TouchableOpacity>
+            <Text style={[g.logo, { fontSize: 20, marginBottom: 2 }]}>🤖 Agent Conversation</Text>
+            <Text style={[g.logoSub, { marginBottom: 0 }]}>
+              {profile.aiName || 'Soma'} meets {agentModal?.person.name}'s Soma
+            </Text>
+          </View>
+          <View style={{ marginHorizontal: 20, marginBottom: 12, borderRadius: 14, padding: 12, backgroundColor: '#7B6EF610', borderWidth: 1, borderColor: '#7B6EF630' }}>
+            <Text style={{ fontSize: 12, color: t.accent, textAlign: 'center' }}>
+              🔒 This conversation is generated privately on your device — nothing is shared with your friend.
+            </Text>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
+            {agentLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+                <ActivityIndicator color="#7B6EF6" size="large" />
+                <Text style={{ color: t.textTertiary, marginTop: 16, fontSize: 14 }}>The two agents are connecting…</Text>
+              </View>
+            ) : agentLines.length === 0 ? (
+              <Text style={{ color: t.textSub, textAlign: 'center', paddingVertical: 40 }}>Could not generate a conversation. Try again.</Text>
+            ) : (
+              agentLines.map((line, i) => {
+                const isA = line.speaker === 'A'
+                return (
+                  <View key={i} style={{ marginBottom: 16, flexDirection: isA ? 'row' : 'row-reverse', alignItems: 'flex-start', gap: 10 }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isA ? '#7B6EF6' : '#10B981', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Text style={{ fontSize: 16 }}>🤖</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: isA ? '#A89BFA' : '#34D399', marginBottom: 4, textAlign: isA ? 'left' : 'right' }}>
+                        {isA ? (profile.aiName || 'Soma') : `${agentModal?.person.name}'s Soma`}
+                      </Text>
+                      <View style={{ backgroundColor: isA ? '#7B6EF615' : '#10B98115', borderRadius: 14, borderTopLeftRadius: isA ? 4 : 14, borderTopRightRadius: isA ? 14 : 4, padding: 12, borderWidth: 1, borderColor: isA ? '#7B6EF630' : '#10B98130' }}>
+                        <Text style={{ fontSize: 14, color: t.text, lineHeight: 20 }}>{line.text}</Text>
+                      </View>
+                    </View>
+                  </View>
+                )
+              })
+            )}
+            {!agentLoading && agentLines.length > 0 && (
+              <TouchableOpacity
+                onPress={() => { setAgentLines([]); setAgentLoading(true); generateAgentConversation(agentModal!.person, profile).then(l => { setAgentLines(l); setAgentLoading(false) }) }}
+                style={{ marginTop: 8, borderRadius: 14, paddingVertical: 13, alignItems: 'center', backgroundColor: '#7B6EF620', borderWidth: 1, borderColor: '#7B6EF640' }}>
+                <Text style={{ color: t.accent, fontSize: 14, fontWeight: '700' }}>↻  Generate new conversation</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Add Person Modal — unified: find on SOMA or add manually */}
+      <Modal visible={addModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => { setAddModal(false); setFindCode(''); setFindResults([]); setFindError('') }}>
+        <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ padding: 28, paddingBottom: 60 }}>
+          <TouchableOpacity onPress={() => { setAddModal(false); setFindCode(''); setFindResults([]); setFindError('') }} style={{ marginBottom: 20 }}>
+            <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Close</Text>
+          </TouchableOpacity>
+          <Text style={[g.logo, { fontSize: 22, marginBottom: 4 }]}>➕ Add someone</Text>
+          <Text style={[g.logoSub, { marginBottom: 24 }]}>Find them on SOMA or add manually</Text>
+
+          {/* ── Find on SOMA ── */}
+          <View style={{ backgroundColor: '#10B98110', borderRadius: 18, borderWidth: 1, borderColor: '#10B98130', padding: 18, marginBottom: 24 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#10B981', marginBottom: 4 }}>🔍 Find on SOMA</Text>
+            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 14 }}>Search by their email or invite code — connect your SOMA AIs</Text>
+            <TextInput
+              value={findCode}
+              onChangeText={v => { setFindCode(v); setFindError(''); setFindResults([]) }}
+              placeholder="friend@email.com  or  invite code"
+              placeholderTextColor={t.textTertiary}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+              style={{ backgroundColor: t.card, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: t.text, marginBottom: 12 }}
+            />
+            {findError ? <Text style={{ color: '#FF6B6B', fontSize: 13, marginBottom: 10 }}>{findError}</Text> : null}
+            <TouchableOpacity
+              onPress={lookupCode}
+              disabled={findLoading || !findCode.trim()}
+              style={{ backgroundColor: findLoading || !findCode.trim() ? '#4A4870' : '#10B981', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: findResults.length > 0 ? 14 : 0 }}>
+              {findLoading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Search</Text>}
+            </TouchableOpacity>
+            {findResults.map((user, i) => (
+              <View key={i} style={{ backgroundColor: t.card, borderRadius: 14, borderWidth: 1, borderColor: '#10B98140', padding: 14, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#10B98120', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: '#10B981' }}>{user.name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{user.name}</Text>
+                  <Text style={{ fontSize: 11, color: t.textSub, marginTop: 2 }}>✦ Has a SOMA account</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => { addFromFind(user); setAddModal(false) }}
+                  style={{ backgroundColor: '#10B981', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add →</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          {/* ── Add manually ── */}
+          <View style={{ backgroundColor: t.card, borderRadius: 18, borderWidth: 1, borderColor: t.border, padding: 18 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: t.accent, marginBottom: 4 }}>✏️ Add manually</Text>
+            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 16 }}>They don't have SOMA yet — add them to your circle</Text>
+
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 6 }}>Name</Text>
+            <TextInput
+              value={addName}
+              onChangeText={setAddName}
+              placeholder="Their name"
+              placeholderTextColor={t.textTertiary}
+              autoCorrect={false}
+              style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: t.text, marginBottom: 16 }}
+            />
+
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 8 }}>Relationship</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {(['friend', 'family', 'romantic', 'work', 'therapy'] as const).map(type => (
+                <TouchableOpacity
+                  key={type}
+                  onPress={() => setAddType(type)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
+                    borderColor: addType === type ? t.accent : t.border,
+                    backgroundColor: addType === type ? `${t.accent}20` : t.bg }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: addType === type ? t.accent : t.textSub }}>
+                    {type === 'therapy' ? '🩺 Support' : type === 'family' ? '👨‍👩‍👧 Family' : type === 'friend' ? '🤝 Friend' : type === 'work' ? '💼 Work' : '💕 Romantic'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 6 }}>Context <Text style={{ fontWeight: '400' }}>(optional)</Text></Text>
+            <TextInput
+              value={addContext}
+              onChangeText={setAddContext}
+              placeholder="How you know them..."
+              placeholderTextColor={t.textTertiary}
+              multiline
+              numberOfLines={2}
+              style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: t.text, marginBottom: 20, minHeight: 64, textAlignVertical: 'top' }}
+            />
+
+            <TouchableOpacity
+              onPress={submitAddPerson}
+              disabled={!addName.trim()}
+              style={{ backgroundColor: addName.trim() ? '#7B6EF6' : '#4A4870', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Add to Circle</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </Modal>
+
+      {/* Find by Code Modal (kept for direct access from circle header button) */}
+      <Modal visible={findModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setFindModal(false)}>
+        <View style={[g.screen, { backgroundColor: t.bg, padding: 28 }]}>
+          <TouchableOpacity onPress={() => setFindModal(false)} style={{ marginBottom: 20 }}>
+            <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Close</Text>
+          </TouchableOpacity>
+          <Text style={[g.logo, { fontSize: 22, marginBottom: 4 }]}>🔍 Find a friend</Text>
+          <Text style={[g.logoSub, { marginBottom: 24 }]}>Search by email address or invite code</Text>
+
+          <TextInput
+            value={findCode}
+            onChangeText={v => { setFindCode(v); setFindError(''); setFindResults([]) }}
+            placeholder="friend@email.com  or  A3F9C2"
+            placeholderTextColor={t.textTertiary}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoCorrect={false}
+            style={{ backgroundColor: t.card, borderRadius: 14, borderWidth: 1, borderColor: t.border, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: t.text, marginBottom: 16 }}
+          />
+
+          {findError ? <Text style={{ color: '#FF6B6B', fontSize: 13, textAlign: 'center', marginBottom: 12 }}>{findError}</Text> : null}
+
+          <TouchableOpacity
+            onPress={lookupCode}
+            disabled={findLoading || !findCode.trim()}
+            style={{ backgroundColor: findLoading || !findCode.trim() ? '#4A4870' : '#7B6EF6', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 20 }}>
+            {findLoading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Find friend</Text>}
+          </TouchableOpacity>
+
+          {findResults.map((user, i) => (
+            <View key={i} style={{ backgroundColor: t.card, borderRadius: 18, borderWidth: 1, borderColor: '#10B98140', padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#10B98120', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: '#10B981' }}>{user.name.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>{user.name}</Text>
+                <Text style={{ fontSize: 12, color: t.textSub, marginTop: 2 }}>Code: {user.code}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => addFromFind(user)}
+                style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add →</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
       </Modal>
 
       {/* Widget promo card */}
@@ -7307,32 +7931,13 @@ interface Candidate {
 
 const U = (id: string) => `https://images.unsplash.com/photo-${id}?w=900&q=80&auto=format&fit=crop`
 
+// One demo profile — shown only when no real users are available
 const CANDIDATES: Candidate[] = [
-  { name: 'Mai', age: 27, emoji: '🌿', color: '#F6A86E', photo: U('1494790108377-be9c29b29330'), location: 'USA, California', distance: '2.5 km', height: '168 cm', weight: '54 kg',
-    bio: 'Hi! Finally, after almost giving up, looking for something real. I love indie films, long hikes, and quiet cafés. Learning to paint.',
+  { name: 'Mai', age: 27, emoji: '🌿', color: '#F6A86E', photo: U('1494790108377-be9c29b29330'), location: 'Demo profile', distance: '—', height: '168 cm', weight: '54 kg',
+    bio: '✨ This is a demo profile. Real people will appear here once more users join SOMA near you.',
     values: ['Depth', 'Growth', 'Freedom'], interests: ['hiking', 'films', 'painting', 'coffee'], agentName: 'Lux',
     loveLanguage: 'Quality Time', attachment: 'Secure', intimacy: 'Values slow, emotionally present closeness over intensity.', work: 'Illustrator', children: 'Wants kids', pets: 'Has a cat',
-    tags: [{icon:'👩',label:'Women'},{icon:'🎨',label:'Painter'},{icon:'🐈',label:'Have cat'},{icon:'🥾',label:'Hiking'},{icon:'🎬',label:'Indie films'}] },
-  { name: 'Daniel', age: 30, emoji: '🎸', color: '#6ECFF6', photo: U('1500648767791-00dcc994a43e'), location: 'USA, New York', distance: '5.1 km', height: '182 cm', weight: '78 kg',
-    bio: 'Musician by night, software engineer by day. Big on deep talks, live shows, and questionable puns. Looking for a partner in curiosity.',
-    values: ['Honesty', 'Creativity', 'Loyalty'], interests: ['music', 'coding', 'concerts', 'travel'], agentName: 'Echo',
-    loveLanguage: 'Words of Affirmation', attachment: 'Secure', intimacy: 'Playful and communicative; loves feeling desired through words.', work: 'Software Engineer', children: 'Open to kids', pets: 'Dog person',
-    tags: [{icon:'👨',label:'Men'},{icon:'🎸',label:'Musician'},{icon:'💻',label:'Engineer'},{icon:'🎫',label:'Concerts'},{icon:'✈️',label:'Travel'}] },
-  { name: 'Sofia', age: 26, emoji: '📚', color: '#A89BFA', photo: U('1438761681033-6461ffad8d80'), location: 'USA, Oregon', distance: '8.0 km', height: '165 cm', weight: '52 kg',
-    bio: 'Bookworm, morning runner, and amateur chef. I want someone to slow down with — cook dinner, talk for hours, watch the rain.',
-    values: ['Calm', 'Depth', 'Kindness'], interests: ['reading', 'running', 'cooking', 'nature'], agentName: 'Vera',
-    loveLanguage: 'Acts of Service', attachment: 'Anxious', intimacy: 'Needs reassurance and tenderness; closeness builds her trust.', work: 'Teacher', children: 'Wants kids', pets: 'Has a dog',
-    tags: [{icon:'👩',label:'Women'},{icon:'📚',label:'Reader'},{icon:'🏃',label:'Runner'},{icon:'🍳',label:'Cooking'},{icon:'🌿',label:'Nature'}] },
-  { name: 'Leo', age: 29, emoji: '🏔', color: '#6EF6A8', photo: U('1507003211169-0a1dd7228f2d'), location: 'USA, Colorado', distance: '12 km', height: '186 cm', weight: '80 kg',
-    bio: 'Climber, photographer, and full-time adventurer. Happiest on a mountain or planning the next trip. Seeking someone who says yes to spontaneity.',
-    values: ['Adventure', 'Freedom', 'Growth'], interests: ['climbing', 'photography', 'travel', 'camping'], agentName: 'Atlas',
-    loveLanguage: 'Physical Touch', attachment: 'Avoidant', intimacy: 'Craves physical connection but needs space and no pressure.', work: 'Photographer', children: 'Not sure yet', pets: 'No pets',
-    tags: [{icon:'👨',label:'Men'},{icon:'🧗',label:'Climber'},{icon:'📷',label:'Photographer'},{icon:'⛺',label:'Camping'},{icon:'🌍',label:'Travel'}] },
-  { name: 'Aisha', age: 28, emoji: '🎨', color: '#F66E8E', photo: U('1534528741775-53994a69daeb'), location: 'USA, California', distance: '3.4 km', height: '170 cm', weight: '56 kg',
-    bio: 'Designer who paints, dances, and overthinks everything beautifully. Looking for genuine connection and someone who notices the small things.',
-    values: ['Authenticity', 'Depth', 'Joy'], interests: ['art', 'dancing', 'design', 'museums'], agentName: 'Iris',
-    loveLanguage: 'Quality Time', attachment: 'Secure', intimacy: 'Sees intimacy as deep play and trust; open and expressive.', work: 'Product Designer', children: 'Wants kids someday', pets: 'Has a dog',
-    tags: [{icon:'👩',label:'Women'},{icon:'🩰',label:'Dancer'},{icon:'🎨',label:'Designer'},{icon:'🖼',label:'Museums'},{icon:'💃',label:'Dancing'}] },
+    tags: [{icon:'🤖',label:'Demo'},{icon:'🎨',label:'Painter'},{icon:'🐈',label:'Have cat'},{icon:'🥾',label:'Hiking'},{icon:'🎬',label:'Indie films'}] },
 ]
 
 // Love languages + attachment reference
@@ -7405,7 +8010,7 @@ const MEET_CATEGORIES = [
   { id: 'purpose', icon: 'compass-outline' as const, title: 'Purpose-Driven', subtitle: 'Mission-aligned, impact partners', color: '#7B6EF6', count: '2.4K' }
 ]
 
-function MeetPeople({ profile, onBack, onMyProfile, onSynergy }: { profile: UserProfile; onBack: () => void; onMyProfile: () => void; onSynergy: () => void }) {
+function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { profile: UserProfile; onBack: () => void; onMyProfile: () => void; onSynergy: () => void; onRegister?: () => void }) {
   const { t } = useT()
   const isInRelationship = profile.circle.some(p => p.type === 'romantic')
   // Extract dating profile from Soma conversations (automatic from daily chats)
@@ -7519,7 +8124,17 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   // Reset card index whenever filters change
   useEffect(() => { setIndex(0); setPhotoIdx(0) }, [maxDistKm, ageMin, ageMax])
 
-  // Load real nearby users when the Nearby tab opens or distance filter changes
+  // Load all SOMA users for "For You" tab (works for guests too)
+  const [allUsers, setAllUsers] = useState<any[]>([])
+  useEffect(() => {
+    const headers: Record<string, string> = {}
+    const token = auth.getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    fetch(`${BACKEND_URL}/users/discover`, { headers })
+      .then(r => r.json()).then(d => { if (d.results) setAllUsers(d.results) }).catch(() => {})
+  }, [])
+
+  // Load real nearby users for "Nearby" tab
   useEffect(() => {
     if (browseTab !== 'nearby') return
     if (!datingApi.authed()) { setRealStatus('unavailable'); return }
@@ -7537,14 +8152,24 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     return () => { stale = true }
   }, [browseTab, maxDistKm])
 
+  const allUsersRanked = allUsers
+    .filter(u => !u.age || (u.age >= ageMin && u.age <= ageMax))
+    .map(u => {
+      const c = nearbyToCandidate(u)
+      return { c, score: u.compatibility || 50, shared: (u.interests || []).slice(0, 3), psych: { attach: 0, love: 0, note: u.hasDatingProfile ? (u.city || '') : 'New to SOMA' } }
+    })
+
   const realRanked = realNearby
     .filter(u => (!u.age || (u.age >= ageMin && u.age <= ageMax)))
     .map(u => {
       const c = nearbyToCandidate(u)
       return { c, score: u.compatibility, shared: (c.interests || []).slice(0, 3), psych: { attach: 0, love: 0, note: `${u.distanceKm} km away` } }
     })
-  const useReal = browseTab === 'nearby' && realStatus === 'ready' && realRanked.length > 0
-  const activeRanked = useReal ? realRanked : ranked
+
+  const useReal = browseTab === 'nearby' ? (realStatus === 'ready' && realRanked.length > 0) : allUsersRanked.length > 0
+  const activeRanked = browseTab === 'nearby'
+    ? (realRanked.length > 0 ? realRanked : allUsersRanked)
+    : (allUsersRanked.length > 0 ? allUsersRanked : ranked)
 
   const safeActive = activeRanked.length > 0 ? activeRanked : [{ c: CANDIDATES[0], score: 0, shared: [] as string[], psych: { attach: 0, love: 0, note: '' } }]
   const safeRanked = ranked.length > 0 ? ranked : [{ c: CANDIDATES[0], score: 0, shared: [] as string[], psych: { attach: 0, love: 0, note: '' } }]
@@ -7554,7 +8179,12 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   const currentPsych = safeRanked[Math.min(index, safeRanked.length - 1)].psych
   const pass = () => { haptic.light(); setPhotoIdx(0); if (index < safeActive.length - 1) setIndex(index + 1); else setIndex(0) }
 
+  const [showRegisterPrompt, setShowRegisterPrompt] = useState(false)
+
   const like = () => {
+    // Prompt registration if the current card is a real user
+    const realId = (safeActive[Math.min(index, safeActive.length - 1)].c as any).realUserId
+    if (realId && !datingApi.authed()) { setShowRegisterPrompt(true); return }
     // Daily like limit
     if (DB.likesLeft() <= 0) { setShowPaywall(true); haptic.error(); return }
     haptic.medium()
@@ -7723,21 +8353,10 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   }
 
   if (step === 'browse') {
-    // Nearby tab: real users from the backend when available, demo profiles otherwise
+    // Always prefer real registered users; fall back to single demo profile
     const filteredRanked = useReal
       ? realRanked
-      : browseTab === 'nearby'
-        ? [...CANDIDATES]
-            .filter(c => {
-              const dist = parseFloat(c.distance) || 0
-              return dist <= maxDistKm && c.age >= ageMin && c.age <= ageMax
-            })
-            .map(c => ({ c, ...alignmentScore(profile, c) }))
-            .sort((a, b) => b.score - a.score)
-        : [...CANDIDATES]
-            .filter(c => c.age >= ageMin && c.age <= ageMax)
-            .map(c => ({ c, ...alignmentScore(profile, c) }))
-            .sort((a, b) => b.score - a.score)
+      : CANDIDATES.map(c => ({ c, ...alignmentScore(profile, c) }))
 
     const browseIndex = Math.min(index, filteredRanked.length - 1)
     const currentBrowse = filteredRanked[browseIndex]?.c
@@ -7777,18 +8396,23 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           <TouchableOpacity style={g.dMe} onPress={() => setStep('profile')}><Text style={g.dMeTxt}>Me</Text></TouchableOpacity>
         </View>
 
-        {/* Live status for the Nearby tab */}
-        {browseTab === 'nearby' && (
-          <View style={{ paddingHorizontal: 20, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: useReal ? '#34C759' : realStatus === 'loading' ? '#F6C26E' : '#C5BFEC' }} />
-            <Text style={{ fontSize: 12, color: t.textSub, fontWeight: '600' }}>
-              {useReal ? `LIVE — ${realRanked.length} real ${realRanked.length === 1 ? 'person' : 'people'} near you`
-                : realStatus === 'loading' ? 'Finding real people near you…'
-                : realStatus === 'ready' ? 'No one nearby yet — showing example profiles'
-                : 'Demo profiles — sign in to meet real people nearby'}
-            </Text>
-          </View>
-        )}
+        {/* Live status bar */}
+        <View style={{ paddingHorizontal: 20, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: useReal ? '#34C759' : realStatus === 'loading' ? '#F6C26E' : '#C5BFEC' }} />
+          <Text style={{ fontSize: 12, color: t.textSub, fontWeight: '600' }}>
+            {browseTab === 'nearby'
+              ? (realRanked.length > 0 ? `${realRanked.length} people near you`
+                : realStatus === 'loading' ? 'Finding people nearby…'
+                : 'No one nearby with location set')
+              : (allUsersRanked.length > 0 ? `${allUsersRanked.length} people on SOMA`
+                : 'Demo mode · Register to see real people')}
+          </Text>
+          {!datingApi.authed() && allUsersRanked.length === 0 && (
+            <TouchableOpacity onPress={() => onRegister?.()} style={{ marginLeft: 'auto' as any, backgroundColor: '#7B6EF620', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '700' }}>Join free →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* No results state */}
         {filteredRanked.length === 0 && (
@@ -8023,6 +8647,28 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
             onClose={() => setShowPaywall(false)}
             onSuccess={() => { setLikesLeft(DB.likesLeft()); setShowPaywall(false) }}
           />
+        )}
+
+        {/* Register prompt for unauthenticated users liking real profiles */}
+        {showRegisterPrompt && (
+          <TouchableOpacity activeOpacity={1} onPress={() => setShowRegisterPrompt(false)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 200, justifyContent: 'flex-end' }}>
+            <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+              <View style={{ backgroundColor: t.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 28, paddingBottom: 44, alignItems: 'center' }}>
+                <Text style={{ fontSize: 32, marginBottom: 12 }}>💜</Text>
+                <Text style={{ fontSize: 22, fontWeight: '900', color: t.text, textAlign: 'center', marginBottom: 8 }}>Create a free account</Text>
+                <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
+                  Register to like real people, match, and start real conversations.
+                </Text>
+                <TouchableOpacity style={[g.primaryBtn, { width: '100%', marginBottom: 12 }]} onPress={() => { setShowRegisterPrompt(false); onRegister?.() }}>
+                  <Text style={g.primaryBtnTxt}>Create free account →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowRegisterPrompt(false)} style={{ paddingVertical: 8 }}>
+                  <Text style={{ color: t.textSub, fontSize: 14 }}>Keep browsing as guest</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         )}
 
         {/* Filter panel */}
@@ -8280,7 +8926,7 @@ function Bubble({ msg }: { msg: Msg }) {
     <Animated.View style={[g.bRow, isAura ? g.bLeft : g.bRight, { opacity: fade, transform: [{ translateY: rise }] }]}>
       {isAura && <View style={g.miniOrb}><Text style={{ fontSize: 9, color: '#fff' }}>✦</Text></View>}
       <View style={[g.bubble, isAura ? g.aBubble : g.uBubble]}>
-        <Text style={[g.bTxt, !isAura && { color: '#2D1B69' }]}>{msg.content}</Text>
+        <Text style={g.bTxt}>{msg.content}</Text>
       </View>
     </Animated.View>
   )
@@ -12098,6 +12744,31 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
         <StgRow icon="🔒" label={t('privacyPolicy')} value="Data stays on your device" last />
       </View>
 
+      {/* Invite */}
+      <Text style={g.stgSec}>Invite</Text>
+      <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {auth.getToken() && (() => {
+          const myCode = (() => { try { const t = auth.getToken(); if (!t) return null; return JSON.parse(atob(t.split('.')[1])).userId?.replace(/-/g,'').slice(0,6).toUpperCase() } catch { return null } })()
+          if (!myCode) return null
+          return <StgRow icon="🪪" label="Your invite code" value={myCode} onPress={() => {
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+              navigator.clipboard.writeText(myCode).then(() => alert(`✅ Copied!\n\nShare this code with your friend:\n\n${myCode}\n\nThey can enter it in Circle → Find by code.`))
+            } else { alert(`Your invite code: ${myCode}`) }
+          }} />
+        })()}
+        <StgRow icon="🔗" label="Share Soma with a friend" value="mysoma.site" last onPress={() => {
+          const url = 'https://mysoma.site'
+          const msg = `Hey! I've been using Soma — an AI that helps you understand yourself better. Try it here: ${url}`
+          if (typeof navigator !== 'undefined' && (navigator as any).share) {
+            ;(navigator as any).share({ title: 'Try Soma', text: msg, url }).catch(() => {})
+          } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(msg).then(() => alert('✅ Link copied!\n\nPaste it in a message to your friend.')).catch(() => alert(`Share this link with your friend:\n\n${url}`))
+          } else {
+            alert(`Share this link with your friend:\n\n${url}`)
+          }
+        }} />
+      </View>
+
       {/* Account */}
       <Text style={g.stgSec}>{t('account')}</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -12836,7 +13507,7 @@ const g = StyleSheet.create({
   iconOn: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
   sendBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   sendIcon: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  homePad: { padding: 24, paddingTop: 58 },
+  homePad: { padding: 24, paddingTop: 58, paddingBottom: 100 },
   homeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
   greeting: { fontSize: 28, fontWeight: '700', color: '#222540', letterSpacing: 0.3 },
   greetDate: { fontSize: 12, color: '#6E7191', marginTop: 3, fontWeight: '500' },

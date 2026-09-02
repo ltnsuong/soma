@@ -302,7 +302,7 @@ bot.on('message', async (msg) => {
 
       const response = await groq.chat.completions.create({
         messages: [{ role: 'user', content: text }],
-        model: 'llama-3.1-8b-instant',
+        model: 'groq/compound-mini',
         max_tokens: 200,
       })
 
@@ -346,7 +346,7 @@ bot.on('message', async (msg) => {
         messages: [
           { role: 'user', content: `My day: ${text}\n\nGive supportive reflection.` }
         ],
-        model: 'llama-3.1-8b-instant',
+        model: 'groq/compound-mini',
         max_tokens: 200,
       })
 
