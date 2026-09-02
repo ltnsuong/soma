@@ -3036,11 +3036,6 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
           style={{ backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadowSm }}>
           <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>{t('ob_start')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onBrowse ?? onDone}
-          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 16, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,155,250,0.25)' }}>
-          <Text style={{ color: '#A89BFA', fontSize: 16, fontWeight: '700' }}>🌍 Browse profiles first</Text>
-          <Text style={{ color: 'rgba(168,155,250,0.45)', fontSize: 12, marginTop: 2 }}>No account needed</Text>
-        </TouchableOpacity>
         <TouchableOpacity onPress={onSignIn} style={{ alignItems: 'center', paddingVertical: 8 }}>
           <Text style={{ fontSize: 13, color: '#6B68A0' }}>{t('alreadyAccount')} <Text style={{ color: '#A89BFA', fontWeight: '700' }}>{t('signIn')}</Text></Text>
         </TouchableOpacity>
@@ -6694,7 +6689,7 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   }
 
   const addFromFind = (user: { name: string; code: string; userId: string }) => {
-    DB.addCircle(user.name, 'friend', '', user.userId)
+    DB.addCircle(user.name, addType, '', user.userId)
     setFindModal(false); setFindCode(''); setFindResults([])
     onRefresh?.()
     alert(`✅ ${user.name} added to your Circle!\n\nTap their name to start a real conversation.`)
@@ -7247,7 +7242,24 @@ Be specific and human. Under 120 words total.`
           {/* ── Find on SOMA ── */}
           <View style={{ backgroundColor: '#10B98110', borderRadius: 18, borderWidth: 1, borderColor: '#10B98130', padding: 18, marginBottom: 24 }}>
             <Text style={{ fontSize: 14, fontWeight: '800', color: '#10B981', marginBottom: 4 }}>🔍 Find on SOMA</Text>
-            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 14 }}>Search by their email or invite code — connect your SOMA AIs</Text>
+            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 12 }}>Search by their email or invite code — connect your SOMA AIs</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {([
+                { type: 'friend', icon: '🤝', label: 'Friend' },
+                { type: 'family', icon: '👨‍👩‍👧', label: 'Family' },
+                { type: 'therapy', icon: '🩺', label: 'Doctor/Therapist' },
+                { type: 'romantic', icon: '💕', label: 'Romantic' },
+                { type: 'work', icon: '💼', label: 'Work' },
+              ] as const).map(({ type, icon, label }) => (
+                <TouchableOpacity key={type} onPress={() => setAddType(type)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5,
+                    borderColor: addType === type ? '#10B981' : t.border,
+                    backgroundColor: addType === type ? '#10B98120' : t.bg }}>
+                  <Text style={{ fontSize: 13 }}>{icon}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: addType === type ? '#10B981' : t.textSub }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TextInput
               value={findCode}
               onChangeText={v => { setFindCode(v); setFindError(''); setFindResults([]) }}
@@ -7298,18 +7310,24 @@ Be specific and human. Under 120 words total.`
               style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: t.text, marginBottom: 16 }}
             />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 8 }}>Relationship</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-              {(['friend', 'family', 'romantic', 'work', 'therapy'] as const).map(type => (
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>Who are they to you?</Text>
+            <View style={{ gap: 8, marginBottom: 16 }}>
+              {([
+                { type: 'friend', icon: '🤝', label: 'Friend' },
+                { type: 'family', icon: '👨‍👩‍👧', label: 'Family member' },
+                { type: 'therapy', icon: '🩺', label: 'Doctor / Therapist' },
+                { type: 'romantic', icon: '💕', label: 'Romantic partner' },
+                { type: 'work', icon: '💼', label: 'Work colleague' },
+              ] as const).map(({ type, icon, label }) => (
                 <TouchableOpacity
                   key={type}
                   onPress={() => setAddType(type)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderRadius: 14, borderWidth: 1.5,
                     borderColor: addType === type ? t.accent : t.border,
-                    backgroundColor: addType === type ? `${t.accent}20` : t.bg }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: addType === type ? t.accent : t.textSub }}>
-                    {type === 'therapy' ? '🩺 Support' : type === 'family' ? '👨‍👩‍👧 Family' : type === 'friend' ? '🤝 Friend' : type === 'work' ? '💼 Work' : '💕 Romantic'}
-                  </Text>
+                    backgroundColor: addType === type ? `${t.accent}15` : t.bg }}>
+                  <Text style={{ fontSize: 18 }}>{icon}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: addType === type ? '700' : '500', color: addType === type ? t.accent : t.text, flex: 1 }}>{label}</Text>
+                  {addType === type && <Text style={{ color: t.accent, fontSize: 16 }}>✓</Text>}
                 </TouchableOpacity>
               ))}
             </View>
@@ -8027,6 +8045,7 @@ function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { p
   const [realStatus, setRealStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
   const [index, setIndex] = useState(0)
   const [liked, setLiked] = useState<Candidate[]>([])
+  const [matchedRealUserId, setMatchedRealUserId] = useState<string | null>(null)
   const [likesLeft, setLikesLeft] = useState(DB.likesLeft())
   const [showPaywall, setShowPaywall] = useState(false)
   const [photoIdx, setPhotoIdx] = useState(0)
@@ -8182,18 +8201,18 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   const [showRegisterPrompt, setShowRegisterPrompt] = useState(false)
 
   const like = () => {
+    const pick = safeActive[Math.min(index, safeActive.length - 1)].c
+    const realId = (pick as any).realUserId
     // Prompt registration if the current card is a real user
-    const realId = (safeActive[Math.min(index, safeActive.length - 1)].c as any).realUserId
     if (realId && !datingApi.authed()) { setShowRegisterPrompt(true); return }
     // Daily like limit
     if (DB.likesLeft() <= 0) { setShowPaywall(true); haptic.error(); return }
     haptic.medium()
     DB.useLike()
     setLikesLeft(DB.likesLeft())
-    const pick = safeActive[Math.min(index, safeActive.length - 1)].c
     setLiked([...liked, pick])
     // Real user? Record the like on the backend (mutual likes become matches)
-    const realId = (pick as any).realUserId
+    setMatchedRealUserId(realId || null)
     if (realId && datingApi.authed()) {
       datingApi.like(realId).then(res => {
         if (res.matched) {
@@ -8220,11 +8239,18 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
 
   // Start the instant conversation the moment it's a mutual match
   const startInstantChat = async () => {
-    // Add to Circle with chosen relationship type
-    const circleId = `circle_${candidate.name}_${Date.now()}`
     const bio = candidate.interests.slice(0, 2).join(', ')
-    DB.addCircle(candidate.name, relationshipType, bio)
 
+    // Real SOMA user — add to Circle with their userId and go to Circle for real DM
+    if (matchedRealUserId) {
+      DB.addCircle(candidate.name, relationshipType, bio, matchedRealUserId)
+      onBack() // go back to Circle/home where they can open the real chat
+      return
+    }
+
+    // Demo profile — AI-simulated chat
+    const circleId = `circle_${candidate.name}_${Date.now()}`
+    DB.addCircle(candidate.name, relationshipType, bio)
     setStep('chat'); setChatLoading(true)
     setChatMsgs([])
     const persona = `You ARE ${candidate.name}, age ${candidate.age}, ${candidate.bio} You value ${candidate.values.join(', ')} and love ${candidate.interests.join(', ')}. You just matched with ${profile.name || 'someone'} on SOMA. Send a warm, natural opening message to start the conversation — 1-2 sentences, like a real person texting, reference something to spark a chat. Just the message, no quotes.`
@@ -8818,10 +8844,20 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           </View>
 
           <TouchableOpacity style={g.primaryBtn} onPress={startInstantChat}>
-            <Text style={g.primaryBtnTxt}>💬  Start chatting with {candidate.name}</Text>
+            <Text style={g.primaryBtnTxt}>
+              {matchedRealUserId ? `💬  Message ${candidate.name} for real` : `💬  Start chatting with ${candidate.name}`}
+            </Text>
           </TouchableOpacity>
+          {matchedRealUserId && (
+            <View style={{ backgroundColor: '#E8F5E9', borderRadius: 14, padding: 12, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 16 }}>🎉</Text>
+              <Text style={{ fontSize: 13, color: '#2E7D32', flex: 1, lineHeight: 18 }}>
+                This is a real person on SOMA. They'll receive your messages directly — no AI in the middle.
+              </Text>
+            </View>
+          )}
           <TouchableOpacity style={g.secondaryBtn} onPress={() => { setStep('conversation'); setTurns([]); setVisibleCount(0); runMatch() }}>
-            <Text style={g.secondaryBtnTxt}>✦  Or let your Auras talk first</Text>
+            <Text style={g.secondaryBtnTxt}>✦  Let your Auras meet first</Text>
           </TouchableOpacity>
           <View style={{ height: 16 }} />
           <View style={[g.matchCard, { backgroundColor: t.card, borderColor: t.border }]}>

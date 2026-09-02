@@ -5,7 +5,7 @@
       "name": "soma-web",
       "runtimeExecutable": "bash",
       "runtimeArgs": ["-c", "cd /Users/suongle/soma/dist && python3 -m http.server $PORT"],
-      "port": 8081,
+      "port": 9090,
       "autoPort": true
     }
   ]

@@ -53,14 +53,54 @@ const backAndHomeKeyboard = {
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const firstName = msg.from.first_name || 'Friend';
 
   userState.set(chatId, { screen: 'home', userId });
 
-  const welcome = `🌟 Welcome to SOMA - Your AI Companion for Life & Connection\n\n` +
-    `✨ Talk to Soma, find meaningful connections, and grow\n\n` +
-    `What would you like to do?`;
+  const welcomeMessage = `🧠 *Welcome to SOMA*
 
-  bot.sendMessage(chatId, welcome, mainMenuKeyboard);
+Hi ${firstName}! 👋
+
+You're in contact with SOMA - your AI companion for mental health support.
+
+💙 *What SOMA offers:*
+• 💬 Chat with Soma anytime - Express yourself safely
+• 📊 Track your mood - Understand your patterns
+• 👨‍⚨️ Connect with doctors - Share your journey securely
+• 🌍 Multilingual support - In your preferred language
+
+✨ *Your mental health matters.*
+Whether you're dealing with depression, anxiety, or just need someone to talk to, SOMA is here for you.
+
+🚀 *Get Started:*
+Tap the button below to open SOMA and begin your journey.
+
+_Built by someone who survived depression. Here to help you reach out._`;
+
+  const welcomeKeyboard = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: '🚀 Open SOMA App',
+            web_app: { url: 'https://mysoma.site' }
+          }
+        ],
+        [
+          { text: '💬 Quick Mood Check', callback_data: 'quick_mood' }
+        ],
+        [
+          { text: '📚 Learn More', callback_data: 'learn_more' },
+          { text: '⚙️ Settings', callback_data: 'settings' }
+        ],
+      ],
+    },
+  };
+
+  bot.sendMessage(chatId, welcomeMessage, {
+    parse_mode: 'Markdown',
+    reply_markup: welcomeKeyboard.reply_markup,
+  });
 });
 
 bot.onText(/\/help/, (msg) => {
@@ -92,6 +132,207 @@ bot.on('callback_query', async (query) => {
       await bot.editMessageText(
         `🌟 Welcome to SOMA\n\nWhat would you like to do?`,
         { chat_id: chatId, message_id: query.message.message_id, ...mainMenuKeyboard }
+      );
+    }
+
+    // QUICK MOOD CHECK
+    else if (data === 'quick_mood') {
+      const moodKeyboard = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '😢 Very Bad', callback_data: 'mood_1' },
+              { text: '😟 Bad', callback_data: 'mood_2' },
+            ],
+            [
+              { text: '😐 Okay', callback_data: 'mood_3' },
+              { text: '🙂 Good', callback_data: 'mood_4' },
+            ],
+            [
+              { text: '😄 Great', callback_data: 'mood_5' },
+            ],
+            [
+              { text: '← Back', callback_data: 'home' },
+            ],
+          ],
+        },
+      };
+
+      await bot.editMessageText(
+        `📊 *How are you feeling right now?*\n\nYour mood matters. Track it to understand your patterns.`,
+        {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: moodKeyboard.reply_markup,
+        }
+      );
+    }
+
+    // MOOD SELECTION
+    else if (data.startsWith('mood_')) {
+      const moodLevel = data.split('_')[1];
+      const moodEmojis = ['😢', '😟', '😐', '🙂', '😄'];
+      const moodTexts = ['Very Bad', 'Bad', 'Okay', 'Good', 'Great'];
+
+      await supabase.from('mood_logs').insert({
+        telegram_id: query.from.id,
+        mood_level: parseInt(moodLevel),
+        created_at: new Date(),
+      });
+
+      await bot.editMessageText(
+        `✅ *Mood Logged!*\n\n${moodEmojis[moodLevel - 1]} ${moodTexts[moodLevel - 1]}\n\nGreat job tracking your mental health! 💙\n\n_Open SOMA to see your mood trends and chat with Soma._`,
+        {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '📱 Open SOMA App',
+                  web_app: { url: 'https://mysoma.site' }
+                }
+              ],
+              [
+                { text: '← Back', callback_data: 'home' },
+              ],
+            ],
+          },
+        }
+      );
+    }
+
+    // LEARN MORE
+    else if (data === 'learn_more') {
+      const learnKeyboard = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '💬 Soma Chat', callback_data: 'learn_chat' },
+              { text: '📊 Mood Tracker', callback_data: 'learn_mood' },
+            ],
+            [
+              { text: '👨‍⚕️ Doctor Connect', callback_data: 'learn_doctor' },
+            ],
+            [
+              { text: '← Back', callback_data: 'home' },
+            ],
+          ],
+        },
+      };
+
+      const learnText = `📚 *SOMA Features*\n\n` +
+        `🧠 *What is SOMA?*\n` +
+        `SOMA is your personal mental health companion built on Telegram. We help you:\n\n` +
+        `• Talk to an AI that listens and supports you\n` +
+        `• Track your mood to understand patterns\n` +
+        `• Connect securely with your doctor\n` +
+        `• Access support 24/7, anywhere\n\n` +
+        `*Tap below to learn more about each feature.*`;
+
+      await bot.editMessageText(learnText, {
+        chat_id: chatId,
+        message_id: query.message.message_id,
+        parse_mode: 'Markdown',
+        reply_markup: learnKeyboard.reply_markup,
+      });
+    }
+
+    // LEARN CHAT
+    else if (data === 'learn_chat') {
+      await bot.editMessageText(
+        `💬 *Chat with Soma*\n\n` +
+        `Express yourself safely without judgment.\n\n` +
+        `Soma is an AI that:\n` +
+        `• Listens without judgment\n` +
+        `• Remembers your preferences\n` +
+        `• Offers support anytime\n` +
+        `• Helps you understand yourself\n\n` +
+        `🚀 Open SOMA to start chatting now!`,
+        {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '💬 Open Soma Chat',
+                  web_app: { url: 'https://mysoma.site' }
+                }
+              ],
+              [
+                { text: '← Back', callback_data: 'learn_more' },
+              ],
+            ],
+          },
+        }
+      );
+    }
+
+    // LEARN MOOD
+    else if (data === 'learn_mood') {
+      await bot.editMessageText(
+        `📊 *Track Your Mood*\n\n` +
+        `Understand your emotional patterns over time.\n\n` +
+        `Benefits:\n` +
+        `• See mood trends\n` +
+        `• Identify triggers\n` +
+        `• Track progress\n` +
+        `• Share with doctor\n\n` +
+        `_Track daily for best insights!_`,
+        {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '📱 Open SOMA',
+                  web_app: { url: 'https://mysoma.site' }
+                }
+              ],
+              [
+                { text: '← Back', callback_data: 'learn_more' },
+              ],
+            ],
+          },
+        }
+      );
+    }
+
+    // LEARN DOCTOR
+    else if (data === 'learn_doctor') {
+      await bot.editMessageText(
+        `👨‍⚕️ *Connect with Your Doctor*\n\n` +
+        `Share your mental health data securely.\n\n` +
+        `Features:\n` +
+        `• Share mood reports\n` +
+        `• Two-way messaging\n` +
+        `• Privacy controlled\n` +
+        `• HIPAA compliant\n\n` +
+        `_Your doctor gets a QR code to join._`,
+        {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '📱 Open SOMA',
+                  web_app: { url: 'https://mysoma.site' }
+                }
+              ],
+              [
+                { text: '← Back', callback_data: 'learn_more' },
+              ],
+            ],
+          },
+        }
       );
     }
 

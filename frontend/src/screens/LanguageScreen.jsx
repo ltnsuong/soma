@@ -4,59 +4,237 @@ export default function LanguageScreen({ onSelectLanguage }) {
   const [selectedLang, setSelectedLang] = useState('en')
 
   const languages = [
-    { code: 'en', name: '🇺🇸 English', nativeName: 'English' },
-    { code: 'es', name: '🇪🇸 Español', nativeName: 'Español' },
-    { code: 'fr', name: '🇫🇷 Français', nativeName: 'Français' },
-    { code: 'de', name: '🇩🇪 Deutsch', nativeName: 'Deutsch' },
-    { code: 'it', name: '🇮🇹 Italiano', nativeName: 'Italiano' },
-    { code: 'pt', name: '🇵🇹 Português', nativeName: 'Português' },
-    { code: 'ru', name: '🇷🇺 Русский', nativeName: 'Русский' },
-    { code: 'ja', name: '🇯🇵 日本語', nativeName: '日本語' },
-    { code: 'zh', name: '🇨🇳 中文', nativeName: '中文' },
-    { code: 'ko', name: '🇰🇷 한국어', nativeName: '한국어' },
-    { code: 'vi', name: '🇻🇳 Tiếng Việt', nativeName: 'Tiếng Việt' },
-    { code: 'th', name: '🇹🇭 ไทย', nativeName: 'ไทย' },
+    { code: 'en', flag: '🇬🇧', name: 'English', native: 'English' },
+    { code: 'es', flag: '🇪🇸', name: 'Español', native: 'Spanish' },
+    { code: 'fr', flag: '🇫🇷', name: 'Français', native: 'French' },
+    { code: 'de', flag: '🇩🇪', name: 'Deutsch', native: 'German' },
+    { code: 'it', flag: '🇮🇹', name: 'Italiano', native: 'Italian' },
+    { code: 'pt', flag: '🇵🇹', name: 'Português', native: 'Portuguese' },
+    { code: 'ru', flag: '🇷🇺', name: 'Русский', native: 'Russian' },
+    { code: 'ja', flag: '🇯🇵', name: '日本語', native: 'Japanese' },
+    { code: 'zh', flag: '🇨🇳', name: '中文', native: 'Chinese' },
+    { code: 'ko', flag: '🇰🇷', name: '한국어', native: 'Korean' },
+    { code: 'vi', flag: '🇻🇳', name: 'Tiếng Việt', native: 'Vietnamese' },
+    { code: 'th', flag: '🇹🇭', name: 'ไทย', native: 'Thai' },
   ]
 
-  const handleContinue = () => {
-    localStorage.setItem('language', selectedLang)
-    onSelectLanguage(selectedLang)
+  const handleSelectLanguage = (langCode) => {
+    setSelectedLang(langCode)
+    localStorage.setItem('language', langCode)
+    // Auto-navigate after selection
+    setTimeout(() => onSelectLanguage(langCode), 200)
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen px-6 py-8 bg-gradient-to-b from-purple-50 to-white">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <div className="text-6xl mb-4">🌍</div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Select Language</h1>
-        <p className="text-gray-600">Choose your preferred language</p>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)',
+      overflow: 'hidden',
+      position: 'relative',
+    }}>
+      {/* Decorative Glowing Orbs */}
+      <div style={{
+        position: 'absolute',
+        top: '-40%',
+        right: '-20%',
+        width: '500px',
+        height: '500px',
+        background: 'radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%)',
+        borderRadius: '50%',
+        filter: 'blur(60px)',
+      }}></div>
+      <div style={{
+        position: 'absolute',
+        bottom: '-30%',
+        left: '-10%',
+        width: '400px',
+        height: '400px',
+        background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)',
+        borderRadius: '50%',
+        filter: 'blur(50px)',
+      }}></div>
+
+      {/* Content */}
+      <div style={{
+        position: 'relative',
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        flex: 1,
+        padding: '20px',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        {/* Header */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '30px',
+          marginBottom: '30px',
+        }}>
+          {/* Logo */}
+          <div style={{
+            width: '80px',
+            height: '80px',
+            margin: '0 auto 24px',
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(99, 102, 241, 0.2) 100%)',
+            borderRadius: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '40px',
+            border: '2px solid rgba(139, 92, 246, 0.4)',
+          }}>
+            🧠
+          </div>
+
+          <h1 style={{
+            fontSize: '48px',
+            fontWeight: '900',
+            color: 'white',
+            margin: '0 0 12px 0',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+          }}>SOMA</h1>
+
+          <p style={{
+            fontSize: '16px',
+            color: 'rgba(147, 112, 219, 0.9)',
+            margin: '0 0 24px 0',
+            fontWeight: '500',
+          }}>Know yourself before knowing each other</p>
+
+          <h2 style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            color: 'white',
+            margin: '24px 0 8px 0',
+          }}>Choose your language</h2>
+
+          <p style={{
+            fontSize: '14px',
+            color: 'rgba(226, 232, 240, 0.7)',
+            margin: '0',
+          }}>Select the language you prefer</p>
+        </div>
+
+        {/* Languages List */}
+        <div style={{
+          width: '100%',
+          maxWidth: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          paddingBottom: '20px',
+        }}>
+          {languages.map(lang => (
+            <button
+              key={lang.code}
+              onClick={() => handleSelectLanguage(lang.code)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '16px 18px',
+                borderRadius: '14px',
+                border: selectedLang === lang.code
+                  ? '2px solid rgba(139, 92, 246, 0.8)'
+                  : '1px solid rgba(139, 92, 246, 0.2)',
+                background: selectedLang === lang.code
+                  ? 'rgba(139, 92, 246, 0.15)'
+                  : 'rgba(139, 92, 246, 0.05)',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                transform: selectedLang === lang.code ? 'scale(1.02)' : 'scale(1)',
+                backdropFilter: 'blur(8px)',
+              }}
+              onMouseEnter={(e) => {
+                if (selectedLang !== lang.code) {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (selectedLang !== lang.code) {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.05)';
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                }
+              }}
+            >
+              {/* Flag */}
+              <div style={{ fontSize: '28px', minWidth: '40px', textAlign: 'center' }}>
+                {lang.flag}
+              </div>
+
+              {/* Language Name */}
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: 'white',
+                  margin: '0',
+                }}>
+                  {lang.name}
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: 'rgba(226, 232, 240, 0.6)',
+                  margin: '4px 0 0 0',
+                }}>
+                  {lang.native}
+                </div>
+              </div>
+
+              {/* Checkmark */}
+              {selectedLang === lang.code && (
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                }}>
+                  ✓
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: 'auto',
+          paddingBottom: '20px',
+        }}>
+          <p style={{
+            fontSize: '12px',
+            color: 'rgba(226, 232, 240, 0.5)',
+            margin: '0',
+          }}>
+            You can change this anytime in settings
+          </p>
+        </div>
       </div>
 
-      {/* Language Grid */}
-      <div className="w-full max-w-sm grid grid-cols-2 gap-3 mb-12">
-        {languages.map(lang => (
-          <button
-            key={lang.code}
-            onClick={() => setSelectedLang(lang.code)}
-            className={`p-4 rounded-lg font-semibold transition-all transform hover:scale-105 ${
-              selectedLang === lang.code
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-            }`}
-          >
-            <div className="text-2xl mb-1">{lang.name.split(' ')[0]}</div>
-            <div className="text-xs opacity-80">{lang.nativeName}</div>
-          </button>
-        ))}
-      </div>
-
-      {/* Continue Button */}
-      <button
-        onClick={handleContinue}
-        className="w-full max-w-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition-all"
-      >
-        Continue →
-      </button>
+      <style>{`
+        ::-webkit-scrollbar {
+          width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: rgba(139, 92, 246, 0.3);
+          border-radius: 3px;
+        }
+      `}</style>
     </div>
   )
 }
