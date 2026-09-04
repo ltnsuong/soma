@@ -207,6 +207,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Next →', ob_finish: 'Finish →', ob_skip: 'Skip', ob_skip_finish: 'Skip & finish',
     ob_building: 'Building your profile…', ob_building_sub: 'Soma is reading everything you shared.',
     ob_allset: "You're all set ✨", ob_ready: "Soma has everything she needs. Let's have your first real conversation.", ob_meet: 'Meet Soma →',
+    ob_start_explore: 'Start Exploring →', ob_browse_sub: 'Browse, meet people, and try everything — no sign-up required.',
+    circle_remove: '✕ Remove', circle_who: 'Who are they to you?',
+    circle_friend: 'Friend', circle_family: 'Family member', circle_therapy: 'Doctor / Therapist', circle_romantic: 'Romantic partner', circle_work: 'Work colleague',
+    circle_friend_s: 'Friend', circle_family_s: 'Family', circle_therapy_s: 'Doctor/Therapist', circle_romantic_s: 'Romantic', circle_work_s: 'Work',
+    type_friends: 'Friends', type_family: 'Family', type_therapy: 'Therapy & Support', type_romantic: 'Romantic', type_work: 'Work',
+    nudge_title: '✦ Message idea', nudge_thinking: 'Soma is thinking…', nudge_send_on: 'Send on SOMA',
+    nudge_copy: 'Copy message', nudge_copied: '✓ Copied!', nudge_retry: '↺ Try another', nudge_dismiss: 'Dismiss',
   },
   ru: {
     tab_circle: 'Круг', tab_inner: 'Внутри', tab_explore: 'Мир',
@@ -255,6 +262,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Далее →', ob_finish: 'Завершить →', ob_skip: 'Пропустить', ob_skip_finish: 'Пропустить и завершить',
     ob_building: 'Создаю твой профиль…', ob_building_sub: 'Сома читает всё, чем ты поделился.',
     ob_allset: 'Всё готово ✨', ob_ready: 'У Сомы есть всё необходимое. Проведём наш первый настоящий разговор.', ob_meet: 'Познакомиться с Сомой →',
+    ob_start_explore: 'Начать исследование →', ob_browse_sub: 'Смотрите профили, знакомьтесь и пробуйте всё — без регистрации.',
+    circle_remove: '✕ Удалить', circle_who: 'Кем они тебе приходятся?',
+    circle_friend: 'Друг', circle_family: 'Член семьи', circle_therapy: 'Врач / Терапевт', circle_romantic: 'Романтический партнёр', circle_work: 'Коллега по работе',
+    circle_friend_s: 'Друг', circle_family_s: 'Семья', circle_therapy_s: 'Врач/Терапевт', circle_romantic_s: 'Романтический', circle_work_s: 'Работа',
+    type_friends: 'Друзья', type_family: 'Семья', type_therapy: 'Терапия и поддержка', type_romantic: 'Романтические', type_work: 'Работа',
+    nudge_title: '✦ Идея сообщения', nudge_thinking: 'Сома думает…', nudge_send_on: 'Отправить в SOMA',
+    nudge_copy: 'Скопировать', nudge_copied: '✓ Скопировано!', nudge_retry: '↺ Попробовать другое', nudge_dismiss: 'Закрыть',
   },
   es: {
     tab_circle: 'Círculo', tab_inner: 'Interior', tab_explore: 'Explorar',
@@ -303,6 +317,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Siguiente →', ob_finish: 'Terminar →', ob_skip: 'Omitir', ob_skip_finish: 'Omitir y terminar',
     ob_building: 'Construyendo tu perfil…', ob_building_sub: 'Soma está leyendo todo lo que compartiste.',
     ob_allset: '¡Todo listo! ✨', ob_ready: 'Soma tiene todo lo que necesita. Tengamos tu primera conversación real.', ob_meet: 'Conoce a Soma →',
+    ob_start_explore: 'Empezar a explorar →', ob_browse_sub: 'Navega, conoce gente y prueba todo — sin registrarte.',
+    circle_remove: '✕ Eliminar', circle_who: '¿Quiénes son para ti?',
+    circle_friend: 'Amigo/a', circle_family: 'Familiar', circle_therapy: 'Médico / Terapeuta', circle_romantic: 'Pareja romántica', circle_work: 'Compañero de trabajo',
+    circle_friend_s: 'Amigo', circle_family_s: 'Familia', circle_therapy_s: 'Médico/Terapeuta', circle_romantic_s: 'Romántico', circle_work_s: 'Trabajo',
+    type_friends: 'Amigos', type_family: 'Familia', type_therapy: 'Terapia y apoyo', type_romantic: 'Romántico', type_work: 'Trabajo',
+    nudge_title: '✦ Idea de mensaje', nudge_thinking: 'Soma está pensando…', nudge_send_on: 'Enviar en SOMA',
+    nudge_copy: 'Copiar mensaje', nudge_copied: '✓ ¡Copiado!', nudge_retry: '↺ Intentar otro', nudge_dismiss: 'Descartar',
   },
   fr: {
     tab_circle: 'Cercle', tab_inner: 'Intérieur', tab_explore: 'Explorer',
@@ -351,6 +372,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Suivant →', ob_finish: 'Terminer →', ob_skip: 'Passer', ob_skip_finish: 'Passer et terminer',
     ob_building: 'Construction de ton profil…', ob_building_sub: "Soma lit tout ce que tu as partagé.",
     ob_allset: 'Tout est prêt ✨', ob_ready: "Soma a tout ce dont elle a besoin. Ayons ta première vraie conversation.", ob_meet: 'Rencontrer Soma →',
+    ob_start_explore: 'Commencer à explorer →', ob_browse_sub: 'Parcourez, rencontrez des gens et essayez tout — sans inscription.',
+    circle_remove: '✕ Supprimer', circle_who: 'Qui sont-ils pour toi?',
+    circle_friend: 'Ami(e)', circle_family: 'Membre de la famille', circle_therapy: 'Médecin / Thérapeute', circle_romantic: 'Partenaire romantique', circle_work: 'Collègue de travail',
+    circle_friend_s: 'Ami', circle_family_s: 'Famille', circle_therapy_s: 'Médecin/Thérapeute', circle_romantic_s: 'Romantique', circle_work_s: 'Travail',
+    type_friends: 'Amis', type_family: 'Famille', type_therapy: 'Thérapie et soutien', type_romantic: 'Romantique', type_work: 'Travail',
+    nudge_title: '✦ Idée de message', nudge_thinking: 'Soma réfléchit…', nudge_send_on: 'Envoyer sur SOMA',
+    nudge_copy: 'Copier le message', nudge_copied: '✓ Copié !', nudge_retry: '↺ Essayer un autre', nudge_dismiss: 'Fermer',
   },
   de: {
     tab_circle: 'Kreis', tab_inner: 'Innenwelt', tab_explore: 'Erkunden',
@@ -399,6 +427,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Weiter →', ob_finish: 'Abschließen →', ob_skip: 'Überspringen', ob_skip_finish: 'Überspringen und abschließen',
     ob_building: 'Dein Profil wird erstellt…', ob_building_sub: 'Soma liest alles, was du geteilt hast.',
     ob_allset: 'Alles bereit ✨', ob_ready: 'Soma hat alles, was sie braucht. Lass uns dein erstes echtes Gespräch führen.', ob_meet: 'Soma kennenlernen →',
+    ob_start_explore: 'Erkunden beginnen →', ob_browse_sub: 'Stöbere, lerne Leute kennen und probiere alles aus — ohne Anmeldung.',
+    circle_remove: '✕ Entfernen', circle_who: 'Wer sind sie für dich?',
+    circle_friend: 'Freund/in', circle_family: 'Familienmitglied', circle_therapy: 'Arzt / Therapeut', circle_romantic: 'Romantischer Partner', circle_work: 'Arbeitskollege',
+    circle_friend_s: 'Freund', circle_family_s: 'Familie', circle_therapy_s: 'Arzt/Therapeut', circle_romantic_s: 'Romantisch', circle_work_s: 'Arbeit',
+    type_friends: 'Freunde', type_family: 'Familie', type_therapy: 'Therapie & Unterstützung', type_romantic: 'Romantisch', type_work: 'Arbeit',
+    nudge_title: '✦ Nachrichtenidee', nudge_thinking: 'Soma denkt nach…', nudge_send_on: 'Auf SOMA senden',
+    nudge_copy: 'Nachricht kopieren', nudge_copied: '✓ Kopiert!', nudge_retry: '↺ Anderen versuchen', nudge_dismiss: 'Schließen',
   },
   it: {
     tab_circle: 'Cerchio', tab_inner: 'Interiore', tab_explore: 'Esplorare',
@@ -447,6 +482,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Avanti →', ob_finish: 'Fine →', ob_skip: 'Salta', ob_skip_finish: 'Salta e finisci',
     ob_building: 'Costruisco il tuo profilo…', ob_building_sub: 'Soma sta leggendo tutto ciò che hai condiviso.',
     ob_allset: 'Tutto pronto ✨', ob_ready: 'Soma ha tutto ciò di cui ha bisogno. Facciamo la tua prima vera conversazione.', ob_meet: 'Incontra Soma →',
+    ob_start_explore: 'Inizia a esplorare →', ob_browse_sub: 'Esplora, incontra persone e prova tutto — senza registrarti.',
+    circle_remove: '✕ Rimuovi', circle_who: 'Chi sono per te?',
+    circle_friend: 'Amico/a', circle_family: 'Membro della famiglia', circle_therapy: 'Medico / Terapeuta', circle_romantic: 'Partner romantico', circle_work: 'Collega di lavoro',
+    circle_friend_s: 'Amico', circle_family_s: 'Famiglia', circle_therapy_s: 'Medico/Terapeuta', circle_romantic_s: 'Romantico', circle_work_s: 'Lavoro',
+    type_friends: 'Amici', type_family: 'Famiglia', type_therapy: 'Terapia e supporto', type_romantic: 'Romantico', type_work: 'Lavoro',
+    nudge_title: '✦ Idea di messaggio', nudge_thinking: 'Soma sta pensando…', nudge_send_on: 'Invia su SOMA',
+    nudge_copy: 'Copia messaggio', nudge_copied: '✓ Copiato!', nudge_retry: '↺ Prova un altro', nudge_dismiss: 'Chiudi',
   },
   pt: {
     tab_circle: 'Círculo', tab_inner: 'Interior', tab_explore: 'Explorar',
@@ -495,6 +537,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Próximo →', ob_finish: 'Terminar →', ob_skip: 'Pular', ob_skip_finish: 'Pular e terminar',
     ob_building: 'Construindo seu perfil…', ob_building_sub: 'Soma está lendo tudo que você compartilhou.',
     ob_allset: 'Tudo pronto ✨', ob_ready: 'Soma tem tudo que precisa. Vamos ter sua primeira conversa real.', ob_meet: 'Conhecer Soma →',
+    ob_start_explore: 'Começar a explorar →', ob_browse_sub: 'Navegue, conheça pessoas e experimente tudo — sem se cadastrar.',
+    circle_remove: '✕ Remover', circle_who: 'Quem são para você?',
+    circle_friend: 'Amigo/a', circle_family: 'Membro da família', circle_therapy: 'Médico / Terapeuta', circle_romantic: 'Parceiro romântico', circle_work: 'Colega de trabalho',
+    circle_friend_s: 'Amigo', circle_family_s: 'Família', circle_therapy_s: 'Médico/Terapeuta', circle_romantic_s: 'Romântico', circle_work_s: 'Trabalho',
+    type_friends: 'Amigos', type_family: 'Família', type_therapy: 'Terapia e suporte', type_romantic: 'Romântico', type_work: 'Trabalho',
+    nudge_title: '✦ Ideia de mensagem', nudge_thinking: 'Soma está pensando…', nudge_send_on: 'Enviar no SOMA',
+    nudge_copy: 'Copiar mensagem', nudge_copied: '✓ Copiado!', nudge_retry: '↺ Tentar outro', nudge_dismiss: 'Fechar',
   },
   vi: {
     tab_circle: 'Vòng tròn', tab_inner: 'Nội tâm', tab_explore: 'Khám phá',
@@ -543,6 +592,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'Tiếp theo →', ob_finish: 'Hoàn thành →', ob_skip: 'Bỏ qua', ob_skip_finish: 'Bỏ qua và hoàn thành',
     ob_building: 'Đang xây dựng hồ sơ…', ob_building_sub: 'Soma đang đọc mọi thứ bạn đã chia sẻ.',
     ob_allset: 'Bạn đã sẵn sàng ✨', ob_ready: 'Soma có mọi thứ cần thiết. Hãy có cuộc trò chuyện thực sự đầu tiên.', ob_meet: 'Gặp gỡ Soma →',
+    ob_start_explore: 'Bắt đầu khám phá →', ob_browse_sub: 'Duyệt hồ sơ, gặp gỡ mọi người và thử mọi thứ — không cần đăng ký.',
+    circle_remove: '✕ Xóa', circle_who: 'Họ là ai với bạn?',
+    circle_friend: 'Bạn bè', circle_family: 'Thành viên gia đình', circle_therapy: 'Bác sĩ / Chuyên gia trị liệu', circle_romantic: 'Người yêu', circle_work: 'Đồng nghiệp',
+    circle_friend_s: 'Bạn', circle_family_s: 'Gia đình', circle_therapy_s: 'Bác sĩ/Trị liệu', circle_romantic_s: 'Tình cảm', circle_work_s: 'Công việc',
+    type_friends: 'Bạn bè', type_family: 'Gia đình', type_therapy: 'Liệu pháp & Hỗ trợ', type_romantic: 'Tình cảm', type_work: 'Công việc',
+    nudge_title: '✦ Ý tưởng tin nhắn', nudge_thinking: 'Soma đang suy nghĩ…', nudge_send_on: 'Gửi trên SOMA',
+    nudge_copy: 'Sao chép tin nhắn', nudge_copied: '✓ Đã sao chép!', nudge_retry: '↺ Thử cái khác', nudge_dismiss: 'Đóng',
   },
   zh: {
     tab_circle: '圈子', tab_inner: '内心', tab_explore: '探索',
@@ -591,6 +647,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: '下一步 →', ob_finish: '完成 →', ob_skip: '跳过', ob_skip_finish: '跳过并完成',
     ob_building: '正在建立你的个人资料…', ob_building_sub: 'Soma正在阅读你分享的一切。',
     ob_allset: '一切就绪 ✨', ob_ready: 'Soma拥有她所需要的一切。让我们进行你的第一次真实对话。', ob_meet: '认识Soma →',
+    ob_start_explore: '开始探索 →', ob_browse_sub: '浏览、认识人并尝试一切 — 无需注册。',
+    circle_remove: '✕ 移除', circle_who: '他们与你是什么关系？',
+    circle_friend: '朋友', circle_family: '家庭成员', circle_therapy: '医生 / 治疗师', circle_romantic: '恋人', circle_work: '工作同事',
+    circle_friend_s: '朋友', circle_family_s: '家庭', circle_therapy_s: '医生/治疗师', circle_romantic_s: '浪漫', circle_work_s: '工作',
+    type_friends: '朋友', type_family: '家庭', type_therapy: '治疗与支持', type_romantic: '浪漫', type_work: '工作',
+    nudge_title: '✦ 消息创意', nudge_thinking: 'Soma正在思考…', nudge_send_on: '在SOMA上发送',
+    nudge_copy: '复制消息', nudge_copied: '✓ 已复制！', nudge_retry: '↺ 试试另一个', nudge_dismiss: '关闭',
   },
   ja: {
     tab_circle: 'サークル', tab_inner: '内面', tab_explore: '探索',
@@ -639,6 +702,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: '次へ →', ob_finish: '完了 →', ob_skip: 'スキップ', ob_skip_finish: 'スキップして完了',
     ob_building: 'プロフィールを作成中…', ob_building_sub: 'Somaがあなたのシェアしたすべてを読んでいます。',
     ob_allset: '準備完了 ✨', ob_ready: 'Somaは必要なものをすべて持っています。最初の本当の会話をしましょう。', ob_meet: 'Somaに会う →',
+    ob_start_explore: '探索を始める →', ob_browse_sub: '閲覧して、人と出会い、すべてを試してみましょう — 登録不要。',
+    circle_remove: '✕ 削除', circle_who: 'あなたにとって誰ですか？',
+    circle_friend: '友達', circle_family: '家族', circle_therapy: '医師 / セラピスト', circle_romantic: 'パートナー', circle_work: '職場の同僚',
+    circle_friend_s: '友達', circle_family_s: '家族', circle_therapy_s: '医師/セラピスト', circle_romantic_s: '恋愛', circle_work_s: '仕事',
+    type_friends: '友達', type_family: '家族', type_therapy: 'セラピーとサポート', type_romantic: '恋愛', type_work: '仕事',
+    nudge_title: '✦ メッセージのアイデア', nudge_thinking: 'Somaが考えています…', nudge_send_on: 'SOMAで送信',
+    nudge_copy: 'メッセージをコピー', nudge_copied: '✓ コピーしました！', nudge_retry: '↺ 別のを試す', nudge_dismiss: '閉じる',
   },
   ar: {
     tab_circle: 'الدائرة', tab_inner: 'الداخل', tab_explore: 'استكشاف',
@@ -687,6 +757,13 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_next: 'التالي ←', ob_finish: 'إنهاء ←', ob_skip: 'تخطى', ob_skip_finish: 'تخطى وإنهاء',
     ob_building: 'جاري بناء ملفك الشخصي…', ob_building_sub: 'سوما تقرأ كل ما شاركته.',
     ob_allset: 'كل شيء جاهز ✨', ob_ready: 'لدى سوما كل ما تحتاجه. لنبدأ محادثتنا الحقيقية الأولى.', ob_meet: 'التعرف على سوما ←',
+    ob_start_explore: 'ابدأ الاستكشاف →', ob_browse_sub: 'تصفح وتعرف على أشخاص وجرب كل شيء — لا يلزم التسجيل.',
+    circle_remove: '✕ إزالة', circle_who: 'ما علاقتك بهم؟',
+    circle_friend: 'صديق', circle_family: 'فرد من العائلة', circle_therapy: 'طبيب / معالج', circle_romantic: 'شريك عاطفي', circle_work: 'زميل عمل',
+    circle_friend_s: 'صديق', circle_family_s: 'عائلة', circle_therapy_s: 'طبيب/معالج', circle_romantic_s: 'عاطفي', circle_work_s: 'عمل',
+    type_friends: 'أصدقاء', type_family: 'عائلة', type_therapy: 'العلاج والدعم', type_romantic: 'عاطفي', type_work: 'عمل',
+    nudge_title: '✦ فكرة رسالة', nudge_thinking: 'سوما تفكر…', nudge_send_on: 'إرسال عبر SOMA',
+    nudge_copy: 'نسخ الرسالة', nudge_copied: '✓ تم النسخ!', nudge_retry: '↺ جرب أخرى', nudge_dismiss: 'إغلاق',
   },
 }
 function t(key: string): string {
@@ -953,8 +1030,8 @@ interface UserProfile {
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
-const FREE_DAILY_LIKES = 10
-const PREMIUM_DAILY_LIKES = 100
+const FREE_DAILY_LIKES = 2
+const PREMIUM_DAILY_LIKES = 5
 
 const EMPTY_DATING: DatingProfile = {
   complete: false, age: '', location: '', photo: '', photos: [], bio: '',
@@ -1859,6 +1936,19 @@ const auth = {
     if (!res.ok) throw new Error(data.error || 'Password reset failed')
     return data
   },
+  // Delete account from backend (required for App Store)
+  deleteAccount: async () => {
+    const token = auth.getToken()
+    if (!token) return
+    const res = await fetch(`${BACKEND_URL}/auth/account`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || 'Delete failed')
+    }
+  },
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2436,6 +2526,7 @@ export default function App() {
   const [resetToken, setResetToken] = useState<string | null>(null)
   const [verifyToken, setVerifyToken] = useState<string | null>(null)
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null)
+  const [pendingAddCode, setPendingAddCode] = useState<string | null>(null)
   const screenStack = useRef<Screen[]>([])
   const slideAnim = useRef(new Animated.Value(0)).current
   const fadeAnim = useRef(new Animated.Value(1)).current
@@ -2491,6 +2582,12 @@ export default function App() {
         setScreen('verifyemail')
         return
       }
+      // Check for add-to-circle invite link: ?add=CODE
+      const addCode = params.get('add')
+      if (addCode) {
+        setPendingAddCode(addCode)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
     }
 
     // Init RevenueCat and sync premium status from the store
@@ -2513,6 +2610,13 @@ export default function App() {
     }, 1900)
     return () => clearTimeout(t)
   }, [])
+
+  // Handle ?add=CODE deep link — go to circle after splash
+  useEffect(() => {
+    if (pendingAddCode && screen === 'home') {
+      go('circle')
+    }
+  }, [pendingAddCode, screen])
 
   // Seed "who liked you" once registered (3 people liked you first)
   useEffect(() => {
@@ -2617,16 +2721,16 @@ export default function App() {
     if (screen === 'try')         return <AuraChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" autoStart={fromOnboarding} />
     if (screen === 'register')    return (
       <RegisterBoundary fallback={<RegisterFallback onDone={(name) => { go('login') }} />}>
-        <Register onDone={(name) => { go('login') }} onSignIn={() => go('login')} />
+        <Register onDone={(name) => { auth.getToken() ? go('login') : go('home') }} onSignIn={() => go('login')} />
       </RegisterBoundary>
     )
     if (screen === 'login')       return <LoginScreen onDone={(name) => { go('home') }} onRegister={() => go('register')} onForgot={() => go('forgotpassword')} />
     if (screen === 'forgotpassword') return <ForgotPasswordScreen onBack={() => go('login')} />
     if (screen === 'resetpassword' && resetToken) return <ResetPasswordScreen token={resetToken} onDone={() => go('login')} />
-    if (screen === 'verifyemail' && verifyToken) return <VerifyEmailScreen token={verifyToken} onDone={() => go('login')} />
+    if (screen === 'verifyemail' && verifyToken) return <VerifyEmailScreen token={verifyToken} onDone={() => { refresh(); go('home') }} />
     if (screen === 'aura')        return <AuraChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" />
     if (screen === 'diary')       return <AuraChat mode="diary" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Today's Diary" isDiary />
-    if (screen === 'circle')      return <CircleScreen profile={profile} onBack={() => go('home')} onStartJourney={(id) => { setBondPersonId(id); go('bondjourney') }} onViewInsights={() => go('relinsights')} onRefresh={refresh} />
+    if (screen === 'circle')      return <CircleScreen profile={profile} onBack={() => { setPendingAddCode(null); go('home') }} onStartJourney={(id) => { setBondPersonId(id); go('bondjourney') }} onViewInsights={() => go('relinsights')} onRefresh={refresh} initialFindCode={pendingAddCode} />
     if (screen === 'bondjourney' && bondPersonId) {
       const bp = profile.circle.find(p => p.id === bondPersonId)
       if (bp) return <BondJourney person={bp} profile={profile} onBack={() => go('circle')} onRefresh={refresh} />
@@ -3647,10 +3751,10 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
           onPress={() => { auth.clearTokens(); onDone('Guest') }}
         >
           <Ionicons name="compass-outline" size={20} color="#fff" />
-          <Text style={g.primaryBtnTxt}>Start Exploring →</Text>
+          <Text style={g.primaryBtnTxt}>{t('ob_start_explore')}</Text>
         </TouchableOpacity>
         <Text style={{ textAlign: 'center', fontSize: 12, color: '#B0B3C8', marginTop: 8, marginBottom: 24 }}>
-          Browse, meet people, and try everything — no sign-up required.
+          {t('ob_browse_sub')}
         </Text>
 
         <View style={g.dividerRow}>
@@ -3893,7 +3997,17 @@ function VerifyEmailScreen({ token, onDone }: { token: string; onDone: () => voi
 
   useEffect(() => {
     auth.verifyEmail(token)
-      .then(() => setStatus('success'))
+      .then((data: any) => {
+        // Auto-login: save tokens returned by the backend
+        if (data?.accessToken && data?.refreshToken) {
+          auth.saveTokens(data.accessToken, data.refreshToken)
+          // Brief success flash then go straight to app
+          setStatus('success')
+          setTimeout(() => onDone(), 1500)
+        } else {
+          setStatus('success')
+        }
+      })
       .catch((err: any) => { setStatus('error'); setErrorMsg(err.message || 'Link expired or already used') })
   }, [])
 
@@ -3909,10 +4023,7 @@ function VerifyEmailScreen({ token, onDone }: { token: string; onDone: () => voi
         <>
           <Text style={{ fontSize: 48, marginBottom: 16 }}>✅</Text>
           <Text style={{ fontSize: 22, fontWeight: '800', color: '#222540', textAlign: 'center', marginBottom: 8 }}>Email confirmed!</Text>
-          <Text style={{ fontSize: 15, color: '#6E7191', textAlign: 'center', marginBottom: 32 }}>Your account is active. Sign in to start your journey.</Text>
-          <TouchableOpacity style={g.primaryBtn} onPress={onDone}>
-            <Text style={g.primaryBtnTxt}>Sign In →</Text>
-          </TouchableOpacity>
+          <Text style={{ fontSize: 15, color: '#6E7191', textAlign: 'center', marginBottom: 32 }}>Taking you in…</Text>
         </>
       )}
       {status === 'error' && (
@@ -4218,19 +4329,6 @@ function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) =>
           )}
         </View>
 
-        {/* Connections shortcut */}
-        <TouchableOpacity onPress={() => go('connections')} style={{ margin: 20, borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <View style={{ position: 'relative' }}>
-            <Ionicons name="chatbubbles-outline" size={28} color={t.accent} />
-            {unread > 0 && <View style={{ position: 'absolute', top: -4, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#F66E8E', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{unread}</Text></View>}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>Connections</Text>
-            <Text style={{ fontSize: 13, color: t.textSub }}>{profile.connections.length > 0 ? `${profile.connections.length} active chats` : 'Your matches will appear here'}</Text>
-          </View>
-          <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity onPress={() => go('relinsights')} style={{ marginHorizontal: 20, borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <Ionicons name="analytics-outline" size={28} color={t.accent} />
           <View style={{ flex: 1 }}>
@@ -4249,6 +4347,7 @@ function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) =>
 function OuterWorldTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => void }) {
   const { t } = useT()
   const isInRelationship = profile.circle.some(p => p.type === 'romantic')
+  const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
 
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 100, gap: 14 }}>
@@ -4308,6 +4407,19 @@ function OuterWorldTab({ profile, go }: { profile: UserProfile; go: (s: Screen) 
         </TouchableOpacity>
       ))}
 
+      {/* Connections */}
+      <TouchableOpacity onPress={() => go('connections')} style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <View style={{ position: 'relative' }}>
+          <Ionicons name="chatbubbles-outline" size={28} color={t.accent} />
+          {unread > 0 && <View style={{ position: 'absolute', top: -4, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#F66E8E', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{unread}</Text></View>}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>Connections</Text>
+          <Text style={{ fontSize: 13, color: t.textSub }}>{profile.connections.length > 0 ? `${profile.connections.length} active chats` : 'Your matches will appear here'}</Text>
+        </View>
+        <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
+      </TouchableOpacity>
+
       {/* My Profile */}
       <TouchableOpacity onPress={() => go('myprofile')} style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#7B6EF640' }}>
@@ -4327,6 +4439,7 @@ function MainTabs({ profile, go, onReset }: { profile: UserProfile; go: (s: Scre
   const { t: theme } = useT()
   const [tab, setTab] = useState<TabName>('inner')
   const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
+  const isGuest = !datingApi.authed()
 
   type TabItem = { id: TabName; icon: keyof typeof Ionicons.glyphMap; label: string }
   const TAB_ITEMS: TabItem[] = [
@@ -4365,11 +4478,29 @@ function MainTabs({ profile, go, onReset }: { profile: UserProfile; go: (s: Scre
     </View>
   )
 
+  const guestBanner = isGuest ? (
+    <TouchableOpacity onPress={() => go('register')} style={{
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingHorizontal: 16, paddingVertical: 9,
+      backgroundColor: '#7B6EF612',
+      borderBottomWidth: 0.5, borderBottomColor: '#7B6EF630',
+    }}>
+      <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#C5BFEC' }} />
+      <Text style={{ flex: 1, fontSize: 12, color: theme.textSub, fontWeight: '500' }}>Demo mode · Register to see real people</Text>
+      <View style={{ backgroundColor: '#7B6EF620', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 }}>
+        <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '700' }}>Join free →</Text>
+      </View>
+    </TouchableOpacity>
+  ) : null
+
   return (
     <View style={{ flex: 1 }}>
-      {tab === 'inner' && <Home profile={profile} go={go} onReset={onReset} />}
-      {tab === 'circle' && <MyCircleTab profile={profile} go={go} />}
-      {tab === 'outer' && <OuterWorldTab profile={profile} go={go} />}
+      {guestBanner}
+      <View style={{ flex: 1 }}>
+        {tab === 'inner' && <Home profile={profile} go={go} onReset={onReset} />}
+        {tab === 'circle' && <MyCircleTab profile={profile} go={go} />}
+        {tab === 'outer' && <OuterWorldTab profile={profile} go={go} />}
+      </View>
       {tabBar}
     </View>
   )
@@ -6621,7 +6752,7 @@ function MomentsStrip({ profile, onPost, onView }: { profile: UserProfile; onPos
 // ════════════════════════════════════════════════════════════
 //  CIRCLE SCREEN
 // ════════════════════════════════════════════════════════════
-function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefresh }: { profile: UserProfile; onBack: () => void; onStartJourney?: (personId: string) => void; onViewInsights?: () => void; onRefresh?: () => void }) {
+function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefresh, initialFindCode }: { profile: UserProfile; onBack: () => void; onStartJourney?: (personId: string) => void; onViewInsights?: () => void; onRefresh?: () => void; initialFindCode?: string | null }) {
   const { t } = useT()
   const [openChat, setOpenChat] = useState<string | null>(null)
   const [msgs, setMsgs] = useState<ChatMessage[]>([])
@@ -6659,6 +6790,16 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   const [findLoading, setFindLoading] = useState(false)
   const [findResults, setFindResults] = useState<{ name: string; code: string; userId: string }[]>([])
   const [findError, setFindError] = useState('')
+  const [linkingPersonId, setLinkingPersonId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (initialFindCode) {
+      setFindCode(initialFindCode)
+      setFindModal(true)
+      setFindResults([])
+      setFindError('')
+    }
+  }, [initialFindCode])
 
   const [addModal, setAddModal] = useState(false)
   const [addName, setAddName] = useState('')
@@ -6689,10 +6830,18 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   }
 
   const addFromFind = (user: { name: string; code: string; userId: string }) => {
-    DB.addCircle(user.name, addType, '', user.userId)
-    setFindModal(false); setFindCode(''); setFindResults([])
-    onRefresh?.()
-    alert(`✅ ${user.name} added to your Circle!\n\nTap their name to start a real conversation.`)
+    if (linkingPersonId) {
+      DB.updateCirclePerson(linkingPersonId, { somaUserId: user.userId })
+      setLinkingPersonId(null)
+      setFindModal(false); setFindCode(''); setFindResults([])
+      onRefresh?.()
+      alert(`✅ Linked! You can now chat directly with ${user.name}.`)
+    } else {
+      DB.addCircle(user.name, addType, '', user.userId)
+      setFindModal(false); setFindCode(''); setFindResults([])
+      onRefresh?.()
+      alert(`✅ ${user.name} added to your Circle!\n\nTap their name to start a real conversation.`)
+    }
   }
 
   const scores = useMemo(() =>
@@ -6746,7 +6895,7 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   types.forEach(t => { byType[t] = profile.circle.filter(c => c.type === t) })
 
   const typeIcon: Record<string, string> = { therapy: '🩺', family: '👨‍👩‍👧', friend: '🤝', work: '💼', romantic: '💕' }
-  const typeLabel: Record<string, string> = { therapy: 'Therapy & Support', family: 'Family', friend: 'Friends', work: 'Work', romantic: 'Romantic' }
+  const typeLabel: Record<string, string> = { therapy: t('type_therapy'), family: t('type_family'), friend: t('type_friends'), work: t('type_work'), romantic: t('type_romantic') }
 
   const [realMsgs, setRealMsgs] = useState<{ id: string; from_user_id: string; content: string; created_at: string }[]>([])
   const pollRef = useRef<any>(null)
@@ -6836,16 +6985,64 @@ Be specific and human. Under 120 words total.`
     const p = profile.circle.find(x => x.id === openChat)
     if (!p) return null
     const isRealChat = !!(p.somaUserId && auth.getToken())
+    const inviteText = `Hey ${p.name}! I'm using SOMA — an app that helps you grow and stay connected with people you care about. Join me so we can chat directly: https://mysoma.site`
+
+    if (!isRealChat) {
+      return (
+        <View style={[g.screen, { backgroundColor: t.bg }]}>
+          <View style={g.chatHeader}>
+            <TouchableOpacity style={g.dBack} onPress={() => { setOpenChat(null) }}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={g.chatName}>{p.name}</Text>
+              <Text style={g.chatStatus}>{p.type}</Text>
+            </View>
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 32 }}>👤</Text>
+            </View>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 10 }}>{p.name} isn't on SOMA yet</Text>
+            <Text style={{ fontSize: 14, color: t.textSub, textAlign: 'center', lineHeight: 21, marginBottom: 32 }}>
+              To chat directly with {p.name}, invite them to join SOMA. Once they sign up and connect with you, you'll be able to message each other here in real time.
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setLinkingPersonId(p.id)
+                setFindModal(true); setFindCode(''); setFindResults([]); setFindError('')
+              }}
+              style={{ backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 28, marginBottom: 12, width: '100%', alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Link {p.name}'s SOMA account</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (typeof navigator !== 'undefined' && navigator.share) {
+                  navigator.share({ title: 'Join me on SOMA', text: inviteText })
+                } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(inviteText)
+                  alert('Invite link copied to clipboard!')
+                }
+              }}
+              style={{ backgroundColor: t.card, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 28, marginBottom: 14, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: t.border }}>
+              <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }}>Invite {p.name} to SOMA</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 12, color: t.textTertiary, textAlign: 'center', lineHeight: 18 }}>
+              If {p.name} is already on SOMA, link their account above to start chatting directly.
+            </Text>
+          </View>
+        </View>
+      )
+    }
+
     return (
       <KeyboardAvoidingView style={[g.screen, { backgroundColor: t.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={g.chatHeader}>
           <TouchableOpacity style={g.dBack} onPress={() => { setOpenChat(null); setSomaPanel(false); if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={g.chatName}>{p.name}</Text>
-            <Text style={g.chatStatus}>{isRealChat ? '🟢 Direct message' : p.type}</Text>
+            <Text style={g.chatStatus}>🟢 Direct message</Text>
           </View>
           <TouchableOpacity
-            onPress={() => { setSomaPanel(!somaPanel); if (!somaPanel) askSomaAboutChat(p, isRealChat ? realMsgs : msgs.map(m => ({ from_user_id: m.role === 'user' ? myId || '' : '', content: m.content }))) }}
+            onPress={() => { setSomaPanel(!somaPanel); if (!somaPanel) askSomaAboutChat(p, realMsgs) }}
             style={{ backgroundColor: '#7B6EF620', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#7B6EF640' }}>
             <Text style={{ color: '#A89BFA', fontSize: 12, fontWeight: '700' }}>✦ Soma</Text>
           </TouchableOpacity>
@@ -6863,46 +7060,39 @@ Be specific and human. Under 120 words total.`
               : <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 21 }}>{somaAdvice}</Text>
             }
             {!somaAdviceLoading && (
-              <TouchableOpacity onPress={() => askSomaAboutChat(p, isRealChat ? realMsgs : msgs.map(m => ({ from_user_id: m.role === 'user' ? myId || '' : '', content: m.content })))}
+              <TouchableOpacity onPress={() => askSomaAboutChat(p, realMsgs)}
                 style={{ marginTop: 10, alignSelf: 'flex-start' }}>
                 <Text style={{ color: '#7B6EF6', fontSize: 12, fontWeight: '600' }}>↻ Refresh</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
-        {isRealChat ? (
-          <ScrollView ref={msgRef} style={{ flex: 1 }} contentContainerStyle={g.msgList} showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => msgRef.current?.scrollToEnd({ animated: false })}>
-            {realMsgs.length === 0 && !loading && (
-              <View style={{ alignItems: 'center', paddingTop: 60 }}>
-                <Text style={{ fontSize: 32, marginBottom: 12 }}>💬</Text>
-                <Text style={{ color: t.textSub, fontSize: 14, textAlign: 'center' }}>Start your conversation with {p.name}.</Text>
-              </View>
-            )}
-            {realMsgs.map((m, i) => {
-              const isMe = m.from_user_id === myId
-              return (
-                <View key={m.id || i} style={{ flexDirection: isMe ? 'row-reverse' : 'row', marginBottom: 10, alignItems: 'flex-end', gap: 8 }}>
-                  {!isMe && <View style={[g.avatar, { width: 28, height: 28, borderRadius: 14 }]}><Text style={[g.avatarTxt, { fontSize: 12 }]}>{p.name.charAt(0)}</Text></View>}
-                  <View style={{ maxWidth: '75%', backgroundColor: isMe ? '#7B6EF6' : t.card, borderRadius: 18, borderBottomRightRadius: isMe ? 4 : 18, borderBottomLeftRadius: isMe ? 18 : 4, padding: 12, borderWidth: isMe ? 0 : 1, borderColor: t.border }}>
-                    <Text style={{ color: isMe ? '#fff' : t.text, fontSize: 15, lineHeight: 21 }}>{m.content}</Text>
-                    <Text style={{ color: isMe ? 'rgba(255,255,255,0.6)' : t.textTertiary, fontSize: 10, marginTop: 4, textAlign: isMe ? 'right' : 'left' }}>
-                      {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
+        <ScrollView ref={msgRef} style={{ flex: 1 }} contentContainerStyle={g.msgList} showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => msgRef.current?.scrollToEnd({ animated: false })}>
+          {realMsgs.length === 0 && !loading && (
+            <View style={{ alignItems: 'center', paddingTop: 60 }}>
+              <Text style={{ fontSize: 32, marginBottom: 12 }}>💬</Text>
+              <Text style={{ color: t.textSub, fontSize: 14, textAlign: 'center' }}>Start your conversation with {p.name}.</Text>
+            </View>
+          )}
+          {realMsgs.map((m, i) => {
+            const isMe = m.from_user_id === myId
+            return (
+              <View key={m.id || i} style={{ flexDirection: isMe ? 'row-reverse' : 'row', marginBottom: 10, alignItems: 'flex-end', gap: 8 }}>
+                {!isMe && <View style={[g.avatar, { width: 28, height: 28, borderRadius: 14 }]}><Text style={[g.avatarTxt, { fontSize: 12 }]}>{p.name.charAt(0)}</Text></View>}
+                <View style={{ maxWidth: '75%', backgroundColor: isMe ? '#7B6EF6' : t.card, borderRadius: 18, borderBottomRightRadius: isMe ? 4 : 18, borderBottomLeftRadius: isMe ? 18 : 4, padding: 12, borderWidth: isMe ? 0 : 1, borderColor: t.border }}>
+                  <Text style={{ color: isMe ? '#fff' : t.text, fontSize: 15, lineHeight: 21 }}>{m.content}</Text>
+                  <Text style={{ color: isMe ? 'rgba(255,255,255,0.6)' : t.textTertiary, fontSize: 10, marginTop: 4, textAlign: isMe ? 'right' : 'left' }}>
+                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
                 </View>
-              )
-            })}
-            {loading && <Typing />}
-          </ScrollView>
-        ) : (
-          <ScrollView ref={msgRef} style={{ flex: 1 }} contentContainerStyle={g.msgList} showsVerticalScrollIndicator={false}>
-            {msgs.map((m, i) => <Bubble key={i} msg={m} />)}
-            {loading && <Typing />}
-          </ScrollView>
-        )}
+              </View>
+            )
+          })}
+          {loading && <Typing />}
+        </ScrollView>
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={isRealChat ? `Message ${p.name}...` : `Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
+          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
           <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -7041,7 +7231,7 @@ Be specific and human. Under 120 words total.`
                       onRefresh?.()
                     }
                   }} style={{ paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', paddingVertical: 4 }}>✕ Remove</Text>
+                    <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', paddingVertical: 4 }}>{t('circle_remove')}</Text>
                   </TouchableOpacity>
                 </View>
                 )
@@ -7055,13 +7245,13 @@ Be specific and human. Under 120 words total.`
       {/* Reach-Out Nudge Modal */}
       <Modal visible={!!nudgeModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setNudgeModal(null)}>
         <View style={[g.screen, { backgroundColor: t.bg, padding: 28, justifyContent: 'center' }]}>
-          <Text style={[g.logo, { fontSize: 20, marginBottom: 4 }]}>✦ Message idea</Text>
+          <Text style={[g.logo, { fontSize: 20, marginBottom: 4 }]}>{t('nudge_title')}</Text>
           <Text style={[g.logoSub, { marginBottom: 24 }]}>For {nudgeModal?.person.name} — edit and send</Text>
 
           {nudgeLoading ? (
             <View style={{ alignItems: 'center', paddingVertical: 32 }}>
               <ActivityIndicator color="#7B6EF6" />
-              <Text style={{ color: t.textTertiary, marginTop: 12 }}>Soma is thinking…</Text>
+              <Text style={{ color: t.textTertiary, marginTop: 12 }}>{t('nudge_thinking')}</Text>
             </View>
           ) : (
             <TextInput
@@ -7091,18 +7281,18 @@ Be specific and human. Under 120 words total.`
                   alert(`✅ Message sent to ${p.name}!`)
                 } catch { alert('Could not send. Check your connection.') }
               }}>
-              <Text style={g.primaryBtnTxt}>Send to {nudgeModal.person.name} on SOMA</Text>
+              <Text style={g.primaryBtnTxt}>{t('nudge_send_on')} — {nudgeModal.person.name}</Text>
             </TouchableOpacity>
           ) : null}
 
           <TouchableOpacity style={[nudgeModal?.person.somaUserId ? g.secondaryBtn : g.primaryBtn, { marginBottom: 12, opacity: nudgeLoading ? 0.4 : 1 }]} onPress={copyNudge} disabled={nudgeLoading}>
-            <Text style={nudgeModal?.person.somaUserId ? g.secondaryBtnTxt : g.primaryBtnTxt}>{nudgeCopied ? '✓ Copied!' : 'Copy message'}</Text>
+            <Text style={nudgeModal?.person.somaUserId ? g.secondaryBtnTxt : g.primaryBtnTxt}>{nudgeCopied ? t('nudge_copied') : t('nudge_copy')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[g.secondaryBtn, { marginBottom: 12 }]} onPress={() => openNudge(nudgeModal!.person)}>
-            <Text style={g.secondaryBtnTxt}>↺ Try another</Text>
+            <Text style={g.secondaryBtnTxt}>{t('nudge_retry')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setNudgeModal(null)} style={{ alignItems: 'center', paddingVertical: 8 }}>
-            <Text style={{ color: '#9A9DB2', fontSize: 14 }}>Dismiss</Text>
+            <Text style={{ color: '#9A9DB2', fontSize: 14 }}>{t('nudge_dismiss')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -7245,20 +7435,22 @@ Be specific and human. Under 120 words total.`
             <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 12 }}>Search by their email or invite code — connect your SOMA AIs</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
               {([
-                { type: 'friend', icon: '🤝', label: 'Friend' },
-                { type: 'family', icon: '👨‍👩‍👧', label: 'Family' },
-                { type: 'therapy', icon: '🩺', label: 'Doctor/Therapist' },
-                { type: 'romantic', icon: '💕', label: 'Romantic' },
-                { type: 'work', icon: '💼', label: 'Work' },
-              ] as const).map(({ type, icon, label }) => (
+                { type: 'friend' as const, icon: '🤝' },
+                { type: 'family' as const, icon: '👨‍👩‍👧' },
+                { type: 'therapy' as const, icon: '🩺' },
+                { type: 'romantic' as const, icon: '💕' },
+                { type: 'work' as const, icon: '💼' },
+              ]).map(({ type, icon }) => {
+                const labelKey: Record<string, string> = { friend: 'circle_friend_s', family: 'circle_family_s', therapy: 'circle_therapy_s', romantic: 'circle_romantic_s', work: 'circle_work_s' }
+                return (
                 <TouchableOpacity key={type} onPress={() => setAddType(type)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5,
                     borderColor: addType === type ? '#10B981' : t.border,
                     backgroundColor: addType === type ? '#10B98120' : t.bg }}>
                   <Text style={{ fontSize: 13 }}>{icon}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: addType === type ? '#10B981' : t.textSub }}>{label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: addType === type ? '#10B981' : t.textSub }}>{t(labelKey[type])}</Text>
                 </TouchableOpacity>
-              ))}
+              )})}
             </View>
             <TextInput
               value={findCode}
@@ -7310,15 +7502,15 @@ Be specific and human. Under 120 words total.`
               style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: t.text, marginBottom: 16 }}
             />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>Who are they to you?</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>{t('circle_who')}</Text>
             <View style={{ gap: 8, marginBottom: 16 }}>
               {([
-                { type: 'friend', icon: '🤝', label: 'Friend' },
-                { type: 'family', icon: '👨‍👩‍👧', label: 'Family member' },
-                { type: 'therapy', icon: '🩺', label: 'Doctor / Therapist' },
-                { type: 'romantic', icon: '💕', label: 'Romantic partner' },
-                { type: 'work', icon: '💼', label: 'Work colleague' },
-              ] as const).map(({ type, icon, label }) => (
+                { type: 'friend' as const, icon: '🤝', key: 'circle_friend' },
+                { type: 'family' as const, icon: '👨‍👩‍👧', key: 'circle_family' },
+                { type: 'therapy' as const, icon: '🩺', key: 'circle_therapy' },
+                { type: 'romantic' as const, icon: '💕', key: 'circle_romantic' },
+                { type: 'work' as const, icon: '💼', key: 'circle_work' },
+              ]).map(({ type, icon, key }) => (
                 <TouchableOpacity
                   key={type}
                   onPress={() => setAddType(type)}
@@ -7326,7 +7518,7 @@ Be specific and human. Under 120 words total.`
                     borderColor: addType === type ? t.accent : t.border,
                     backgroundColor: addType === type ? `${t.accent}15` : t.bg }}>
                   <Text style={{ fontSize: 18 }}>{icon}</Text>
-                  <Text style={{ fontSize: 14, fontWeight: addType === type ? '700' : '500', color: addType === type ? t.accent : t.text, flex: 1 }}>{label}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: addType === type ? '700' : '500', color: addType === type ? t.accent : t.text, flex: 1 }}>{t(key)}</Text>
                   {addType === type && <Text style={{ color: t.accent, fontSize: 16 }}>✓</Text>}
                 </TouchableOpacity>
               ))}
@@ -7752,10 +7944,10 @@ function MyProfile({ profile, onBack }: { profile: UserProfile; onBack: () => vo
 const SOMA_PLUS_FEATURES = [
   { icon: '✦', label: 'Unlimited AI conversations', sub: 'No daily cap — Soma is always there' },
   { icon: '👀', label: 'See who liked you', sub: 'Know before they do' },
-  { icon: '♾️', label: 'Unlimited daily likes', sub: `Free plan: ${FREE_DAILY_LIKES} likes/day` },
+  { icon: '⚡', label: 'Instant AI connection', sub: `Like someone → your AIs talk immediately (free: wait for mutual like)` },
+  { icon: '♾️', label: `${PREMIUM_DAILY_LIKES} likes/day`, sub: `Free plan: ${FREE_DAILY_LIKES} likes/day` },
   { icon: '🧠', label: 'Extended memory', sub: 'Soma remembers everything, forever' },
   { icon: '🖼️', label: 'AI profile photo', sub: 'Let Soma pick your best shot' },
-  { icon: '⚡', label: 'Priority AI matching', sub: 'Your AI meets theirs first' },
   { icon: '📊', label: 'Premium weekly insights', sub: 'Deeper reflection & growth tips' },
 ]
 
@@ -8036,7 +8228,7 @@ function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { p
   const extractedInterests = profile.memories.filter(m => m.domain === 'hobby').map(m => m.content)
   const extractedPurpose = profile.memories.filter(m => m.domain === 'purpose').map(m => m.content)
 
-  const [step, setStep] = useState<'category' | 'browse' | 'matched' | 'chat' | 'conversation' | 'report'>('category')
+  const [step, setStep] = useState<'category' | 'browse' | 'matched' | 'chat' | 'conversation' | 'report' | 'liked'>('category')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [browseTab, setBrowseTab] = useState<'for-you' | 'nearby'>('for-you')
   const [userLocation] = useState({ lat: 34.0522, lng: -118.2437 }) // Mock LA location
@@ -8211,11 +8403,13 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     DB.useLike()
     setLikesLeft(DB.likesLeft())
     setLiked([...liked, pick])
-    // Real user? Record the like on the backend (mutual likes become matches)
     setMatchedRealUserId(realId || null)
+
     if (realId && datingApi.authed()) {
+      // Real user: send like to backend; backend tells us if it's mutual
       datingApi.like(realId).then(res => {
         if (res.matched) {
+          // Mutual match! Save connection
           DB.upsertConnection({
             id: `real_${realId}`,
             name: pick.name, age: pick.age, photo: pick.photo,
@@ -8224,15 +8418,33 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
             attachment: (pick as any).attachment || '',
             messages: [], matchScore: Math.round(currentScore),
           })
+          haptic.success()
+          analytics.track('match_created', { with: pick.name })
+          setStep('matched')
+          setTimeout(() => runMatch(), 100)
         }
+        // If not mutual: stay in 'liked' waiting state (already set below for non-premium)
       }).catch(() => {})
+
+      if (profile.premium) {
+        // Premium: immediate AI conversation without waiting for mutual
+        haptic.success()
+        analytics.track('match_created', { with: pick.name })
+        setStep('matched')
+        setTimeout(() => runMatch(), 100)
+      } else {
+        // Non-premium + real user: show "liked" waiting state, auto-advance
+        haptic.light()
+        setStep('liked')
+        setTimeout(() => { setStep('browse'); setPhotoIdx(0); if (index < safeActive.length - 1) setIndex(index + 1); else setIndex(0) }, 2500)
+      }
+    } else {
+      // Demo profile: always immediate match (no real mutual matching possible)
+      haptic.success()
+      analytics.track('match_created', { with: pick.name })
+      setStep('matched')
+      setTimeout(() => runMatch(), 100)
     }
-    // ✨ Immediate match! AI agents start talking right away
-    analytics.track('match_created', { with: pick.name })
-    haptic.success()
-    setStep('matched')
-    // Auto-start the matching conversation immediately
-    setTimeout(() => runMatch(), 100)
   }
 
   const connId = () => `conn_${candidate.name}_${candidate.age}`
@@ -8457,12 +8669,12 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           </View>
         )}
 
-        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        {currentBrowse && (<ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           {/* Full-bleed photo gallery */}
           {(() => {
-            const allPhotos = (current.photos && current.photos.length > 0) ? current.photos : (current.photo ? [current.photo] : [])
+            const allPhotos = (currentBrowse.photos && currentBrowse.photos.length > 0) ? currentBrowse.photos : (currentBrowse.photo ? [currentBrowse.photo] : [])
             const safeIdx = Math.min(photoIdx, Math.max(0, allPhotos.length - 1))
-            const displayPhoto = allPhotos[safeIdx] || current.photo
+            const displayPhoto = allPhotos[safeIdx] || currentBrowse.photo
             return (
               <TouchableOpacity activeOpacity={0.97} onPress={() => { if (allPhotos.length > 1) setPhotoIdx((safeIdx + 1) % allPhotos.length) }}
                 style={g.dPhoto}>
@@ -8479,7 +8691,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
                 )}
                 {/* Compatibility badge */}
                 <View style={{ position: 'absolute', top: 68, right: 16, zIndex: 5, alignItems: 'center' }}>
-                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 2, borderColor: current.color, alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 2, borderColor: currentBrowse.color, alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>{currentScore}%</Text>
                   </View>
                   <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginTop: 4 }}>MATCH</Text>
@@ -8490,7 +8702,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
                 <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 100, backgroundColor: 'rgba(0,0,0,0.45)' }} />
                 {/* Interests chips */}
                 <View style={{ position: 'absolute', left: 16, right: 70, bottom: 82, flexDirection: 'row', flexWrap: 'wrap', gap: 6, zIndex: 5 }}>
-                  {current.interests.slice(0, 3).map(interest => (
+                  {currentBrowse.interests.slice(0, 3).map(interest => (
                     <View key={interest} style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}>
                       <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{interest}</Text>
                     </View>
@@ -8501,17 +8713,17 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
                   <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                        <Text style={g.dName}>{current.name}</Text>
-                        <Text style={g.dAge}>{current.age}</Text>
+                        <Text style={g.dName}>{currentBrowse.name}</Text>
+                        <Text style={g.dAge}>{currentBrowse.age}</Text>
                         <View style={{ backgroundColor: 'rgba(246,214,110,0.25)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(246,214,110,0.5)' }}>
                           <Text style={{ color: '#F6D66E', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>PRO</Text>
                         </View>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                         <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.65)" />
-                        <Text style={g.dLoc}>{current.location}</Text>
+                        <Text style={g.dLoc}>{currentBrowse.location}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>·</Text>
-                        <Text style={g.dLoc}>{current.distance}</Text>
+                        <Text style={g.dLoc}>{currentBrowse.distance}</Text>
                       </View>
                     </View>
                     <TouchableOpacity onPress={like} style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', ...shadowMd }}>
@@ -8526,9 +8738,9 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           {/* Quick stats row */}
           <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 16, gap: 0 }}>
             {[
-              { icon: 'barbell-outline' as const, label: current.height },
-              { icon: 'resize-outline' as const, label: current.weight },
-              { icon: 'briefcase-outline' as const, label: current.work },
+              { icon: 'barbell-outline' as const, label: currentBrowse.height },
+              { icon: 'resize-outline' as const, label: currentBrowse.weight },
+              { icon: 'briefcase-outline' as const, label: currentBrowse.work },
             ].map((s, i) => (
               <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRightWidth: i < 2 ? 1 : 0, borderColor: '#EAE8F2' }}>
                 <Ionicons name={s.icon} size={18} color="#7B6EF6" />
@@ -8540,7 +8752,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           {/* About — quote style */}
           <View style={[g.dSection, { marginTop: 16 }]}>
             <View style={{ borderLeftWidth: 3, borderColor: '#7B6EF6', paddingLeft: 14 }}>
-              <Text style={{ color: '#1A1A2E', fontSize: 16, lineHeight: 26, fontStyle: 'italic', fontWeight: '400' }}>"{current.bio}"</Text>
+              <Text style={{ color: '#1A1A2E', fontSize: 16, lineHeight: 26, fontStyle: 'italic', fontWeight: '400' }}>"{currentBrowse.bio}"</Text>
             </View>
           </View>
 
@@ -8550,22 +8762,22 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
             <View style={g.dTags}>
               <View style={g.dTag}>
                 <Ionicons name="people-outline" size={13} color="#6E7191" />
-                <Text style={g.dTagTxt}>{current.children}</Text>
+                <Text style={g.dTagTxt}>{currentBrowse.children}</Text>
               </View>
               <View style={g.dTag}>
                 <Ionicons name="paw-outline" size={13} color="#6E7191" />
-                <Text style={g.dTagTxt}>{current.pets}</Text>
+                <Text style={g.dTagTxt}>{currentBrowse.pets}</Text>
               </View>
             </View>
             {(() => {
               const mine = (profile.dating.children || '').toLowerCase()
-              const theirs = (current.children || '').toLowerCase()
+              const theirs = (currentBrowse.children || '').toLowerCase()
               const iWant = mine.includes('want') && !mine.includes("don't") && !mine.includes('not')
               const iDont = mine.includes("don't") || mine.includes('not')
               const theyWant = theirs.includes('want') && !theirs.includes('not')
               const theyDont = theirs.includes("don't") || theirs.includes('not')
               if ((iWant && theyDont) || (iDont && theyWant)) {
-                return <Text style={g.dealbreak}>⚠ Heads up: you and {current.name} seem to differ on children — worth talking about early.</Text>
+                return <Text style={g.dealbreak}>⚠ Heads up: you and {currentBrowse.name} seem to differ on children — worth talking about early.</Text>
               }
               if (iWant && theyWant) {
                 return <Text style={g.dealgood}>✓ You both want children — aligned on family.</Text>
@@ -8610,14 +8822,14 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
                   <Ionicons name="heart-outline" size={13} color="#7B6EF6" />
                   <Text style={g.styleLbl}>LOVE LANGUAGE</Text>
                 </View>
-                <Text style={g.styleVal}>{current.loveLanguage}</Text>
+                <Text style={g.styleVal}>{currentBrowse.loveLanguage}</Text>
               </View>
               <View style={g.styleCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                   <Ionicons name="link-outline" size={13} color="#7B6EF6" />
                   <Text style={g.styleLbl}>ATTACHMENT</Text>
                 </View>
-                <Text style={g.styleVal}>{current.attachment}</Text>
+                <Text style={g.styleVal}>{currentBrowse.attachment}</Text>
               </View>
             </View>
           </View>
@@ -8626,26 +8838,27 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           <View style={g.dSection}>
             <Text style={g.dH}>More info</Text>
             <View style={g.dTags}>
-              {current.tags.map(tag => (
+              {currentBrowse.tags.map(tag => (
                 <View key={tag.label} style={g.dTag}><Text style={g.dTagTxt}>{tag.label}</Text></View>
               ))}
-              {current.values.map(v => (
-                <View key={v} style={[g.dTag, { borderColor: current.color + '50', backgroundColor: current.color + '10' }]}><Text style={[g.dTagTxt, { color: current.color }]}>{v}</Text></View>
+              {currentBrowse.values.map(v => (
+                <View key={v} style={[g.dTag, { borderColor: currentBrowse.color + '50', backgroundColor: currentBrowse.color + '10' }]}><Text style={[g.dTagTxt, { color: currentBrowse.color }]}>{v}</Text></View>
               ))}
             </View>
           </View>
-        </ScrollView>
+        </ScrollView>)}
 
         {/* Likes-left bar */}
-        <View style={g.likesBar}>
+        {currentBrowse && <View style={g.likesBar}>
           <Text style={g.likesTxt}>
-            {profile.premium ? '★ Premium · ' : ''}♥ {likesLeft} like{likesLeft !== 1 ? 's' : ''} left today
+            {profile.premium ? '⚡ Premium · ' : ''}♥ {likesLeft} like{likesLeft !== 1 ? 's' : ''} left today
+            {profile.premium ? '' : ' · mutual match required'}
           </Text>
-          {!profile.premium && <TouchableOpacity onPress={() => setShowPaywall(true)}><Text style={g.likesUpgrade}>Get more →</Text></TouchableOpacity>}
-        </View>
+          {!profile.premium && <TouchableOpacity onPress={() => setShowPaywall(true)}><Text style={g.likesUpgrade}>Go instant →</Text></TouchableOpacity>}
+        </View>}
 
         {/* Bottom action bar */}
-        <View style={[g.dActions, { paddingHorizontal: 20, justifyContent: 'center', gap: 12 }]}>
+        {currentBrowse && <View style={[g.dActions, { paddingHorizontal: 20, justifyContent: 'center', gap: 12 }]}>
           <PressButton
             onPress={pass}
             style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E3F0', alignItems: 'center', justifyContent: 'center', ...shadowSm }}
@@ -8657,7 +8870,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
             style={{ flex: 1, height: 56, borderRadius: 28, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, ...shadowMd }}
           >
             <Ionicons name="heart" size={20} color="#fff" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.3 }}>Like {current.name}</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.3 }}>Like {currentBrowse.name}</Text>
           </PressButton>
           <PressButton
             onPress={() => { haptic.medium(); like() }}
@@ -8665,7 +8878,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           >
             <Ionicons name="star" size={22} color="#F6A86E" />
           </PressButton>
-        </View>
+        </View>}
 
         {/* Paywall */}
         {showPaywall && (
@@ -8780,6 +8993,38 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
+        )}
+      </View>
+    )
+  }
+
+  // ── LIKED — waiting for mutual match (non-premium real users) ──
+  if (step === 'liked') {
+    const pick = liked[liked.length - 1] ?? safeActive[0]?.c
+    return (
+      <View style={[g.screen, { backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', padding: 40 }]}>
+        <Text style={{ fontSize: 64, marginBottom: 20 }}>💜</Text>
+        <Text style={{ fontSize: 24, fontWeight: '900', color: t.text, textAlign: 'center', marginBottom: 10 }}>
+          You liked {pick?.name}!
+        </Text>
+        <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', lineHeight: 24, marginBottom: 32 }}>
+          If they like you back, your AIs will connect and start the conversation for you.{'\n\n'}
+          Upgrade to SOMA+ to start the AI conversation immediately — no waiting.
+        </Text>
+        <TouchableOpacity
+          style={[g.primaryBtn, { width: '100%', marginBottom: 12 }]}
+          onPress={() => setShowPaywall(true)}
+        >
+          <Text style={g.primaryBtnTxt}>⚡ Get SOMA+ — {PREMIUM_DAILY_LIKES} likes/day, instant match</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { setStep('browse'); setPhotoIdx(0); if (index < safeActive.length - 1) setIndex(index + 1); else setIndex(0) }} style={{ paddingVertical: 10 }}>
+          <Text style={{ color: t.textSub, fontSize: 14 }}>Keep browsing →</Text>
+        </TouchableOpacity>
+        {showPaywall && (
+          <SomaPlusPaywall
+            onClose={() => setShowPaywall(false)}
+            onSuccess={() => { setLikesLeft(DB.likesLeft()); setShowPaywall(false); setStep('matched'); setTimeout(() => runMatch(), 100) }}
+          />
         )}
       </View>
     )
@@ -12786,13 +13031,17 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
         {auth.getToken() && (() => {
           const myCode = (() => { try { const t = auth.getToken(); if (!t) return null; return JSON.parse(atob(t.split('.')[1])).userId?.replace(/-/g,'').slice(0,6).toUpperCase() } catch { return null } })()
           if (!myCode) return null
-          return <StgRow icon="🪪" label="Your invite code" value={myCode} onPress={() => {
-            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-              navigator.clipboard.writeText(myCode).then(() => alert(`✅ Copied!\n\nShare this code with your friend:\n\n${myCode}\n\nThey can enter it in Circle → Find by code.`))
-            } else { alert(`Your invite code: ${myCode}`) }
+          const addLink = `https://mysoma.site/?add=${myCode}`
+          return <StgRow icon="🔗" label="Share your connect link" value={addLink} onPress={() => {
+            const msg = `Add me on SOMA! Just tap this link and we can chat directly: ${addLink}`
+            if (typeof navigator !== 'undefined' && (navigator as any).share) {
+              ;(navigator as any).share({ title: 'Connect with me on SOMA', text: msg, url: addLink }).catch(() => {})
+            } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+              navigator.clipboard.writeText(addLink).then(() => alert('✅ Link copied!\n\nSend it to anyone — when they open it, they can add you directly.'))
+            } else { alert(`Your connect link:\n\n${addLink}`) }
           }} />
         })()}
-        <StgRow icon="🔗" label="Share Soma with a friend" value="mysoma.site" last onPress={() => {
+        <StgRow icon="📣" label="Share Soma with a friend" value="mysoma.site" last onPress={() => {
           const url = 'https://mysoma.site'
           const msg = `Hey! I've been using Soma — an AI that helps you understand yourself better. Try it here: ${url}`
           if (typeof navigator !== 'undefined' && (navigator as any).share) {
@@ -12825,7 +13074,11 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
             <TouchableOpacity style={[g.settingsSaveBtn, { flex: 1, backgroundColor: '#EDEAF8' }]} onPress={() => setShowDanger(false)}>
               <Text style={[g.settingsSaveTxt, { color: '#6E7191' }]}>{t('cancel')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[g.settingsSaveBtn, { flex: 1, backgroundColor: '#F66E6E' }]} onPress={onReset}>
+            <TouchableOpacity style={[g.settingsSaveBtn, { flex: 1, backgroundColor: '#F66E6E' }]} onPress={async () => {
+              try { await auth.deleteAccount() } catch {}
+              auth.clearTokens()
+              onReset()
+            }}>
               <Text style={g.settingsSaveTxt}>Delete all</Text>
             </TouchableOpacity>
           </View>

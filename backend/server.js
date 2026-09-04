@@ -168,6 +168,9 @@ app.post('/auth/verify-email', async (req, res) => {
 
     await supabase.from('users').update({ verified: true }).eq('id', decoded.userId)
 
+    // Issue tokens so the frontend can auto-login without a second step
+    const { accessToken, refreshToken } = generateTokens(decoded.userId, user.email)
+
     // Send welcome email now that they're verified
     sendEmail({
       to: user.email,
@@ -186,7 +189,7 @@ app.post('/auth/verify-email', async (req, res) => {
       </div>`
     }).catch(() => {})
 
-    res.json({ message: 'Email verified — you can now log in' })
+    res.json({ message: 'Email verified', accessToken, refreshToken, user: { id: decoded.userId, email: user.email, name: user.name } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
