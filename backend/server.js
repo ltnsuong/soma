@@ -467,6 +467,58 @@ app.post('/auth/social', async (req, res) => {
   return res.status(400).json({ error: `Unsupported provider: ${provider}` })
 })
 
+// TELEGRAM MINI APP AUTH — verifies initData from window.Telegram.WebApp
+app.post('/auth/telegram-webapp', async (req, res) => {
+  try {
+    const { initData } = req.body
+    if (!initData) return res.status(400).json({ error: 'initData required' })
+
+    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+    if (!BOT_TOKEN) return res.status(500).json({ error: 'Bot token not configured' })
+
+    // Verify using WebAppData HMAC (different from Login Widget)
+    const params = new URLSearchParams(initData)
+    const hash = params.get('hash')
+    params.delete('hash')
+    const dataCheckString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n')
+    const secret = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest()
+    const expectedHash = crypto.createHmac('sha256', secret).update(dataCheckString).digest('hex')
+    if (hash !== expectedHash) return res.status(401).json({ error: 'Invalid initData' })
+
+    // Check auth_date freshness (max 1 day)
+    const authDate = Number(params.get('auth_date') || 0)
+    if (Date.now() / 1000 - authDate > 86400) return res.status(401).json({ error: 'initData expired' })
+
+    const tgUser = JSON.parse(params.get('user') || '{}')
+    if (!tgUser.id) return res.status(400).json({ error: 'No user in initData' })
+
+    const telegramId = String(tgUser.id)
+
+    let { data: user } = await supabase.from('users').select('id, email, name, premium, telegram_id').eq('telegram_id', telegramId).maybeSingle()
+    if (user) {
+      if (tgUser.photo_url) await supabase.from('users').update({ avatar: tgUser.photo_url }).eq('id', user.id)
+    } else {
+      const email = tgUser.username ? `${tgUser.username}@telegram.soma` : `user_${telegramId}@telegram.soma`
+      const name = tgUser.first_name ? `${tgUser.first_name}${tgUser.last_name ? ' ' + tgUser.last_name : ''}` : `Telegram User`
+      const { data: newUser, error: createErr } = await supabase.from('users').insert({
+        telegram_id: telegramId, email, name,
+        avatar: tgUser.photo_url || '', verified: true, premium: false,
+      }).select().single()
+      if (createErr) return res.status(500).json({ error: createErr.message })
+      user = newUser
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user.id, user.email)
+    res.json({ user: { id: user.id, email: user.email, name: user.name, premium: user.premium || false }, accessToken, refreshToken, isNew: !user })
+  } catch (err) {
+    console.error('[Telegram WebApp Auth]', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET CURRENT USER (protected)
 app.get('/auth/me', auth, async (req, res) => {
   try {
