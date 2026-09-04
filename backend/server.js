@@ -203,6 +203,7 @@ app.delete('/auth/account', requireAuth, async (req, res) => {
     // Delete from all tables in order (likes → messages → users)
     await supabase.from('likes').delete().or(`from_user.eq.${userId},to_user.eq.${userId}`)
     await supabase.from('messages').delete().eq('user_id', userId)
+    await supabase.from('profiles').delete().eq('user_id', userId)
     await supabase.from('users').delete().eq('id', userId)
     res.json({ ok: true })
   } catch (err) {
