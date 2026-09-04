@@ -192,6 +192,20 @@ app.post('/auth/verify-email', async (req, res) => {
   }
 })
 
+// DELETE ACCOUNT — required for App Store (Apple mandates account deletion)
+app.delete('/auth/account', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    // Delete from all tables in order (likes → messages → users)
+    await supabase.from('likes').delete().or(`from_user.eq.${userId},to_user.eq.${userId}`)
+    await supabase.from('messages').delete().eq('user_id', userId)
+    await supabase.from('users').delete().eq('id', userId)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // RESEND VERIFICATION EMAIL
 app.post('/auth/resend-verification', async (req, res) => {
   const { email } = req.body
