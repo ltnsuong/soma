@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
+import crypto from 'crypto'
 import { dirname, join } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -369,10 +370,29 @@ app.post('/auth/social', async (req, res) => {
   // Telegram
   if (provider === 'telegram') {
     try {
-      const telegramId = token
       const telegramData = req.body.telegramData || {}
+      const telegramId = String(telegramData.id || token || '')
 
       if (!telegramId) return res.status(400).json({ error: 'Telegram ID required' })
+
+      // Verify hash from Telegram Login Widget
+      const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+      if (BOT_TOKEN && telegramData.hash) {
+        const { hash, ...dataWithoutHash } = telegramData
+        const dataCheckString = Object.keys(dataWithoutHash)
+          .sort()
+          .map(k => `${k}=${dataWithoutHash[k]}`)
+          .join('\n')
+        const secret = crypto.createHash('sha256').update(BOT_TOKEN).digest()
+        const expectedHash = crypto.createHmac('sha256', secret).update(dataCheckString).digest('hex')
+        if (hash !== expectedHash) {
+          return res.status(401).json({ error: 'Invalid Telegram auth data' })
+        }
+        // Check auth_date not older than 1 day
+        if (Date.now() / 1000 - Number(telegramData.auth_date) > 86400) {
+          return res.status(401).json({ error: 'Telegram auth data expired' })
+        }
+      }
 
       // Look for existing user by telegram_id
       let { data: user } = await supabase
