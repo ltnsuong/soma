@@ -2557,9 +2557,84 @@ export default function App() {
         [data-focusable="true"]:active{transform:scale(.96)!important;opacity:.75}
         input,textarea{font-size:16px!important}
         .tab-bar-safe{padding-bottom:max(16px,env(safe-area-inset-bottom))!important}
-        @media(min-width:600px){body{display:flex!important;justify-content:center;background:radial-gradient(ellipse at 50% -20%,#1e0f5e 0%,#090618 70%)!important;overflow:hidden!important}#root{max-width:430px;width:100%;flex:none!important;box-shadow:0 0 140px rgba(123,110,246,.22),0 0 0 1px rgba(123,110,246,.1)}}
+        @media(min-width:600px){
+          html,body{height:100%!important;overflow:hidden!important}
+          body{display:flex!important;align-items:center!important;justify-content:center!important;background:radial-gradient(ellipse at 30% 20%,#2a1060 0%,#0d0620 50%,#060210 100%)!important}
+          #root{
+            position:relative!important;
+            width:390px!important;max-width:390px!important;flex:none!important;
+            height:min(844px,95vh)!important;
+            border-radius:50px!important;
+            overflow:hidden!important;
+            background:#0d0620!important;
+            box-shadow:
+              0 0 0 1px rgba(255,255,255,0.18),
+              0 0 0 8px #111,
+              0 0 0 9px rgba(255,255,255,0.06),
+              0 40px 120px rgba(0,0,0,0.9),
+              0 0 100px rgba(123,110,246,0.25);
+          }
+          #soma-phone-chrome{
+            position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important;
+            pointer-events:none!important;z-index:99999!important;border-radius:50px!important;overflow:hidden!important;
+          }
+          #soma-island{
+            position:absolute;top:13px;left:50%;transform:translateX(-50%);
+            width:126px;height:37px;background:#000;border-radius:20px;
+          }
+          #soma-statusbar{
+            position:absolute;top:0;left:0;right:0;height:54px;
+            background:#0d0620;
+            display:flex;align-items:center;justify-content:space-between;
+            padding:14px 28px 0;color:#fff;font-size:13px;font-weight:600;
+            font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+            text-shadow:0 1px 3px rgba(0,0,0,0.4);
+          }
+          #soma-home{
+            position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+            width:134px;height:5px;background:rgba(255,255,255,0.32);border-radius:3px;
+          }
+          #soma-side-btn-vol-up{position:fixed;top:calc(50vh - 160px);left:calc(50vw - 202px);width:4px;height:60px;background:#222;border-radius:2px 0 0 2px}
+          #soma-side-btn-vol-dn{position:fixed;top:calc(50vh - 90px);left:calc(50vw - 202px);width:4px;height:60px;background:#222;border-radius:2px 0 0 2px}
+          #soma-side-btn-power{position:fixed;top:calc(50vh - 80px);left:calc(50vw + 198px);width:4px;height:80px;background:#222;border-radius:0 2px 2px 0}
+        }
       `
       document.head.appendChild(s)
+    }
+
+    // Phone chrome overlay (Dynamic Island + status bar + home indicator + side buttons)
+    // Only inject once and only on desktop
+    if (window.innerWidth >= 600 && !document.getElementById('soma-phone-chrome')) {
+      const chrome = document.createElement('div'); chrome.id = 'soma-phone-chrome'
+      const island = document.createElement('div'); island.id = 'soma-island'
+      const statusBar = document.createElement('div'); statusBar.id = 'soma-statusbar'
+      const home = document.createElement('div'); home.id = 'soma-home'
+
+      // Status bar content: time left, icons right
+      const updateTime = () => {
+        const now = new Date()
+        const h = now.getHours(); const m = String(now.getMinutes()).padStart(2, '0')
+        statusBar.innerHTML = `<span>${h}:${m}</span><span style="display:flex;align-items:center;gap:5px"><svg width="16" height="12" viewBox="0 0 16 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="white" opacity="0.4"/><rect x="4" y="2" width="3" height="10" rx="1" fill="white" opacity="0.6"/><rect x="8" y="1" width="3" height="11" rx="1" fill="white" opacity="0.8"/><rect x="12" y="0" width="3" height="12" rx="1" fill="white"/></svg><svg width="16" height="12" viewBox="0 0 18 12" fill="white"><path d="M9 2.4C6.3 2.4 3.9 3.5 2.2 5.3L0 3C2.3 1.1 5.5 0 9 0s6.7 1.1 9 3l-2.2 2.3C14.1 3.5 11.7 2.4 9 2.4z" opacity=".4"/><path d="M9 5.5c-1.8 0-3.4.7-4.6 1.9L2.2 5.3C3.9 3.5 6.3 2.4 9 2.4s5.1 1.1 6.8 2.9l-2.2 2.1C12.4 6.2 10.8 5.5 9 5.5z" opacity=".7"/><path d="M9 8.5c-.9 0-1.7.4-2.3 1L9 12l2.3-2.5C10.7 8.9 9.9 8.5 9 8.5z"/></svg><svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="0.5" y="0.5" width="22" height="12" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="23" y="4" width="2.5" height="5" rx="1.25" fill="white" fill-opacity="0.4"/><rect x="2" y="2" width="17" height="9" rx="2" fill="white"/></svg></span>`
+      }
+      updateTime()
+      setInterval(updateTime, 30000)
+
+      chrome.appendChild(island)
+      chrome.appendChild(statusBar)
+      chrome.appendChild(home)
+
+      // Side hardware buttons (volume up, volume down, power)
+      const btnVolUp = document.createElement('div'); btnVolUp.id = 'soma-side-btn-vol-up'
+      const btnVolDn = document.createElement('div'); btnVolDn.id = 'soma-side-btn-vol-dn'
+      const btnPower = document.createElement('div'); btnPower.id = 'soma-side-btn-power'
+
+      const root = document.getElementById('root')
+      if (root) {
+        root.appendChild(chrome)
+        root.parentNode?.appendChild(btnVolUp)
+        root.parentNode?.appendChild(btnVolDn)
+        root.parentNode?.appendChild(btnPower)
+      }
     }
   }, [])
 
@@ -2759,9 +2834,12 @@ export default function App() {
     return <MainTabs profile={profile} go={go} onReset={() => { DB.reset(); go('language') }} />
   })()
 
+  // On web desktop, reserve space for phone chrome (Dynamic Island + status bar = 54px)
+  const webTopInset = Platform.OS === 'web' ? 54 : 0
+
   return (
     <ThemeCtx.Provider value={themeVal}>
-      <View style={{ flex: 1, backgroundColor: themeVal.t.bg }}>
+      <View style={{ flex: 1, backgroundColor: themeVal.t.bg, paddingTop: webTopInset }}>
         <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateX: slideAnim }] }}>
           {inner}
         </Animated.View>
@@ -3562,6 +3640,84 @@ class RegisterBoundary extends Component<{ children: ReactNode; fallback: ReactN
   render() { return this.state.crashed ? this.props.fallback : this.props.children }
 }
 
+// One-tap banner shown when app is opened inside Telegram Mini App
+function TelegramMiniAppBanner({ onAuth }: { onAuth: (data: any) => void }) {
+  const [tgUser, setTgUser] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.initDataUnsafe?.user) {
+      tg.ready()
+      setTgUser(tg.initDataUnsafe.user)
+    }
+  }, [])
+
+  if (!tgUser) return null
+
+  const handleContinue = async () => {
+    setLoading(true)
+    try {
+      const tg = (window as any).Telegram?.WebApp
+      const res = await fetch(`${BACKEND_URL}/auth/telegram-webapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData }),
+      })
+      const data = await res.json()
+      if (res.ok && data.accessToken) {
+        onAuth(data)
+      } else {
+        alert(data.error || 'Telegram login failed')
+      }
+    } catch {
+      alert('Could not connect. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const name = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '')
+  return (
+    <TouchableOpacity
+      onPress={handleContinue}
+      disabled={loading}
+      style={{ backgroundColor: '#2AABEE', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 20, flexDirection: 'row', gap: 12 }}
+    >
+      {tgUser.photo_url
+        ? <Image source={{ uri: tgUser.photo_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+        : <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>{name[0]}</Text>
+          </View>
+      }
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+          {loading ? 'Signing in…' : `Continue as ${name}`}
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Tap to sign in with your Telegram account</Text>
+      </View>
+      {!loading && <Text style={{ color: '#fff', fontSize: 20 }}>→</Text>}
+    </TouchableOpacity>
+  )
+}
+
+// Opens Telegram OAuth popup; calls onAuth(userData) on success
+function openTelegramAuth(onAuth: (data: any) => void) {
+  if (Platform.OS !== 'web') return
+  ;(window as any).onTelegramAuth = onAuth
+  const botId = '8900670759'
+  const origin = encodeURIComponent(window.location.origin)
+  const w = 550, h = 470
+  const left = Math.max(0, (window.screen.width - w) / 2)
+  const top = Math.max(0, (window.screen.height - h) / 2)
+  window.open(
+    `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${origin}&request_access=write`,
+    'tg_oauth',
+    `width=${w},height=${h},left=${left},top=${top}`
+  )
+}
+
 function RegisterFallback({ onDone }: { onDone: (name: string) => void }) {
   const [step, setStep] = useState<'method' | 'email'>('method')
   const [email, setEmail] = useState('')
@@ -3638,6 +3794,13 @@ function AppleIcon({ size = 20 }: { size?: number }) {
     </Svg>
   )
 }
+function TelegramIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <SvgPath fill="#2AABEE" d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.44 14.46l-2.94-.918c-.64-.203-.653-.64.136-.954l11.49-4.43c.534-.194 1.002.131.957.073l-.521.017z" />
+    </Svg>
+  )
+}
 function FacebookIcon({ size = 20 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 320 512">
@@ -3710,6 +3873,36 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
     alert(`${provider} sign-in isn't wired up yet (Apple needs a paid Apple Developer account; Facebook needs a Facebook app). Use Google or email signup for now.`)
   }
 
+  const handleTelegramAuth = async (tgData: any) => {
+    if (!BACKEND_URL || BACKEND_URL.includes('localhost')) {
+      alert('Telegram login requires the deployed backend. Use email signup locally.')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/social`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'telegram', token: String(tgData.id), telegramData: tgData }),
+      })
+      const data = await res.json()
+      if (res.ok && data.accessToken) {
+        await auth.saveTokens(data.accessToken, data.refreshToken)
+        const userName = data.user?.name || tgData.first_name || 'Friend'
+        const pulled = await cloudSync.pull()
+        if (!pulled) DB.register(userName)
+        else cloudSync.push().catch(() => {})
+        onDone(userName)
+      } else {
+        alert(data.error || 'Telegram login failed')
+      }
+    } catch {
+      alert('Telegram login failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleEmailSignup = async () => {
     if (!email.trim() || !name.trim() || !password.trim()) {
       alert('Please fill in all fields'); return
@@ -3739,6 +3932,14 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
   if (step === 'method') {
     return (
       <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
+        <TelegramMiniAppBanner onAuth={async (data) => {
+          await auth.saveTokens(data.accessToken, data.refreshToken)
+          const userName = data.user?.name || 'Friend'
+          const pulled = await cloudSync.pull()
+          if (!pulled) DB.register(userName)
+          else cloudSync.push().catch(() => {})
+          onDone(userName)
+        }} />
         <View style={{ alignItems: 'center', marginBottom: 32 }}>
           <View style={{ marginBottom: 14 }}><SomaMark size={72} /></View>
           <Text style={g.logo}>Meet yourself first.</Text>
@@ -3768,9 +3969,9 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
           <Text style={g.socialLabel}>{t('continueWith').replace('or ', '').replace('ou ', '').replace('oder ', '').trim()} Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={g.socialBtn} onPress={() => handleSocial('Apple')}>
-          <View style={{ width: 28, alignItems: 'center' }}><AppleIcon size={20} /></View>
-          <Text style={g.socialLabel}>{t('continueWith').replace('or ', '').replace('ou ', '').replace('oder ', '').trim()} Apple</Text>
+        <TouchableOpacity style={g.socialBtn} onPress={() => openTelegramAuth(handleTelegramAuth)}>
+          <View style={{ width: 28, alignItems: 'center' }}><TelegramIcon size={20} /></View>
+          <Text style={g.socialLabel}>Continue with Telegram</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[g.socialBtn, { marginTop: 0 }]} onPress={() => setStep('email')}>
@@ -3855,6 +4056,35 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
   const [resendLoading, setResendLoading] = useState(false)
   const [resendSent, setResendSent] = useState(false)
 
+  const handleTelegramAuth = async (tgData: any) => {
+    if (!BACKEND_URL || BACKEND_URL.includes('localhost')) {
+      alert('Telegram login requires the deployed backend.')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/social`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'telegram', token: String(tgData.id), telegramData: tgData }),
+      })
+      const data = await res.json()
+      if (res.ok && data.accessToken) {
+        await auth.saveTokens(data.accessToken, data.refreshToken)
+        const userName = data.user?.name || tgData.first_name || 'Friend'
+        const pulled = await cloudSync.pull()
+        if (!pulled) DB.register(userName)
+        onDone(userName)
+      } else {
+        alert(data.error || 'Telegram login failed')
+      }
+    } catch {
+      alert('Telegram login failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) { alert('Please enter email and password'); return }
     setLoading(true)
@@ -3895,6 +4125,14 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
         <Text style={g.logoSub}>Sign in to continue your journey</Text>
       </View>
 
+      <TelegramMiniAppBanner onAuth={async (data) => {
+        await auth.saveTokens(data.accessToken, data.refreshToken)
+        const userName = data.user?.name || 'Friend'
+        const pulled = await cloudSync.pull()
+        if (!pulled) DB.register(userName)
+        onDone(userName)
+      }} />
+
       <Text style={g.inputLabel}>{t('emailAddress')}</Text>
       <TextInput style={g.authInput} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9A9DB2" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
 
@@ -3907,6 +4145,16 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
 
       <TouchableOpacity style={[g.primaryBtn, { marginTop: 24 }, loading && g.off]} disabled={loading} onPress={handleLogin}>
         <Text style={g.primaryBtnTxt}>{loading ? '⏳ Signing in...' : 'Sign In'}</Text>
+      </TouchableOpacity>
+
+      <View style={[g.dividerRow, { marginTop: 20 }]}>
+        <View style={g.dividerLine} />
+        <Text style={g.dividerTxt}>or</Text>
+        <View style={g.dividerLine} />
+      </View>
+      <TouchableOpacity style={[g.socialBtn, { marginTop: 8 }]} onPress={() => openTelegramAuth(handleTelegramAuth)}>
+        <View style={{ width: 28, alignItems: 'center' }}><TelegramIcon size={20} /></View>
+        <Text style={g.socialLabel}>Continue with Telegram</Text>
       </TouchableOpacity>
 
       {unverifiedEmail && (
@@ -4266,7 +4514,18 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
 }
 
 // ── MAIN TABS (3-world navigation) ─────────────────────────
-type TabName = 'circle' | 'inner' | 'outer'
+type TabName = 'circle' | 'inner' | 'outer' | 'bond'
+
+// All translations of "Romantic partner" across languages
+const ROMANTIC_LABELS = new Set([
+  'Romantic partner','Романтический партнёр','Pareja romántica','Partenaire romantique',
+  'Romantischer Partner','Partner romantico','Parceiro romântico','Người yêu','恋人','パートナー',
+  'Romantic','Романтический','Romántico','Romantique','Romantisch','Romantico','Romântico','Lãng mạn','浪漫','ロマンチック',
+])
+
+function getRomanticPartner(profile: UserProfile) {
+  return profile.circle.find(p => ROMANTIC_LABELS.has(p.relationship))
+}
 
 function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => void }) {
   const { t } = useT()
@@ -4435,17 +4694,97 @@ function OuterWorldTab({ profile, go }: { profile: UserProfile; go: (s: Screen) 
   )
 }
 
+function BondTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => void }) {
+  const { t: theme } = useT()
+  const partner = getRomanticPartner(profile)
+  if (!partner) return null
+  const initial = partner.name?.[0]?.toUpperCase() || '♥'
+
+  return (
+    <ScrollView style={[{ flex: 1, backgroundColor: theme.bg }]} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+      {/* Partner card */}
+      <View style={{ backgroundColor: '#7B6EF614', borderRadius: 24, padding: 20, marginBottom: 20, alignItems: 'center', borderWidth: 1, borderColor: '#7B6EF630' }}>
+        <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+          {partner.avatar
+            ? <Image source={{ uri: partner.avatar }} style={{ width: 72, height: 72, borderRadius: 36 }} />
+            : <Text style={{ fontSize: 28, color: '#fff', fontWeight: '700' }}>{initial}</Text>
+          }
+        </View>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text, marginBottom: 4 }}>{partner.name}</Text>
+        <Text style={{ fontSize: 13, color: theme.textSub }}>Your partner · in your Circle</Text>
+      </View>
+
+      {/* Relationship tools */}
+      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textSub, letterSpacing: 0.8, marginBottom: 12, textTransform: 'uppercase' }}>Relationship tools</Text>
+
+      <TouchableOpacity onPress={() => go('bondjourney')} style={{ flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: theme.card, borderRadius: 18, padding: 18, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#F66E8E20', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22 }}>🧭</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Bond Journey</Text>
+          <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>Shared goals & milestones</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => go('relinsights')} style={{ flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: theme.card, borderRadius: 18, padding: 18, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22 }}>💞</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Relationship Insights</Text>
+          <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>Compatibility & patterns</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => go('circle')} style={{ flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: theme.card, borderRadius: 18, padding: 18, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#F9A82520', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22 }}>💬</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Talk it through with Soma</Text>
+          <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>Relationship advice & support</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => go('checkin')} style={{ flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: theme.card, borderRadius: 18, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: theme.border }}>
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#4ADE8020', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 22 }}>🌱</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Daily Check-in</Text>
+          <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>How are you both doing?</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
+      </TouchableOpacity>
+
+      <Text style={{ fontSize: 12, color: theme.textSub, textAlign: 'center', lineHeight: 18 }}>
+        You found your person. 🎉{'\n'}SOMA is now your relationship companion.
+      </Text>
+    </ScrollView>
+  )
+}
+
 function MainTabs({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void }) {
   const { t: theme } = useT()
   const [tab, setTab] = useState<TabName>('inner')
   const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
-  const isGuest = !datingApi.authed()
+  const isGuest = !auth.getToken()
+  const partner = getRomanticPartner(profile)
+  const inRelationship = !!partner
+  // If user just entered relationship mode, move them off the Explore tab
+  useEffect(() => { if (inRelationship && tab === 'outer') setTab('bond') }, [inRelationship])
 
   type TabItem = { id: TabName; icon: keyof typeof Ionicons.glyphMap; label: string }
   const TAB_ITEMS: TabItem[] = [
     { id: 'circle', icon: 'people-outline',   label: t('tab_circle') },
     { id: 'inner',  icon: 'sparkles-outline', label: t('tab_inner') },
-    { id: 'outer',  icon: 'compass-outline',  label: t('tab_explore') },
+    inRelationship
+      ? { id: 'bond', icon: 'heart-outline', label: 'Bond' }
+      : { id: 'outer', icon: 'compass-outline', label: t('tab_explore') },
   ]
   const tabBar = (
     <View dataSet={{ class: 'tab-bar-safe' }} style={{
@@ -4500,6 +4839,7 @@ function MainTabs({ profile, go, onReset }: { profile: UserProfile; go: (s: Scre
         {tab === 'inner' && <Home profile={profile} go={go} onReset={onReset} />}
         {tab === 'circle' && <MyCircleTab profile={profile} go={go} />}
         {tab === 'outer' && <OuterWorldTab profile={profile} go={go} />}
+        {tab === 'bond' && <BondTab profile={profile} go={go} />}
       </View>
       {tabBar}
     </View>
@@ -13058,7 +13398,7 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
       <Text style={g.stgSec}>{t('account')}</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {auth.getToken() ? (
-          <StgRow icon="🚪" label={t('signOut')} value="Signed in" onPress={() => { auth.clearTokens(); onRefresh() }} />
+          <StgRow icon="🚪" label={t('signOut')} value="Signed in" onPress={() => { auth.clearTokens(); onSignIn?.() }} />
         ) : (
           <StgRow icon="🔑" label={t('signIn')} value="Save your data & meet people" onPress={onSignIn} />
         )}

@@ -29,7 +29,10 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "serviceWorker": {
+        "autoRegister": false
+      }
     },
     "extra": {
       "eas": {

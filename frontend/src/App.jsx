@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react'
 import { initTelegram, getTelegramUser } from './lib/telegram'
 import { telegramLogin, getAuthToken, setAuthToken } from './lib/api'
-import ChatScreen from './screens/ChatScreen'
-import MoodTrackerScreen from './screens/MoodTrackerScreen'
-import ProfileScreen from './screens/ProfileScreen'
+import CircleScreen from './screens/CircleScreen'
+import ConnectionsScreen from './screens/ConnectionsScreen'
+import ExploreScreen from './screens/ExploreScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import LanguageScreen from './screens/LanguageScreen'
 import IntroductionScreen from './screens/IntroductionScreen'
 
 const BottomNav = ({ current, setCurrent }) => {
   const tabs = [
-    { id: 'chat', icon: '💬', label: 'Chat' },
-    { id: 'mood', icon: '📊', label: 'Mood' },
-    { id: 'profile', icon: '⚙️', label: 'Profile' },
+    { id: 'circle', icon: '👥', label: 'Circle' },
+    { id: 'inner', icon: '✨', label: 'Inner' },
+    { id: 'explore', icon: '🔍', label: 'Explore' },
   ]
 
   return (
@@ -58,7 +58,7 @@ function App() {
       const token = getAuthToken()
       if (token) {
         setUser({ authenticated: true })
-        setScreen('chat')
+        setScreen('circle')
         setLoading(false)
         return
       }
@@ -71,7 +71,7 @@ function App() {
           if (response.accessToken) {
             setAuthToken(response.accessToken)
             setUser({ ...response.user, authenticated: true })
-            setScreen('chat')
+            setScreen('circle')
           }
         } catch (err) {
           console.error('Telegram login failed:', err)
@@ -111,15 +111,15 @@ function App() {
   }
 
   if (!user?.authenticated) {
-    return <WelcomeScreen onAuth={(u) => { setUser(u); setScreen('chat') }} />
+    return <WelcomeScreen onAuth={(u) => { setUser(u); setScreen('circle') }} />
   }
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       <div className="flex-1 overflow-y-auto pb-24 safe-area-bottom">
-        {screen === 'chat' && <ChatScreen />}
-        {screen === 'mood' && <MoodTrackerScreen />}
-        {screen === 'profile' && <ProfileScreen />}
+        {screen === 'circle' && <CircleScreen />}
+        {screen === 'inner' && <ConnectionsScreen />}
+        {screen === 'explore' && <ExploreScreen />}
       </div>
       <BottomNav current={screen} setCurrent={setScreen} />
     </div>

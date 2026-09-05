@@ -888,6 +888,9 @@ app.post('/dating/like', auth, async (req, res) => {
       sendPush(theirToken, '🎉 New match!', `You and ${myName} matched on SOMA`, { screen: 'connections' })
       sendPush(myToken,   '🎉 New match!', `You and ${theirName} matched on SOMA`, { screen: 'connections' })
 
+      // Fire-and-forget: generate AI agent-to-agent compatibility report
+      generateMatchReport(req.user.userId, targetId)
+
       return res.json({ matched: true })
     }
     res.json({ matched: false })
@@ -923,6 +926,132 @@ app.get('/dating/liked-you', auth, async (req, res) => {
     const { data: profiles } = await supabase.from('dating_profiles')
       .select('user_id, name, age, photo, city').in('user_id', ids)
     res.json({ likedYou: profiles || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// AGENT-TO-AGENT MATCH REPORTS
+// ════════════════════════════════════════════════════════════
+
+async function callGroq(systemPrompt, userPrompt, maxTokens = 600) {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: JSON.stringify({
+      model: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+    }),
+  })
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content ?? ''
+}
+
+function buildProfileSummary(profile, name) {
+  const p = profile?.data || profile || {}
+  const dating = p.dating || {}
+  const memories = (p.memories || []).slice(-15).map(m => m.content || m.text || m).filter(Boolean)
+  const diary = (p.diary || []).slice(-5).map(d => d.text || d.content || d).filter(Boolean)
+  const goals = p.onboarding?.goals || []
+  const focusDomains = p.onboarding?.focusDomains || []
+
+  const lines = [
+    `Name: ${name || p.name || 'Unknown'}`,
+    dating.age ? `Age: ${dating.age}` : null,
+    dating.city || dating.location ? `Lives in: ${dating.city || dating.location}` : null,
+    dating.loveLanguage ? `Love language: ${dating.loveLanguage}` : null,
+    dating.attachment ? `Attachment style: ${dating.attachment}` : null,
+    dating.interests?.length ? `Interests: ${dating.interests.slice(0, 8).join(', ')}` : null,
+    dating.bio ? `About: ${dating.bio}` : null,
+    dating.lookingFor ? `Looking for: ${dating.lookingFor}` : null,
+    dating.relationshipValues?.length ? `Relationship values: ${dating.relationshipValues.join(', ')}` : null,
+    goals.length ? `Life goals: ${goals.join(', ')}` : null,
+    focusDomains.length ? `Working on: ${focusDomains.join(', ')}` : null,
+    memories.length ? `Recent things on their mind:\n${memories.slice(0, 8).map(m => `- ${String(m).slice(0, 120)}`).join('\n')}` : null,
+    diary.length ? `Recent journal notes:\n${diary.map(d => `- ${String(d).slice(0, 100)}`).join('\n')}` : null,
+  ].filter(Boolean)
+
+  return lines.join('\n')
+}
+
+async function generateMatchReport(userAId, userBId) {
+  try {
+    // Check if report already exists
+    const [a, b] = [userAId, userBId].sort()
+    const { data: existing } = await supabase.from('match_reports')
+      .select('id').eq('user_a', a).eq('user_b', b).maybeSingle()
+    if (existing) return
+
+    // Fetch both profiles
+    const [{ data: profA }, { data: profB }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('user_id', userAId).maybeSingle(),
+      supabase.from('profiles').select('*').eq('user_id', userBId).maybeSingle(),
+    ])
+    const [{ data: dpA }, { data: dpB }] = await Promise.all([
+      supabase.from('dating_profiles').select('*').eq('user_id', userAId).maybeSingle(),
+      supabase.from('dating_profiles').select('*').eq('user_id', userBId).maybeSingle(),
+    ])
+
+    const nameA = profA?.name || dpA?.name || 'Person A'
+    const nameB = profB?.name || dpB?.name || 'Person B'
+
+    // Merge dating profile into profile data for summary
+    const mergedA = { ...(profA || {}), data: { ...(profA?.data || {}), dating: { ...(profA?.data?.dating || {}), ...(dpA || {}) } } }
+    const mergedB = { ...(profB || {}), data: { ...(profB?.data || {}), dating: { ...(profB?.data?.dating || {}), ...(dpB || {}) } } }
+
+    const summaryA = buildProfileSummary(mergedA, nameA)
+    const summaryB = buildProfileSummary(mergedB, nameB)
+
+    const systemPrompt = `You are SOMA's compatibility intelligence. Two people just matched. You have access to their AI companion's deep knowledge of each person. Your job is to find genuine connection points — not generic flattery — and help them start a real conversation.
+
+Respond ONLY with valid JSON in this exact shape:
+{
+  "score": <number 0-100>,
+  "scoreReason": "<one sentence why>",
+  "commonGround": ["<thing 1>", "<thing 2>", "<thing 3>"],
+  "growthArea": "<one sentence about how they could grow each other>",
+  "firstMessage": "<a natural opening message ${nameA} could send ${nameB}, max 2 sentences, referencing something real about them>",
+  "vibe": "<one evocative sentence describing the energy of their potential connection>"
+}`
+
+    const userPrompt = `PROFILE OF ${nameA.toUpperCase()}:\n${summaryA}\n\n---\n\nPROFILE OF ${nameB.toUpperCase()}:\n${summaryB}`
+
+    const raw = await callGroq(systemPrompt, userPrompt, 700)
+
+    let report = {}
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (jsonMatch) report = JSON.parse(jsonMatch[0])
+    } catch {}
+
+    await supabase.from('match_reports').upsert({
+      user_a: a,
+      user_b: b,
+      compatibility_score: report.score || null,
+      common_ground: report.commonGround || [],
+      growth_area: report.growthArea || null,
+      first_message: report.firstMessage || null,
+      vibe: report.vibe || null,
+      raw_report: report,
+    }, { onConflict: 'user_a,user_b' })
+  } catch (err) {
+    console.error('generateMatchReport error:', err.message)
+  }
+}
+
+// GET /dating/match-report/:otherId — fetch the agent report for a match
+app.get('/dating/match-report/:otherId', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+    const other = req.params.otherId
+    const [a, b] = [me, other].sort()
+    const { data } = await supabase.from('match_reports')
+      .select('*').eq('user_a', a).eq('user_b', b).maybeSingle()
+    if (!data) return res.json({ report: null })
+    res.json({ report: data })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
