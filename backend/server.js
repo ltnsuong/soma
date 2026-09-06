@@ -1396,6 +1396,51 @@ app.get('/friends/unread', auth, async (req, res) => {
   }
 })
 
+// GET /friends/conversations — list all DM threads with last message + unread count
+app.get('/friends/conversations', auth, async (req, res) => {
+  try {
+    const me = req.user.userId
+
+    // All messages where I'm involved
+    const { data: msgs, error } = await supabase.from('direct_messages')
+      .select('id, from_user_id, to_user_id, content, created_at, read_at')
+      .or(`from_user_id.eq.${me},to_user_id.eq.${me}`)
+      .order('created_at', { ascending: false })
+      .limit(500)
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    // Group by conversation partner
+    const threads = {}
+    for (const m of (msgs || [])) {
+      const otherId = m.from_user_id === me ? m.to_user_id : m.from_user_id
+      if (!threads[otherId]) {
+        threads[otherId] = { lastMessage: m.content, lastTime: m.created_at, unread: 0 }
+      }
+      if (m.to_user_id === me && !m.read_at) threads[otherId].unread++
+    }
+
+    if (Object.keys(threads).length === 0) return res.json({ conversations: [] })
+
+    // Fetch user names
+    const otherIds = Object.keys(threads)
+    const { data: users } = await supabase.from('users').select('id, name, email').in('id', otherIds)
+    const userMap = Object.fromEntries((users || []).map(u => [u.id, u]))
+
+    const conversations = otherIds.map(id => ({
+      userId: id,
+      name: userMap[id]?.name || userMap[id]?.email || 'Unknown',
+      lastMessage: threads[id].lastMessage,
+      lastTime: threads[id].lastTime,
+      unread: threads[id].unread,
+    })).sort((a, b) => new Date(b.lastTime).getTime() - new Date(a.lastTime).getTime())
+
+    res.json({ conversations })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ════════════════════════════════════════════════════════════
 // DISCOVER — all registered SOMA users (for "For You" tab)
 // ════════════════════════════════════════════════════════════
