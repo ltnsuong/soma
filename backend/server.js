@@ -520,6 +520,109 @@ app.post('/auth/telegram-webapp', async (req, res) => {
   }
 })
 
+// ════════════════════════════════════════════════════════════
+// TELEGRAM BOT LOGIN — deep-link based flow
+// ════════════════════════════════════════════════════════════
+
+// In-memory token store: token → { createdAt, user?, tokens? }
+const tgLoginTokens = new Map()
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of tgLoginTokens) { if (now - v.createdAt > 10 * 60 * 1000) tgLoginTokens.delete(k) }
+}, 60 * 1000)
+
+// Step 1: frontend requests a login token → gets a Telegram deep-link
+app.post('/auth/tg-link', (req, res) => {
+  const token = crypto.randomBytes(16).toString('hex')
+  tgLoginTokens.set(token, { createdAt: Date.now() })
+  res.json({ token, url: `https://t.me/yoursomabot?start=login_${token}` })
+})
+
+// Step 2: poll — frontend checks every 2s until token is validated by bot
+app.get('/auth/tg-link-poll', (req, res) => {
+  const { token } = req.query
+  const entry = tgLoginTokens.get(token)
+  if (!entry) return res.status(404).json({ error: 'Token expired or not found' })
+  if (!entry.done) return res.json({ pending: true })
+  tgLoginTokens.delete(token)
+  res.json({ done: true, user: entry.user, accessToken: entry.accessToken, refreshToken: entry.refreshToken })
+})
+
+// Step 3: Telegram bot webhook — receives /start login_TOKEN command from user
+app.post('/telegram/webhook', async (req, res) => {
+  res.sendStatus(200) // always ack Telegram immediately
+  try {
+    const message = req.body?.message
+    if (!message) return
+    const text = message.text || ''
+    const tgUser = message.from
+    if (!tgUser) return
+
+    // Handle /start login_TOKEN
+    const match = text.match(/^\/start login_([0-9a-f]{32})$/)
+    if (!match) {
+      // Generic /start — send welcome message
+      const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+      if (BOT_TOKEN) {
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: tgUser.id,
+            text: `👋 Welcome to SOMA!\n\nOpen the app here: https://mysoma.site`,
+            reply_markup: { inline_keyboard: [[{ text: '🌟 Open SOMA', web_app: { url: 'https://mysoma.site' } }]] }
+          })
+        })
+      }
+      return
+    }
+
+    const loginToken = match[1]
+    if (!tgLoginTokens.has(loginToken)) return // expired or invalid
+
+    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+    const telegramId = String(tgUser.id)
+
+    let { data: user } = await supabase.from('users').select('id, email, name, premium, telegram_id').eq('telegram_id', telegramId).maybeSingle()
+    if (user) {
+      if (tgUser.photo_url) await supabase.from('users').update({ avatar: tgUser.photo_url }).eq('id', user.id)
+    } else {
+      const email = tgUser.username ? `${tgUser.username}@telegram.soma` : `user_${telegramId}@telegram.soma`
+      const name = tgUser.first_name ? `${tgUser.first_name}${tgUser.last_name ? ' ' + tgUser.last_name : ''}` : 'Telegram User'
+      const { data: newUser, error: createErr } = await supabase.from('users').insert({
+        telegram_id: telegramId, email, name,
+        avatar: tgUser.photo_url || '', verified: true, premium: false,
+      }).select().single()
+      if (createErr) { console.error('[TG Bot Login] create user error:', createErr); return }
+      user = newUser
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user.id, user.email)
+    tgLoginTokens.set(loginToken, {
+      createdAt: tgLoginTokens.get(loginToken).createdAt,
+      done: true,
+      user: { id: user.id, email: user.email, name: user.name, premium: user.premium || false },
+      accessToken, refreshToken
+    })
+
+    // Send success message in bot
+    if (BOT_TOKEN) {
+      const name = tgUser.first_name || 'there'
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: tgUser.id,
+          text: `✅ You're signed in to SOMA, ${name}! Go back to the app.`,
+          reply_markup: { inline_keyboard: [[{ text: '🌟 Open SOMA', web_app: { url: 'https://mysoma.site' } }]] }
+        })
+      })
+    }
+  } catch (err) {
+    console.error('[Telegram Webhook]', err)
+  }
+})
+
 // GET CURRENT USER (protected)
 app.get('/auth/me', auth, async (req, res) => {
   try {
@@ -1380,10 +1483,27 @@ app.get(['/', '/health'], (req, res) => res.json({ status: 'ok', service: 'soma-
 
 // START
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`✅ SOMA backend running at http://localhost:${PORT}`)
   console.log(`🔐 Auth endpoints ready`)
   console.log(`📧 Email via Resend (set RESEND_API_KEY in env)`)
   console.log(`🔑 OAuth ready to wire (add provider SDKs)`)
   console.log(`💎 Premium endpoints ready`)
+  // Auto-register Telegram bot webhook
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+  const BACKEND_URL_ENV = process.env.APP_URL || 'https://soma-backend-production-4a3b.up.railway.app'
+  if (BOT_TOKEN) {
+    try {
+      const webhookUrl = `${BACKEND_URL_ENV}/telegram/webhook`
+      const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message'] })
+      })
+      const data = await r.json()
+      console.log(`🤖 Telegram webhook → ${webhookUrl}:`, data.ok ? '✅ set' : `❌ ${data.description}`)
+    } catch (e) {
+      console.warn('⚠️  Telegram webhook registration failed:', e.message)
+    }
+  }
 })

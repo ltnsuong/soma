@@ -5,7 +5,7 @@ import {
   Platform, Animated, Easing, Image, ImageBackground, Switch, Modal, ActivityIndicator,
   useWindowDimensions
 } from 'react-native'
-import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline, Defs, RadialGradient, Stop as SvgStop, Ellipse as SvgEllipse, LinearGradient as SvgLinearGradient } from 'react-native-svg'
+import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline, Defs, RadialGradient, Stop as SvgStop, Ellipse as SvgEllipse, LinearGradient as SvgLinearGradient, Text as SvgText, G as SvgG } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
 import * as Font from 'expo-font'
 import * as WebBrowser from 'expo-web-browser'
@@ -2018,7 +2018,9 @@ const cloudSync = {
         name: row.name || row.data.name || local.name,
         language: row.language || row.data.language || local.language,
       }
-      localStorage.setItem('soma_profile', JSON.stringify(merged))
+      // Keep cloud restoration in the same store used everywhere else in SOMA.
+      // Using a second key left the visible app out of sync with an account session.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
       return true
     } catch {
       return false
@@ -2861,12 +2863,12 @@ function LanguageSelect({ onDone }: { onDone: () => void }) {
           <Image source={require('./assets/icon.png')} style={{ width: 80, height: 80, borderRadius: 24, marginBottom: 18 }} />
           <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', letterSpacing: -0.5 }}>SOMA</Text>
           <Text style={{ fontSize: 14, color: '#7B6EF6', fontWeight: '700', textAlign: 'center', marginTop: 6, letterSpacing: 0.3 }}>
-            Know yourself before knowing each other
+            Meet yourself before meeting others.
           </Text>
         </View>
 
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 6 }}>Choose your language</Text>
-        <Text style={{ fontSize: 14, color: '#6B68A0', textAlign: 'center', marginBottom: 24 }}>Select the language you prefer</Text>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 6 }}>Choose how Soma speaks with you</Text>
+        <Text style={{ fontSize: 14, color: '#6B68A0', textAlign: 'center', marginBottom: 24 }}>You can change this anytime in Settings.</Text>
 
         <View style={{ gap: 10 }}>
           {LANGS.map(l => {
@@ -3644,22 +3646,12 @@ class RegisterBoundary extends Component<{ children: ReactNode; fallback: ReactN
 function TelegramMiniAppBanner({ onAuth }: { onAuth: (data: any) => void }) {
   const [tgUser, setTgUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
 
-  useEffect(() => {
-    if (Platform.OS !== 'web') return
-    const tg = (window as any).Telegram?.WebApp
-    if (tg?.initDataUnsafe?.user) {
-      tg.ready()
-      setTgUser(tg.initDataUnsafe.user)
-    }
-  }, [])
-
-  if (!tgUser) return null
-
-  const handleContinue = async () => {
+  const doAuth = async (tg: any) => {
+    if (done) return
     setLoading(true)
     try {
-      const tg = (window as any).Telegram?.WebApp
       const res = await fetch(`${BACKEND_URL}/auth/telegram-webapp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3667,24 +3659,34 @@ function TelegramMiniAppBanner({ onAuth }: { onAuth: (data: any) => void }) {
       })
       const data = await res.json()
       if (res.ok && data.accessToken) {
+        setDone(true)
         onAuth(data)
       } else {
         alert(data.error || 'Telegram login failed')
+        setLoading(false)
       }
     } catch {
       alert('Could not connect. Please try again.')
-    } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.initDataUnsafe?.user) {
+      tg.ready()
+      setTgUser(tg.initDataUnsafe.user)
+      // Auto-login — no tap needed when opened inside Telegram
+      doAuth(tg)
+    }
+  }, [])
+
+  if (!tgUser) return null
+
   const name = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '')
   return (
-    <TouchableOpacity
-      onPress={handleContinue}
-      disabled={loading}
-      style={{ backgroundColor: '#2AABEE', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 20, flexDirection: 'row', gap: 12 }}
-    >
+    <View style={{ backgroundColor: '#2AABEE', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 20, flexDirection: 'row', gap: 12 }}>
       {tgUser.photo_url
         ? <Image source={{ uri: tgUser.photo_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
         : <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}>
@@ -3693,29 +3695,44 @@ function TelegramMiniAppBanner({ onAuth }: { onAuth: (data: any) => void }) {
       }
       <View style={{ flex: 1 }}>
         <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
-          {loading ? 'Signing in…' : `Continue as ${name}`}
+          {loading ? `Signing in as ${name}…` : `Welcome, ${name}!`}
         </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Tap to sign in with your Telegram account</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+          {loading ? 'Connecting your Telegram account…' : 'Signed in via Telegram'}
+        </Text>
       </View>
-      {!loading && <Text style={{ color: '#fff', fontSize: 20 }}>→</Text>}
-    </TouchableOpacity>
+      {loading && <ActivityIndicator color="#fff" size="small" />}
+    </View>
   )
 }
 
-// Opens Telegram OAuth popup; calls onAuth(userData) on success
-function openTelegramAuth(onAuth: (data: any) => void) {
+// Bot-link login: generates token → opens t.me/yoursomabot?start=login_TOKEN → polls until user taps Start
+async function openTelegramAuth(onAuth: (data: any) => void, setTgPending: (v: boolean) => void) {
   if (Platform.OS !== 'web') return
-  ;(window as any).onTelegramAuth = onAuth
-  const botId = '8900670759'
-  const origin = encodeURIComponent(window.location.origin)
-  const w = 550, h = 470
-  const left = Math.max(0, (window.screen.width - w) / 2)
-  const top = Math.max(0, (window.screen.height - h) / 2)
-  window.open(
-    `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${origin}&request_access=write`,
-    'tg_oauth',
-    `width=${w},height=${h},left=${left},top=${top}`
-  )
+  try {
+    setTgPending(true)
+    const r = await fetch(`${BACKEND_URL}/auth/tg-link`, { method: 'POST' })
+    const { token, url } = await r.json()
+    window.open(url, '_blank')
+    // Poll every 2 seconds for up to 3 minutes
+    let attempts = 0
+    const timer = setInterval(async () => {
+      attempts++
+      if (attempts > 90) { clearInterval(timer); setTgPending(false); return }
+      try {
+        const pr = await fetch(`${BACKEND_URL}/auth/tg-link-poll?token=${token}`)
+        const pd = await pr.json()
+        if (pd.done) {
+          clearInterval(timer)
+          setTgPending(false)
+          onAuth(pd)
+        }
+      } catch {}
+    }, 2000)
+  } catch {
+    setTgPending(false)
+    alert('Could not connect to server. Please try again.')
+  }
 }
 
 function RegisterFallback({ onDone }: { onDone: (name: string) => void }) {
@@ -3724,6 +3741,7 @@ function RegisterFallback({ onDone }: { onDone: (name: string) => void }) {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [tgPending, setTgPending] = useState(false)
 
   const handleEmailSignup = async () => {
     if (!email.trim() || !name.trim() || !password.trim()) { alert('Please fill in all fields'); return }
@@ -3969,9 +3987,18 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
           <Text style={g.socialLabel}>{t('continueWith').replace('or ', '').replace('ou ', '').replace('oder ', '').trim()} Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={g.socialBtn} onPress={() => openTelegramAuth(handleTelegramAuth)}>
-          <View style={{ width: 28, alignItems: 'center' }}><TelegramIcon size={20} /></View>
-          <Text style={g.socialLabel}>Continue with Telegram</Text>
+        <TouchableOpacity style={[g.socialBtn, tgPending && { opacity: 0.7 }]} disabled={tgPending} onPress={() => openTelegramAuth(async (data) => {
+            await auth.saveTokens(data.accessToken, data.refreshToken)
+            const userName = data.user?.name || 'Friend'
+            const pulled = await cloudSync.pull()
+            if (!pulled) DB.register(userName)
+            else cloudSync.push().catch(() => {})
+            onDone(userName)
+          }, setTgPending)}>
+          <View style={{ width: 28, alignItems: 'center' }}>
+            {tgPending ? <ActivityIndicator size="small" color="#2AABEE" /> : <TelegramIcon size={20} />}
+          </View>
+          <Text style={g.socialLabel}>{tgPending ? 'Waiting for Telegram…' : 'Continue with Telegram'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[g.socialBtn, { marginTop: 0 }]} onPress={() => setStep('email')}>
@@ -4052,6 +4079,7 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [tgPending, setTgPending] = useState(false)
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendSent, setResendSent] = useState(false)
@@ -4152,9 +4180,18 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
         <Text style={g.dividerTxt}>or</Text>
         <View style={g.dividerLine} />
       </View>
-      <TouchableOpacity style={[g.socialBtn, { marginTop: 8 }]} onPress={() => openTelegramAuth(handleTelegramAuth)}>
-        <View style={{ width: 28, alignItems: 'center' }}><TelegramIcon size={20} /></View>
-        <Text style={g.socialLabel}>Continue with Telegram</Text>
+      <TouchableOpacity style={[g.socialBtn, { marginTop: 8 }, tgPending && { opacity: 0.7 }]} disabled={tgPending} onPress={() => openTelegramAuth(async (data) => {
+          await auth.saveTokens(data.accessToken, data.refreshToken)
+          const userName = data.user?.name || 'Friend'
+          const pulled = await cloudSync.pull()
+          if (!pulled) DB.register(userName)
+          else cloudSync.push().catch(() => {})
+          onDone(userName)
+        }, setTgPending)}>
+        <View style={{ width: 28, alignItems: 'center' }}>
+          {tgPending ? <ActivityIndicator size="small" color="#2AABEE" /> : <TelegramIcon size={20} />}
+        </View>
+        <Text style={g.socialLabel}>{tgPending ? 'Waiting for Telegram…' : 'Continue with Telegram'}</Text>
       </TouchableOpacity>
 
       {unverifiedEmail && (
@@ -4521,24 +4558,48 @@ const ROMANTIC_LABELS = new Set([
   'Romantic partner','Романтический партнёр','Pareja romántica','Partenaire romantique',
   'Romantischer Partner','Partner romantico','Parceiro romântico','Người yêu','恋人','パートナー',
   'Romantic','Романтический','Romántico','Romantique','Romantisch','Romantico','Romântico','Lãng mạn','浪漫','ロマンチック',
+  // Specific partner labels
+  'Spouse','Girlfriend','Boyfriend','Partner','romantic',
 ])
 
 function getRomanticPartner(profile: UserProfile) {
-  return profile.circle.find(p => ROMANTIC_LABELS.has(p.relationship))
+  return profile.circle.find(p => ROMANTIC_LABELS.has(p.relationship) || p.type === 'romantic')
 }
 
 function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => void }) {
-  const { t } = useT()
+  const { t: theme } = useT()
   const [showPost, setShowPost] = useState(false)
   const [viewMoment, setViewMoment] = useState<Moment | null>(null)
-  const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
+  const [addModal, setAddModal] = useState(false)
+  const [addName, setAddName] = useState('')
+  const [addType, setAddType] = useState<'friend' | 'family' | 'romantic' | 'work'>('friend')
+  const [addRelationship, setAddRelationship] = useState('Friend')
+  const FAMILY_ROLES = ['Dad','Mom','Brother','Sister','Grandmother','Grandfather','Uncle','Aunt','Son','Daughter','Cousin','Other family']
+  const ROMANTIC_ROLES = ['Girlfriend','Boyfriend','Spouse','Partner']
+  const WORK_ROLES = ['Colleague','Manager','Mentor','Employee']
+
+  const submitAdd = () => {
+    if (!addName.trim()) return
+    DB.addCircle(addName.trim(), addType, '')
+    const p = DB.get()
+    const member = p.circle.find(c => c.name === addName.trim() && c.type === addType)
+    if (member) { member.relationship = addRelationship; DB.save(p) }
+    setAddModal(false); setAddName(''); setAddType('friend'); setAddRelationship('Friend')
+  }
 
   return (
     <>
-      <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 100 }}>
-        <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12 }}>
-          <Text style={[g.greeting, { fontSize: 28 }]}>My Circle</Text>
-          <Text style={[g.auraSub, { marginTop: 4 }]}>Your 20 most important people</Text>
+      <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 100 }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[g.greeting, { fontSize: 28 }]}>My Circle</Text>
+            <Text style={[g.auraSub, { marginTop: 4 }]}>Your 20 most important people</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => profile.circle.length < 20 ? setAddModal(true) : null}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', opacity: profile.circle.length >= 20 ? 0.4 : 1 }}>
+            <Text style={{ color: '#fff', fontSize: 26, lineHeight: 30 }}>+</Text>
+          </TouchableOpacity>
         </View>
 
         {profile.circle.length > 0 && (
@@ -4553,29 +4614,29 @@ function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) =>
 
         <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
           {profile.circle.length === 0 ? (
-            <TouchableOpacity onPress={() => go('circle')} style={{ borderRadius: 20, padding: 24, backgroundColor: t.card, borderWidth: 1.5, borderColor: t.border, borderStyle: 'dashed', alignItems: 'center', gap: 12 }}>
-              <Ionicons name="people-outline" size={36} color={t.textSub} />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>Add your first person</Text>
-              <Text style={{ fontSize: 13, color: t.textSub, textAlign: 'center' }}>Your circle holds your most important people. Soma helps you stay connected.</Text>
+            <TouchableOpacity onPress={() => setAddModal(true)} style={{ borderRadius: 20, padding: 24, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border, borderStyle: 'dashed', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="people-outline" size={36} color={theme.textSub} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text }}>Add your first person</Text>
+              <Text style={{ fontSize: 13, color: theme.textSub, textAlign: 'center' }}>Your circle holds your most important people. Soma helps you stay connected.</Text>
             </TouchableOpacity>
           ) : (
             profile.circle.slice(0, 8).map(person => {
               const typeIcon: Record<string, keyof typeof Ionicons.glyphMap> = { therapy: 'medical-outline', family: 'home-outline', friend: 'people-outline', work: 'briefcase-outline', romantic: 'heart-outline' }
               const score = Math.min(100, Math.max(0, 40 + person.mentions * 8))
               return (
-                <TouchableOpacity key={person.id} onPress={() => go('circle')} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border }}>
+                <TouchableOpacity key={person.id} onPress={() => go('circle')} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border }}>
                   <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name={typeIcon[person.type] || 'person-outline'} size={22} color={t.accent} />
+                    <Ionicons name={typeIcon[person.type] || 'person-outline'} size={22} color={theme.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{person.name}</Text>
-                    <Text style={{ fontSize: 12, color: t.textSub, marginTop: 1 }}>{person.relationship}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{person.name}</Text>
+                    <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 1 }}>{person.relationship}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                    <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: t.border, overflow: 'hidden' }}>
+                    <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, overflow: 'hidden' }}>
                       <View style={{ width: `${score}%` as any, height: '100%', backgroundColor: score > 60 ? '#22C55E' : '#F6A86E', borderRadius: 2 }} />
                     </View>
-                    <Text style={{ fontSize: 10, color: t.textSub }}>{score}%</Text>
+                    <Text style={{ fontSize: 10, color: theme.textSub }}>{score}%</Text>
                   </View>
                 </TouchableOpacity>
               )
@@ -4588,15 +4649,85 @@ function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) =>
           )}
         </View>
 
-        <TouchableOpacity onPress={() => go('relinsights')} style={{ marginHorizontal: 20, borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <Ionicons name="analytics-outline" size={28} color={t.accent} />
+        <TouchableOpacity onPress={() => go('relinsights')} style={{ marginHorizontal: 20, borderRadius: 18, padding: 16, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Ionicons name="analytics-outline" size={28} color={theme.accent} />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>Relationship Insights</Text>
-            <Text style={{ fontSize: 13, color: t.textSub }}>Soma's view of your connections</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Relationship Insights</Text>
+            <Text style={{ fontSize: 13, color: theme.textSub }}>Soma's view of your connections</Text>
           </View>
-          <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
+          <Text style={{ color: theme.textSub, fontSize: 18 }}>›</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Add person modal */}
+      <Modal visible={addModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setAddModal(false)}>
+        <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 28, paddingBottom: 60 }}>
+          <TouchableOpacity onPress={() => setAddModal(false)} style={{ marginBottom: 20 }}>
+            <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '600' }}>‹ Cancel</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: 4 }}>Add someone</Text>
+          <Text style={{ fontSize: 14, color: theme.textSub, marginBottom: 28 }}>Add a person to your circle of 20</Text>
+
+          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 8 }}>Their name</Text>
+          <TextInput
+            value={addName}
+            onChangeText={setAddName}
+            placeholder="e.g. Mom, John, Dr. Smith"
+            placeholderTextColor={theme.textTertiary}
+            autoFocus
+            autoCorrect={false}
+            style={{ backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, color: theme.text, marginBottom: 24 }}
+          />
+
+          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>Who are they?</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+            {([
+              { type: 'family' as const, icon: '👨‍👩‍👧', label: 'Family', defaultRole: 'Mom' },
+              { type: 'friend' as const, icon: '🤝', label: 'Friend', defaultRole: 'Friend' },
+              { type: 'romantic' as const, icon: '💕', label: 'Partner', defaultRole: 'Girlfriend' },
+              { type: 'work' as const, icon: '💼', label: 'Work', defaultRole: 'Colleague' },
+            ]).map(({ type, icon, label, defaultRole }) => (
+              <TouchableOpacity
+                key={type}
+                onPress={() => { setAddType(type); setAddRelationship(defaultRole) }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5,
+                  borderColor: addType === type ? '#7B6EF6' : theme.border,
+                  backgroundColor: addType === type ? '#7B6EF615' : theme.card }}>
+                <Text style={{ fontSize: 18 }}>{icon}</Text>
+                <Text style={{ fontSize: 14, fontWeight: addType === type ? '700' : '500', color: addType === type ? '#7B6EF6' : theme.text }}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {addType !== 'friend' && (
+            <>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>
+                {addType === 'family' ? 'Relation' : addType === 'romantic' ? 'Relationship' : 'Role'}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+                {(addType === 'family' ? FAMILY_ROLES : addType === 'romantic' ? ROMANTIC_ROLES : WORK_ROLES).map(role => (
+                  <TouchableOpacity
+                    key={role}
+                    onPress={() => setAddRelationship(role)}
+                    style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 18, borderWidth: 1.5,
+                      borderColor: addRelationship === role ? '#7B6EF6' : theme.border,
+                      backgroundColor: addRelationship === role ? '#7B6EF615' : theme.card }}>
+                    <Text style={{ fontSize: 14, fontWeight: addRelationship === role ? '700' : '400', color: addRelationship === role ? '#7B6EF6' : theme.text }}>{role}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity
+            onPress={submitAdd}
+            disabled={!addName.trim()}
+            style={{ backgroundColor: addName.trim() ? '#7B6EF6' : '#C4B9F8', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 }}>
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Add to Circle</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Modal>
+
       {showPost && <PostMomentModal profile={profile} onClose={() => setShowPost(false)} onPosted={() => setShowPost(false)} />}
       {viewMoment && <MomentViewer moment={viewMoment} onClose={() => setViewMoment(null)} />}
     </>
@@ -4605,7 +4736,7 @@ function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) =>
 
 function OuterWorldTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => void }) {
   const { t } = useT()
-  const isInRelationship = profile.circle.some(p => p.type === 'romantic')
+  const isInRelationship = !!getRomanticPartner(profile)
   const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
 
   return (
@@ -5400,45 +5531,179 @@ function WheelSegment({ domain, profile, angle, index, score }: { domain: typeof
 }
 
 // A real Wheel of Life: radial chart with a spoke per domain, scores plotted as
-// dots and connected into a polygon. Balanced life = smooth circle; imbalanced = jagged.
+// Wheel of Life — segmented pie chart with colored sectors, numbered rings, and score polygon
 function WheelOfLifeChart({ domains, scoreOf, size = 340 }: { domains: typeof DOMAINS; scoreOf: (k: DomainKey) => number; size?: number }) {
-  const { t } = useT()
   const C = size / 2
-  const R = size / 2 - 66 // room for labels
+  const R = size / 2 - 52 // inner chart radius (leaves room for labels)
   const N = domains.length
-  const ang = (i: number) => (-90 + (360 / N) * i) * Math.PI / 180
-  const pt = (i: number, r: number) => ({ x: C + r * Math.cos(ang(i)), y: C + r * Math.sin(ang(i)) })
-  const scores = domains.map(d => Math.max(0, Math.min(100, scoreOf(d.key))))
-  // Animate the polygon growing out from the centre on mount.
+  const RINGS = 9 // 1–9 scale
+  const GAP_DEG = 1.5 // small gap between sectors in degrees
+
+  // Animate on mount
   const [prog, setProg] = useState(0)
   const av = useRef(new Animated.Value(0)).current
   useEffect(() => {
     const id = av.addListener(({ value }) => setProg(value))
-    Animated.timing(av, { toValue: 1, duration: 850, useNativeDriver: false }).start()
+    Animated.timing(av, { toValue: 1, duration: 900, useNativeDriver: false }).start()
     return () => av.removeListener(id)
   }, [])
-  const dataPts = scores.map((s, i) => pt(i, (Math.max(s, 5) / 100) * R * prog))
-  const polygon = dataPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+
+  const scores1to9 = domains.map(d => {
+    const s100 = Math.max(0, Math.min(100, scoreOf(d.key)))
+    return Math.max(0.3, (s100 / 100) * RINGS)
+  })
+
+  // Sector angle helpers
+  const sliceDeg = 360 / N
+  const startDeg = (i: number) => -90 + sliceDeg * i + GAP_DEG / 2
+  const endDeg = (i: number) => -90 + sliceDeg * (i + 1) - GAP_DEG / 2
+  const toRad = (d: number) => d * Math.PI / 180
+  const ptOnArc = (angleDeg: number, r: number) => ({
+    x: C + r * Math.cos(toRad(angleDeg)),
+    y: C + r * Math.sin(toRad(angleDeg)),
+  })
+
+  // SVG arc path for a sector ring between r1 and r2, from a1 to a2 (degrees)
+  const arcPath = (a1: number, a2: number, r1: number, r2: number) => {
+    const p1 = ptOnArc(a1, r1), p2 = ptOnArc(a2, r1)
+    const p3 = ptOnArc(a2, r2), p4 = ptOnArc(a1, r2)
+    const large = Math.abs(a2 - a1) > 180 ? 1 : 0
+    return [
+      `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`,
+      `A ${r1} ${r1} 0 ${large} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`,
+      `L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)}`,
+      `A ${r2} ${r2} 0 ${large} 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)}`,
+      'Z',
+    ].join(' ')
+  }
+
+  // Score polygon: dot at the mid-angle of each sector at the score radius
+  const midDeg = (i: number) => startDeg(i) + (endDeg(i) - startDeg(i)) / 2
+  const scoreDots = domains.map((_, i) => {
+    const scoreR = (scores1to9[i] / RINGS) * R * prog
+    return ptOnArc(midDeg(i), Math.max(scoreR, 4))
+  })
+  const polygon = scoreDots.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+
+  // Label positions — outside the wheel
+  const labelPts = domains.map((_, i) => ptOnArc(midDeg(i), R + 26))
+
+  // Pastel fill for each sector ring (lightest at outer, darker toward score)
+  const sectorBaseColor = (d: typeof DOMAINS[number], opacity: number) => {
+    const hex = d.color
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return `rgba(${r},${g},${b},${opacity})`
+  }
+
   return (
     <View style={{ width: size, height: size, alignSelf: 'center' }}>
       <Svg width={size} height={size}>
-        {[0.25, 0.5, 0.75, 1].map((r, i) => (
-          <SvgCircle key={i} cx={C} cy={C} r={R * r} fill={i === 3 ? 'rgba(123,110,246,0.06)' : 'none'} stroke="#C8C3E8" strokeWidth={i === 3 ? 1.5 : 1} />
+        {/* Render each sector: ring by ring from outer to inner */}
+        {domains.map((d, i) => {
+          const a1 = startDeg(i), a2 = endDeg(i)
+          const ringR = R / RINGS
+          return (
+            <SvgG key={d.key}>
+              {Array.from({ length: RINGS }).map((_, ring) => {
+                const outerR = R - ring * ringR
+                const innerR = R - (ring + 1) * ringR
+                // Outer rings lighter, inner rings slightly darker
+                const opacity = 0.12 + (ring / RINGS) * 0.22
+                return (
+                  <SvgPath
+                    key={ring}
+                    d={arcPath(a1, a2, innerR, outerR)}
+                    fill={sectorBaseColor(d, opacity)}
+                  />
+                )
+              })}
+              {/* Sector border lines from center */}
+              {[a1, a2].map((angle, li) => {
+                const outer = ptOnArc(angle, R)
+                return (
+                  <SvgLine
+                    key={li}
+                    x1={C} y1={C}
+                    x2={outer.x} y2={outer.y}
+                    stroke="rgba(255,255,255,0.6)"
+                    strokeWidth={0.8}
+                  />
+                )
+              })}
+            </SvgG>
+          )
+        })}
+
+        {/* Concentric ring circles */}
+        {Array.from({ length: RINGS }).map((_, ring) => {
+          const r = ((ring + 1) / RINGS) * R
+          return (
+            <SvgCircle
+              key={ring}
+              cx={C} cy={C} r={r}
+              fill="none"
+              stroke="rgba(255,255,255,0.5)"
+              strokeWidth={ring === RINGS - 1 ? 1.5 : 0.8}
+            />
+          )
+        })}
+
+        {/* Score numbers inside each sector */}
+        {domains.map((d, i) => {
+          const score = Math.round(scores1to9[i])
+          const labelAngle = midDeg(i)
+          const labelR = R * 0.62
+          const lp = ptOnArc(labelAngle, labelR)
+          return (
+            <SvgText
+              key={d.key}
+              x={lp.x}
+              y={lp.y + 10}
+              textAnchor="middle"
+              fontSize={22}
+              fontWeight="bold"
+              fill="white"
+              fillOpacity={0.9}
+            >
+              {score}
+            </SvgText>
+          )
+        })}
+
+        {/* Score polygon line */}
+        <SvgPolygon
+          points={polygon}
+          fill="rgba(255,255,255,0.15)"
+          stroke="white"
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+
+        {/* Score dots */}
+        {scoreDots.map((p, i) => (
+          <SvgCircle
+            key={i}
+            cx={p.x} cy={p.y}
+            r={5}
+            fill="white"
+            stroke={domains[i].color}
+            strokeWidth={2}
+          />
         ))}
-        {domains.map((d, i) => { const e = pt(i, R); return (
-          <SvgLine key={d.key} x1={C} y1={C} x2={e.x} y2={e.y} stroke="#C8C3E8" strokeWidth={1} />
-        ) })}
-        <SvgPolygon points={polygon} fill="rgba(123,110,246,0.20)" stroke="#7B6EF6" strokeWidth={2.5} strokeLinejoin="round" />
-        {dataPts.map((p, i) => (
-          <SvgCircle key={i} cx={p.x} cy={p.y} r={4.5} fill={domains[i].color} stroke="#fff" strokeWidth={1.5} />
-        ))}
+
+        {/* Center circle */}
+        <SvgCircle cx={C} cy={C} r={10} fill="white" opacity={0.9} />
       </Svg>
+
+      {/* Domain labels outside the wheel */}
       {domains.map((d, i) => {
-        const lp = pt(i, R + 30)
+        const lp = labelPts[i]
+        const score = Math.round(scores1to9[i])
         return (
-          <View key={d.key} style={{ position: 'absolute', width: 56, alignItems: 'center', left: lp.x - 28, top: lp.y - 16 }}>
-            <Text style={{ fontSize: 10, fontWeight: '600', color: t.text, textAlign: 'center' }} numberOfLines={1}>{d.label}</Text>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: d.color }}>{Math.round(scores[i] / 10)}</Text>
+          <View key={d.key} style={{ position: 'absolute', width: 64, alignItems: 'center', left: lp.x - 32, top: lp.y - 18 }}>
+            <Text style={{ fontSize: 9, fontWeight: '700', color: d.color, textAlign: 'center', letterSpacing: 0.3 }} numberOfLines={2}>{d.label}</Text>
           </View>
         )
       })}
@@ -7143,13 +7408,22 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
 
   const [addModal, setAddModal] = useState(false)
   const [addName, setAddName] = useState('')
-  const [addType, setAddType] = useState<'friend' | 'family' | 'romantic' | 'work' | 'therapy'>('friend')
+  const [addType, setAddType] = useState<'friend' | 'family' | 'romantic' | 'work'>('friend')
+  const [addRelationship, setAddRelationship] = useState('Friend')
   const [addContext, setAddContext] = useState('')
+
+  const FAMILY_ROLES = ['Dad','Mom','Brother','Sister','Grandmother','Grandfather','Uncle','Aunt','Son','Daughter','Cousin','Other family']
+  const ROMANTIC_ROLES = ['Girlfriend','Boyfriend','Spouse','Partner']
+  const WORK_ROLES = ['Colleague','Manager','Mentor','Employee','Business partner']
 
   const submitAddPerson = () => {
     if (!addName.trim()) return
     DB.addCircle(addName.trim(), addType, addContext.trim())
-    setAddModal(false); setAddName(''); setAddType('friend'); setAddContext('')
+    // Patch the relationship field with the specific label
+    const p = DB.get()
+    const member = p.circle.find(c => c.name === addName.trim() && c.type === addType)
+    if (member) { member.relationship = addRelationship; DB.save(p) }
+    setAddModal(false); setAddName(''); setAddType('friend'); setAddRelationship('Friend'); setAddContext('')
     onRefresh?.()
   }
 
@@ -7842,27 +8116,46 @@ Be specific and human. Under 120 words total.`
               style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: t.text, marginBottom: 16 }}
             />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>{t('circle_who')}</Text>
-            <View style={{ gap: 8, marginBottom: 16 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>Category</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               {([
-                { type: 'friend' as const, icon: '🤝', key: 'circle_friend' },
-                { type: 'family' as const, icon: '👨‍👩‍👧', key: 'circle_family' },
-                { type: 'therapy' as const, icon: '🩺', key: 'circle_therapy' },
-                { type: 'romantic' as const, icon: '💕', key: 'circle_romantic' },
-                { type: 'work' as const, icon: '💼', key: 'circle_work' },
-              ]).map(({ type, icon, key }) => (
+                { type: 'family' as const, icon: '👨‍👩‍👧', label: 'Family', defaultRole: 'Dad' },
+                { type: 'friend' as const, icon: '🤝', label: 'Friend', defaultRole: 'Friend' },
+                { type: 'romantic' as const, icon: '💕', label: 'Partner', defaultRole: 'Girlfriend' },
+                { type: 'work' as const, icon: '💼', label: 'Work', defaultRole: 'Colleague' },
+              ]).map(({ type, icon, label, defaultRole }) => (
                 <TouchableOpacity
                   key={type}
-                  onPress={() => setAddType(type)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderRadius: 14, borderWidth: 1.5,
+                  onPress={() => { setAddType(type); setAddRelationship(defaultRole) }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 20, borderWidth: 1.5,
                     borderColor: addType === type ? t.accent : t.border,
                     backgroundColor: addType === type ? `${t.accent}15` : t.bg }}>
-                  <Text style={{ fontSize: 18 }}>{icon}</Text>
-                  <Text style={{ fontSize: 14, fontWeight: addType === type ? '700' : '500', color: addType === type ? t.accent : t.text, flex: 1 }}>{t(key)}</Text>
-                  {addType === type && <Text style={{ color: t.accent, fontSize: 16 }}>✓</Text>}
+                  <Text style={{ fontSize: 16 }}>{icon}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: addType === type ? '700' : '500', color: addType === type ? t.accent : t.text }}>{label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Sub-role picker */}
+            {addType !== 'friend' && (
+              <>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>
+                  {addType === 'family' ? 'Relation' : addType === 'romantic' ? 'Relationship' : 'Role'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                  {(addType === 'family' ? FAMILY_ROLES : addType === 'romantic' ? ROMANTIC_ROLES : WORK_ROLES).map(role => (
+                    <TouchableOpacity
+                      key={role}
+                      onPress={() => setAddRelationship(role)}
+                      style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 16, borderWidth: 1.5,
+                        borderColor: addRelationship === role ? t.accent : t.border,
+                        backgroundColor: addRelationship === role ? `${t.accent}15` : t.bg }}>
+                      <Text style={{ fontSize: 13, fontWeight: addRelationship === role ? '700' : '400', color: addRelationship === role ? t.accent : t.text }}>{role}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
 
             <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 6 }}>Context <Text style={{ fontWeight: '400' }}>(optional)</Text></Text>
             <TextInput
@@ -8562,7 +8855,7 @@ const MEET_CATEGORIES = [
 
 function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { profile: UserProfile; onBack: () => void; onMyProfile: () => void; onSynergy: () => void; onRegister?: () => void }) {
   const { t } = useT()
-  const isInRelationship = profile.circle.some(p => p.type === 'romantic')
+  const isInRelationship = !!getRomanticPartner(profile)
   // Extract dating profile from Soma conversations (automatic from daily chats)
   const extractedValues = profile.memories.filter(m => m.domain === 'relationship').map(m => m.content)
   const extractedInterests = profile.memories.filter(m => m.domain === 'hobby').map(m => m.content)
@@ -8592,6 +8885,8 @@ function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { p
   const [turns, setTurns] = useState<AgentTurn[]>([])
   const [visibleCount, setVisibleCount] = useState(0)
   const [report, setReport] = useState<{ score: string; why: string; date: string; activities: string; intimacy?: string } | null>(null)
+  const [agentReport, setAgentReport] = useState<any>(null)
+  const [agentReportLoading, setAgentReportLoading] = useState(false)
   const [relationshipType, setRelationshipType] = useState<'romantic' | 'friend'>('romantic')
   const scrollRef = useRef<ScrollView>(null)
 
@@ -8668,6 +8963,72 @@ Return:
 }
 JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.', 400)
       try { const m = raw.match(/\{[\s\S]*\}/); setReport(m ? JSON.parse(m[0]) : fallbackReport()) } catch { setReport(fallbackReport()) }
+      setStep('report')
+    }, totalDelay)
+  }
+
+  // Fetch the real agent-to-agent report from backend (with retry while it's being generated)
+  const fetchAgentReport = async (otherId: string, attempts = 0): Promise<any> => {
+    if (!BACKEND_URL || BACKEND_URL.includes('localhost')) return null
+    try {
+      const res = await fetch(`${BACKEND_URL}/dating/match-report/${otherId}`, {
+        headers: { Authorization: `Bearer ${auth.getToken()}` }
+      })
+      const data = await res.json()
+      if (data.report) return data.report
+      if (attempts < 6) {
+        await new Promise(r => setTimeout(r, 3000))
+        return fetchAgentReport(otherId, attempts + 1)
+      }
+    } catch {}
+    return null
+  }
+
+  // Run real agent conversation using the backend-generated report
+  const runRealMatch = async () => {
+    setStep('conversation'); setTurns([]); setVisibleCount(0); setReport(null)
+    setAgentReportLoading(true)
+
+    const rpt = agentReport || await fetchAgentReport(matchedRealUserId!)
+    if (rpt) setAgentReport(rpt)
+
+    const common: string[] = rpt?.common_ground || rpt?.commonGround || []
+    const vibe: string = rpt?.vibe || ''
+    const firstMsg: string = rpt?.first_message || rpt?.firstMessage || ''
+    const growth: string = rpt?.growth_area || rpt?.growthArea || ''
+    const score: number = rpt?.compatibility_score || rpt?.score || 0
+    const scoreReason: string = rpt?.raw_report?.scoreReason || ''
+
+    // Turn the report into a short agent dialogue
+    const agentTurns: AgentTurn[] = [
+      { agent: 'A', text: `Hello. I'm Soma, ${profile.name || 'my person'}'s AI companion. I know them well — their dreams, how they love, what they're working through. Ready to compare notes?` },
+      { agent: 'B', text: `I'm ${candidate.agentName || 'Lux'}, here for ${candidate.name}. I've been listening to them too. Let's see what we find.` },
+    ]
+    if (common.length >= 2) {
+      agentTurns.push({ agent: 'A', text: `There's real common ground here — ${common[0]}. And ${common[1] || common[0]}.` })
+      agentTurns.push({ agent: 'B', text: common[2] ? `Agreed. And there's more — ${common[2]}. These two have more to talk about than they might expect.` : `Exactly. The fit feels natural, not forced.` })
+    }
+    if (growth) agentTurns.push({ agent: 'A', text: `There's also potential to grow — ${growth}` })
+    agentTurns.push({ agent: 'B', text: vibe || `I think they'd be good together. Let's make sure they actually connect.` })
+
+    setAgentReportLoading(false)
+    setTurns(agentTurns)
+    agentTurns.forEach((_, i) => {
+      setTimeout(() => {
+        setVisibleCount(i + 1)
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+      }, i * 1500)
+    })
+
+    const totalDelay = agentTurns.length * 1500 + 600
+    setTimeout(() => {
+      setReport({
+        score: score ? `${score}%` : '—',
+        why: scoreReason || vibe || 'Your agents found meaningful common ground.',
+        date: firstMsg ? `Suggested opening: "${firstMsg}"` : 'Send them a hello and let the conversation unfold.',
+        activities: common.slice(0, 3).join(' · ') || 'Shared interests to explore together',
+        intimacy: growth || undefined,
+      })
       setStep('report')
     }, totalDelay)
   }
@@ -8931,10 +9292,10 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   }
 
   if (step === 'browse') {
-    // Always prefer real registered users; fall back to single demo profile
-    const filteredRanked = useReal
-      ? realRanked
-      : CANDIDATES.map(c => ({ c, ...alignmentScore(profile, c) }))
+    const demoFallback = CANDIDATES.map(c => ({ c, ...alignmentScore(profile, c) }))
+    const filteredRanked = browseTab === 'nearby'
+      ? (realRanked.length > 0 ? realRanked : demoFallback)
+      : (allUsersRanked.length > 0 ? allUsersRanked : demoFallback)
 
     const browseIndex = Math.min(index, filteredRanked.length - 1)
     const currentBrowse = filteredRanked[browseIndex]?.c
@@ -8974,23 +9335,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           <TouchableOpacity style={g.dMe} onPress={() => setStep('profile')}><Text style={g.dMeTxt}>Me</Text></TouchableOpacity>
         </View>
 
-        {/* Live status bar */}
-        <View style={{ paddingHorizontal: 20, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: useReal ? '#34C759' : realStatus === 'loading' ? '#F6C26E' : '#C5BFEC' }} />
-          <Text style={{ fontSize: 12, color: t.textSub, fontWeight: '600' }}>
-            {browseTab === 'nearby'
-              ? (realRanked.length > 0 ? `${realRanked.length} people near you`
-                : realStatus === 'loading' ? 'Finding people nearby…'
-                : 'No one nearby with location set')
-              : (allUsersRanked.length > 0 ? `${allUsersRanked.length} people on SOMA`
-                : 'Demo mode · Register to see real people')}
-          </Text>
-          {!datingApi.authed() && allUsersRanked.length === 0 && (
-            <TouchableOpacity onPress={() => onRegister?.()} style={{ marginLeft: 'auto' as any, backgroundColor: '#7B6EF620', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 }}>
-              <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '700' }}>Join free →</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Live status — compact, inside the top bar area */}
 
         {/* No results state */}
         {filteredRanked.length === 0 && (
@@ -9009,69 +9354,85 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           </View>
         )}
 
-        {currentBrowse && (<ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-          {/* Full-bleed photo gallery */}
+        {currentBrowse && (<ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+          {/* Card stack + photo */}
           {(() => {
             const allPhotos = (currentBrowse.photos && currentBrowse.photos.length > 0) ? currentBrowse.photos : (currentBrowse.photo ? [currentBrowse.photo] : [])
             const safeIdx = Math.min(photoIdx, Math.max(0, allPhotos.length - 1))
             const displayPhoto = allPhotos[safeIdx] || currentBrowse.photo
             return (
-              <TouchableOpacity activeOpacity={0.97} onPress={() => { if (allPhotos.length > 1) setPhotoIdx((safeIdx + 1) % allPhotos.length) }}
-                style={g.dPhoto}>
-                <Image source={{ uri: displayPhoto }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} resizeMode="cover" />
-                {/* Top vignette */}
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120, backgroundColor: 'rgba(0,0,0,0.28)' }} />
-                {/* Photo progress dots */}
-                {allPhotos.length > 1 && (
-                  <View style={{ position: 'absolute', top: 16, left: 16, right: 16, flexDirection: 'row', gap: 4, zIndex: 10 }}>
-                    {allPhotos.map((_, i) => (
-                      <View key={i} style={{ height: 3, borderRadius: 2, backgroundColor: i === safeIdx ? '#fff' : 'rgba(255,255,255,0.35)', flex: 1 }} />
+              <View style={{ paddingHorizontal: 20, paddingTop: 106, paddingBottom: 8, alignItems: 'center' }}>
+                {/* User count pill */}
+                <View style={{ position: 'absolute', top: 110, left: 36, zIndex: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: useReal ? '#34C759' : '#C5BFEC' }} />
+                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } }}>
+                    {allUsersRanked.length > 0 ? `${allUsersRanked.length} on SOMA` : 'Demo mode'}
+                  </Text>
+                </View>
+                {/* Card stack — 2 rotated cards behind */}
+                <View style={{ position: 'absolute', top: 125, left: 30, right: 30, height: 540, borderRadius: 28, backgroundColor: '#C4B5F4', transform: [{ rotate: '5deg' }], opacity: 0.5 }} />
+                <View style={{ position: 'absolute', top: 120, left: 24, right: 24, height: 540, borderRadius: 28, backgroundColor: '#9580E8', transform: [{ rotate: '2.5deg' }], opacity: 0.7 }} />
+
+                {/* Main photo card */}
+                <TouchableOpacity activeOpacity={0.97}
+                  onPress={() => { if (allPhotos.length > 1) setPhotoIdx((safeIdx + 1) % allPhotos.length) }}
+                  style={{ width: '100%', height: 560, borderRadius: 28, overflow: 'hidden', ...shadowMd }}>
+                  <Image source={{ uri: displayPhoto }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} resizeMode="cover" />
+
+                  {/* Photo progress bars */}
+                  {allPhotos.length > 1 && (
+                    <View style={{ position: 'absolute', top: 14, left: 14, right: 14, flexDirection: 'row', gap: 4, zIndex: 10 }}>
+                      {allPhotos.map((_, i) => (
+                        <View key={i} style={{ height: 3, borderRadius: 2, backgroundColor: i === safeIdx ? '#fff' : 'rgba(255,255,255,0.35)', flex: 1 }} />
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Compatibility badge top-right */}
+                  <View style={{ position: 'absolute', top: 14, right: 14, zIndex: 5, alignItems: 'center' }}>
+                    <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="sparkles" size={11} color="#F6D66E" />
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{currentScore}%</Text>
+                    </View>
+                  </View>
+
+                  {/* Deep bottom gradient */}
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 280, backgroundColor: 'rgba(0,0,0,0.0)' }}>
+                    <View style={{ flex: 1, background: 'linear-gradient(transparent, rgba(0,0,0,0.85))' }} />
+                  </View>
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 200, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 100, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+
+                  {/* Interest chips */}
+                  <View style={{ position: 'absolute', left: 16, right: 16, bottom: 90, flexDirection: 'row', flexWrap: 'wrap', gap: 6, zIndex: 5 }}>
+                    {currentBrowse.interests.slice(0, 3).map(interest => (
+                      <View key={interest} style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' }}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{interest}</Text>
+                      </View>
                     ))}
                   </View>
-                )}
-                {/* Compatibility badge */}
-                <View style={{ position: 'absolute', top: 68, right: 16, zIndex: 5, alignItems: 'center' }}>
-                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 2, borderColor: currentBrowse.color, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>{currentScore}%</Text>
-                  </View>
-                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginTop: 4 }}>MATCH</Text>
-                </View>
-                {/* Gradient layers */}
-                <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 320, backgroundColor: 'rgba(0,0,0,0.15)' }} />
-                <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 200, backgroundColor: 'rgba(0,0,0,0.45)' }} />
-                <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 100, backgroundColor: 'rgba(0,0,0,0.45)' }} />
-                {/* Interests chips */}
-                <View style={{ position: 'absolute', left: 16, right: 70, bottom: 82, flexDirection: 'row', flexWrap: 'wrap', gap: 6, zIndex: 5 }}>
-                  {currentBrowse.interests.slice(0, 3).map(interest => (
-                    <View key={interest} style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}>
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{interest}</Text>
-                    </View>
-                  ))}
-                </View>
-                {/* Name / location overlay */}
-                <View style={g.dPhotoOverlay}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                        <Text style={g.dName}>{currentBrowse.name}</Text>
-                        <Text style={g.dAge}>{currentBrowse.age}</Text>
-                        <View style={{ backgroundColor: 'rgba(246,214,110,0.25)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(246,214,110,0.5)' }}>
-                          <Text style={{ color: '#F6D66E', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>PRO</Text>
+
+                  {/* Name / location */}
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingBottom: 20 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                          <Text style={{ color: '#fff', fontSize: 34, fontWeight: '800', letterSpacing: -0.5 }}>{currentBrowse.name}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 26, fontWeight: '300' }}>{currentBrowse.age}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                          <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '500' }}>{currentBrowse.distance || currentBrowse.location}</Text>
                         </View>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                        <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.65)" />
-                        <Text style={g.dLoc}>{currentBrowse.location}</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>·</Text>
-                        <Text style={g.dLoc}>{currentBrowse.distance}</Text>
-                      </View>
+                      <TouchableOpacity onPress={like}
+                        style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', shadowColor: '#F6379B', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }}>
+                        <Ionicons name="heart" size={24} color="#fff" />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={like} style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', ...shadowMd }}>
-                      <Ionicons name="heart" size={22} color="#fff" />
-                    </TouchableOpacity>
                   </View>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             )
           })()}
 
@@ -9198,25 +9559,24 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
         </View>}
 
         {/* Bottom action bar */}
-        {currentBrowse && <View style={[g.dActions, { paddingHorizontal: 20, justifyContent: 'center', gap: 12 }]}>
+        {currentBrowse && <View style={[g.dActions, { paddingHorizontal: 32, justifyContent: 'center', gap: 20 }]}>
           <PressButton
             onPress={pass}
-            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E3F0', alignItems: 'center', justifyContent: 'center', ...shadowSm }}
+            style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E3F0', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}
           >
-            <Ionicons name="close" size={24} color="#9A9DB2" />
+            <Ionicons name="close" size={28} color="#9A9DB2" />
           </PressButton>
           <PressButton
             onPress={like}
-            style={{ flex: 1, height: 56, borderRadius: 28, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, ...shadowMd }}
+            style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', shadowColor: '#F6379B', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }}
           >
-            <Ionicons name="heart" size={20} color="#fff" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.3 }}>Like {currentBrowse.name}</Text>
+            <Ionicons name="heart" size={34} color="#fff" />
           </PressButton>
           <PressButton
             onPress={() => { haptic.medium(); like() }}
-            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF5EB', borderWidth: 1.5, borderColor: '#F6A86E40', alignItems: 'center', justifyContent: 'center', ...shadowSm }}
+            style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#F3F0FF', borderWidth: 1.5, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}
           >
-            <Ionicons name="star" size={22} color="#F6A86E" />
+            <Ionicons name="star" size={26} color="#7B6EF6" />
           </PressButton>
         </View>}
 
@@ -9408,11 +9768,30 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
       {/* MATCHED */}
       {step === 'matched' && (
         <>
-          <View style={[g.matchedBanner, { overflow: 'hidden' }]}>
+          {/* Match screen — fanned cards + confetti */}
+          <View style={{ alignItems: 'center', paddingTop: 60, paddingBottom: 16, backgroundColor: '#6B3FA0', marginHorizontal: -20, marginTop: -20, paddingHorizontal: 20, overflow: 'hidden', minHeight: 380 }}>
             <MatchConfetti />
-            <Text style={{ fontSize: 40 }}>💜</Text>
-            <Text style={g.matchedTitle}>It's a match!</Text>
-            <Text style={g.matchedSub}>You and {candidate.name} liked each other.</Text>
+            {/* Fanned photo cards */}
+            <View style={{ width: 280, height: 240, position: 'relative', marginBottom: 24, marginTop: 12 }}>
+              {/* Their card — rotated left */}
+              <View style={{ position: 'absolute', left: 0, top: 10, width: 160, height: 210, borderRadius: 20, overflow: 'hidden', transform: [{ rotate: '-8deg' }], shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: -4, height: 6 } }}>
+                <Image source={{ uri: profile.dating?.photos?.[0] || profile.dating?.photo || `https://ui-avatars.com/api/?name=${profile.name}&background=7B6EF6&color=fff&size=200` }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+                <Text style={{ position: 'absolute', bottom: 10, left: 10, color: '#fff', fontWeight: '700', fontSize: 14 }}>{profile.name || 'You'}</Text>
+              </View>
+              {/* Their card — rotated right */}
+              <View style={{ position: 'absolute', right: 0, top: 10, width: 160, height: 210, borderRadius: 20, overflow: 'hidden', transform: [{ rotate: '8deg' }], shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 4, height: 6 } }}>
+                <Image source={{ uri: candidate.photo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+                <Text style={{ position: 'absolute', bottom: 10, left: 10, color: '#fff', fontWeight: '700', fontSize: 14 }}>{candidate.name}</Text>
+              </View>
+              {/* Heart in center */}
+              <View style={{ position: 'absolute', left: '50%', top: '50%', marginLeft: -24, marginTop: -24, width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#F6379B', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, zIndex: 10 }}>
+                <Ionicons name="heart" size={26} color="#F6379B" />
+              </View>
+            </View>
+            <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -1, marginBottom: 8 }}>Match!</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, textAlign: 'center', lineHeight: 22 }}>You and {candidate.name} liked each other.</Text>
           </View>
 
           {/* Choose relationship type */}
@@ -9441,8 +9820,8 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
               </Text>
             </View>
           )}
-          <TouchableOpacity style={g.secondaryBtn} onPress={() => { setStep('conversation'); setTurns([]); setVisibleCount(0); runMatch() }}>
-            <Text style={g.secondaryBtnTxt}>✦  Let your Auras meet first</Text>
+          <TouchableOpacity style={g.secondaryBtn} onPress={() => matchedRealUserId ? runRealMatch() : (() => { setStep('conversation'); setTurns([]); setVisibleCount(0); runMatch() })()}>
+            <Text style={g.secondaryBtnTxt}>✦  Let your AIs meet first</Text>
           </TouchableOpacity>
           <View style={{ height: 16 }} />
           <View style={[g.matchCard, { backgroundColor: t.card, borderColor: t.border }]}>
@@ -9491,20 +9870,25 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
       {step === 'report' && report && (
         <>
           <View style={g.scoreCard}>
-            <Text style={g.scoreLabel}>OUR AURAS AGREE</Text>
+            <Text style={g.scoreLabel}>{matchedRealUserId ? 'YOUR AIs MET' : 'OUR AURAS AGREE'}</Text>
             <Text style={g.scoreNum}>{report.score}</Text>
             <Text style={g.scoreWhy}>{report.why}</Text>
           </View>
-          <View style={g.reportCard}><Text style={g.cardTag}>✦  YOUR IDEAL FIRST DATE</Text><Text style={g.reportDate}>{report.date}</Text></View>
-          <View style={g.reportCard}><Text style={g.cardTag}>✦  THINGS TO DO TOGETHER</Text><Text style={g.reportAct}>{report.activities}</Text></View>
-          {report.intimacy ? (
+          <View style={g.reportCard}><Text style={g.cardTag}>{matchedRealUserId ? '✦  SUGGESTED FIRST MESSAGE' : '✦  YOUR IDEAL FIRST DATE'}</Text><Text style={g.reportDate}>{report.date}</Text></View>
+          <View style={g.reportCard}><Text style={g.cardTag}>{matchedRealUserId ? '✦  WHAT YOU HAVE IN COMMON' : '✦  THINGS TO DO TOGETHER'}</Text><Text style={g.reportAct}>{report.activities}</Text></View>
+          {report.intimacy && !matchedRealUserId ? (
             <View style={g.intimacyReport}>
-              <Text style={g.intimacyRLbl}>🔒  INTIMACY COMPATIBILITY · handled privately by your Auras</Text>
+              <Text style={g.intimacyRLbl}>🔒  INTIMACY COMPATIBILITY · handled privately by your AIs</Text>
               <Text style={g.intimacyRTxt}>{report.intimacy}</Text>
               <Text style={g.intimacyRNote}>Neither of you had to bring this up. Your agents compared notes so the conversation could stay easy.</Text>
             </View>
+          ) : report.intimacy && matchedRealUserId ? (
+            <View style={[g.reportCard, { borderLeftWidth: 3, borderLeftColor: '#7B6EF6' }]}>
+              <Text style={g.cardTag}>✦  GROWTH POTENTIAL</Text>
+              <Text style={g.reportAct}>{report.intimacy}</Text>
+            </View>
           ) : null}
-          <TouchableOpacity style={g.primaryBtn} onPress={() => { setStep('browse'); setReport(null); setTurns([]); setVisibleCount(0) }}><Text style={g.primaryBtnTxt}>💜  Send {candidate.name} a hello</Text></TouchableOpacity>
+          <TouchableOpacity style={g.primaryBtn} onPress={() => { startInstantChat(); setReport(null); setTurns([]); setVisibleCount(0) }}><Text style={g.primaryBtnTxt}>💜  Send {candidate.name} a hello</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => { setStep('browse'); setReport(null); setTurns([]); setVisibleCount(0) }}><Text style={g.ghostTxt}>Meet more people</Text></TouchableOpacity>
         </>
       )}
@@ -14325,7 +14709,7 @@ const g = StyleSheet.create({
   dTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dTag: { backgroundColor: '#F4F2FC', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 13, borderWidth: 1, borderColor: '#E9E6F2', flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5 },
   dTagTxt: { color: '#3D3A56', fontSize: 13, fontWeight: '600' },
-  dActions: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 32, backgroundColor: '#FBFAF8' },
+  dActions: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 20, paddingHorizontal: 32, paddingTop: 16, paddingBottom: 36, backgroundColor: '#FBFAF8' },
   dPass: { flex: 1, height: 60, borderRadius: 30, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadowMd },
   dPassIcon: { fontSize: 24 },
   dMsg: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#EFEDF6', borderWidth: 1, borderColor: '#E9E6F2', alignItems: 'center', justifyContent: 'center', ...shadowSm },
@@ -14368,7 +14752,7 @@ const g = StyleSheet.create({
   intimacyRLbl: { color: '#F6379B', fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8 },
   intimacyRTxt: { color: '#222540', fontSize: 15, lineHeight: 23 },
   intimacyRNote: { color: '#6E7191', fontSize: 11, lineHeight: 17, marginTop: 10, fontStyle: 'italic' },
-  likesBar: { position: 'absolute', bottom: 108, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
+  likesBar: { position: 'absolute', bottom: 132, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   likesTxt: { color: '#6E7191', fontSize: 12, fontWeight: '600' },
   likesUpgrade: { color: '#F6D66E', fontSize: 12, fontWeight: '700' },
   secondaryBtn: { width: '100%', height: 52, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center', marginBottom: 4, ...shadowSm },
