@@ -178,3 +178,6 @@ RETURNS TABLE (
   ORDER BY distance_km ASC
   LIMIT p_limit;
 $$;
+
+-- Add connection_type to dating_profiles (dating / friends / professional / support)
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS connection_type TEXT DEFAULT 'dating';

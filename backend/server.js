@@ -896,14 +896,14 @@ function compatibility(me, them) {
 // UPSERT my dating profile (+ rounded location)
 app.put('/dating/profile', auth, async (req, res) => {
   try {
-    const { name, age, photo, photos, bio, interests, values, loveLanguage, attachment, lookingFor, work, lat, lng, city } = req.body
+    const { name, age, photo, photos, bio, interests, values, loveLanguage, attachment, lookingFor, connectionType, work, lat, lng, city } = req.body
     if (!name) return res.status(400).json({ error: 'Name required' })
     const row = {
       user_id: req.user.userId,
       name, age: age || null, photo: photo || '', photos: (photos || []).slice(0, 6), bio: bio || '',
       interests: interests || [], values: values || [],
       love_language: loveLanguage || '', attachment: attachment || '',
-      looking_for: lookingFor || '', work: work || '',
+      looking_for: lookingFor || '', connection_type: connectionType || 'dating', work: work || '',
       lat: lat != null ? roundCoord(lat) : null,
       lng: lng != null ? roundCoord(lng) : null,
       city: city || '',
@@ -950,7 +950,7 @@ app.get('/dating/nearby', auth, async (req, res) => {
         userId: r.user_id, name: r.name, age: r.age, photo: r.photo,
         photos: photosMap[r.user_id] || (r.photo ? [r.photo] : []),
         bio: r.bio, interests: r.interests, values: r.values, loveLanguage: r.love_language,
-        attachment: r.attachment, work: r.work, city: r.city,
+        attachment: r.attachment, connectionType: r.connection_type || 'dating', work: r.work, city: r.city,
         distanceKm: Math.round(r.distance_km * 10) / 10,
         compatibility: compatibility(me, r),
       }))
@@ -1456,7 +1456,7 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
     // Also fetch their dating profiles if available
     const ids = (users || []).map(u => u.id)
     const { data: profiles } = ids.length
-      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, interests, values, love_language, attachment, work, city').in('user_id', ids)
+      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, interests, values, love_language, attachment, connection_type, work, city').in('user_id', ids)
       : { data: [] }
     const profileMap = {}
     ;(profiles || []).forEach(p => { profileMap[p.user_id] = p })
@@ -1474,6 +1474,7 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
         values: dp.values || [],
         loveLanguage: dp.love_language || null,
         attachment: dp.attachment || null,
+        connectionType: dp.connection_type || 'dating',
         work: dp.work || null,
         city: dp.city || null,
         hasDatingProfile: !!dp.age,
