@@ -2551,6 +2551,30 @@ function PressButton({ onPress, style, children, disabled }: { onPress?: () => v
 }
 
 // ── GROQ ───────────────────────────────────────────────────
+// Speech → text via Whisper on the backend. Works anywhere MediaRecorder does,
+// including Firefox and the Telegram WebView where Web Speech is unavailable.
+async function transcribe(blob: Blob): Promise<string> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 45000)
+  try {
+    const lang = currentLangCode()
+    const res = await fetch(`${BACKEND_URL}/ai/transcribe?lang=${encodeURIComponent(lang)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'audio/webm' },
+      body: blob,
+      signal: ctrl.signal,
+    })
+    if (!res.ok) { console.warn('[transcribe] HTTP', res.status); return '' }
+    const d = await res.json()
+    return d.text ?? ''
+  } catch (e) {
+    console.warn('[transcribe] failed:', e instanceof Error ? e.message : e)
+    return ''
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function groq(messages: any[], system: string, maxTokens = 200, temperature = 0.85): Promise<string> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 25000)
@@ -2729,13 +2753,62 @@ const LANG_CODES: Record<string, string> = {
   it: 'it-IT', pt: 'pt-BR', vi: 'vi-VN', zh: 'zh-CN', ja: 'ja-JP', ar: 'ar-SA',
 }
 
+// Record with MediaRecorder, transcribe with Whisper. Same contract as listen():
+// returns a stop function; stopping ends the recording and resolves the transcript.
+function listenViaWhisper(
+  onResult: (t: string) => void,
+  onEnd: () => void,
+  onInterim?: (t: string) => void,
+): () => void {
+  const MR = (window as any).MediaRecorder
+  if (!MR || !navigator?.mediaDevices?.getUserMedia) {
+    alert('Voice input is not supported in this browser.')
+    onEnd()
+    return () => {}
+  }
+  // getUserMedia is async, so the caller may stop us before the recorder exists.
+  let recorder: any = null
+  let stopRequested = false
+
+  ;(async () => {
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      alert('Microphone access was denied.')
+      onEnd()
+      return
+    }
+    if (stopRequested) { stream.getTracks().forEach(t => t.stop()); onEnd(); return }
+
+    const chunks: BlobPart[] = []
+    recorder = new MR(stream)
+    recorder.ondataavailable = (e: any) => { if (e.data?.size > 0) chunks.push(e.data) }
+    recorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop())
+      if (!chunks.length) { onResult(''); onEnd(); return }
+      onInterim?.('…')
+      onResult(await transcribe(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })))
+      onEnd()
+    }
+    recorder.start()
+  })()
+
+  return () => {
+    stopRequested = true
+    try { if (recorder && recorder.state !== 'inactive') recorder.stop() } catch {}
+  }
+}
+
 function listen(
   onResult: (t: string) => void,
   onEnd: () => void,
   onInterim?: (t: string) => void,
 ): () => void {
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-  if (!SR) { alert('Voice requires Chrome or Safari'); onEnd(); return () => {} }
+  // No Web Speech (Firefox, Telegram WebView, most in-app browsers) → record and
+  // send to Whisper instead. No interim text there, so report progress via onInterim.
+  if (!SR) return listenViaWhisper(onResult, onEnd, onInterim)
   const lang = DB.get().language || 'en'
   const r = new SR()
   r.lang = LANG_CODES[lang] || 'en-US'
@@ -3712,6 +3785,11 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
     })
   }
 
+  // Soma speaks first when the conversation opens.
+  useEffect(() => {
+    if (phase === 9) openConversation()
+  }, [phase])
+
   // Pulse animation for mic button while recording
   useEffect(() => {
     if (listening) {
@@ -3943,15 +4021,80 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
   const [somaReplyLoading, setSomaReplyLoading] = useState(false)
   const [typeMode, setTypeMode] = useState(false)
 
+  // ── Onboarding conversation ──────────────────────────────
+  // Soma asks, the user answers, Soma follows up on what they actually said.
+  const MIN_TURNS = 3   // user answers before "build my profile" appears
+  const MAX_TURNS = 6   // after this Soma wraps up on its own
+  const userTurns = sectionConvo.filter(m => m.role === 'user').length
+
+  // Flatten the exchange into the single text blob the extractor expects.
+  const convoTranscript = () =>
+    sectionConvo.filter(m => m.role === 'user').map(m => m.text).join('\n\n').trim()
+
+  const somaSystem = () =>
+    `You are Soma, a warm, curious AI life companion meeting someone for the first time.${langDirective()}
+You are having a real conversation — not an interview. Rules:
+- Reply in 1-2 short sentences, then ask ONE specific follow-up question.
+- Build on what they just said; never ask something they already answered.
+- Sound like a thoughtful friend, not a form. No lists, no clinical language.
+- Across the chat, gently cover: how they're doing day to day, their people and work, and what's on their mind.
+- Never give advice yet. Just get to know them.`
+
+  const openConversation = async () => {
+    if (sectionConvoRef.current.length) return
+    setSomaGenerating(true)
+    const name = userName.trim()
+    const opener = await groq(
+      [{ role: 'user', content: `Greet me${name ? ` by name (${name})` : ''} in one warm sentence and ask an open question about how life is going right now.` }],
+      somaSystem(), 120,
+    )
+    const text = opener || (name ? `Hi ${name}. How's life going for you right now?` : `Hi. How's life going for you right now?`)
+    sectionConvoRef.current = [{ role: 'soma', text }]
+    setSectionConvo(sectionConvoRef.current)
+    setSomaGenerating(false)
+  }
+
+  const sendToSoma = async (raw: string) => {
+    const text = raw.trim()
+    if (!text || somaGenerating) return
+    setQuickAnswer('')
+    setTranscript('')
+    sectionConvoRef.current = [...sectionConvoRef.current, { role: 'user', text }]
+    setSectionConvo(sectionConvoRef.current)
+    setSomaGenerating(true)
+    setTimeout(() => convoScrollRef.current?.scrollToEnd({ animated: true }), 60)
+
+    const answered = sectionConvoRef.current.filter(m => m.role === 'user').length
+    const wrapUp = answered >= MAX_TURNS
+    const history = sectionConvoRef.current.map(m => ({
+      role: m.role === 'soma' ? ('assistant' as const) : ('user' as const),
+      content: m.text,
+    }))
+    const reply = await groq(
+      history,
+      wrapUp
+        ? `${somaSystem()}\nThis is your last message: warmly acknowledge what they shared and tell them you have enough to build their profile. Do NOT ask another question.`
+        : somaSystem(),
+      140,
+    )
+    if (reply) {
+      sectionConvoRef.current = [...sectionConvoRef.current, { role: 'soma', text: reply }]
+      setSectionConvo(sectionConvoRef.current)
+    }
+    setSomaGenerating(false)
+    setTimeout(() => convoScrollRef.current?.scrollToEnd({ animated: true }), 60)
+  }
+
   const handleQuickSubmit = async () => {
-    if (!quickAnswer.trim()) return
+    const said = convoTranscript() || quickAnswer.trim()
+    if (!said) return
     const name = userName.trim()
     if (name) DB.setName(name)
     setSomaReplyLoading(true)
     setPhase(10)
 
     // Run profile extraction + warm reply in parallel
-    const extractPrompt = `Someone just shared this about themselves: "${quickAnswer.trim()}"
+    const extractPrompt = `Someone just shared this about themselves: "${said}"
 
 Extract a JSON profile from this text. Return ONLY valid JSON, no markdown, no explanation:
 {
@@ -3968,7 +4111,7 @@ Extract a JSON profile from this text. Return ONLY valid JSON, no markdown, no e
 Rules: use 5 for any domain not mentioned. Only include memories for domains clearly mentioned. Max 4 memories.`
 
     const replyPrompt = `You are Soma, a warm and deeply empathetic AI life companion. Someone just joined the app.
-Their name is ${name || 'unknown'}. They wrote: "${quickAnswer.trim()}"
+Their name is ${name || 'unknown'}. They told you: "${said}"
 
 Write a warm, personal 2-3 sentence response to them. Rules:
 - Use their name if you have it
@@ -3989,7 +4132,7 @@ Write a warm, personal 2-3 sentence response to them. Rules:
         const jsonStr = extractRaw.value.replace(/```json|```/g, '').trim()
         const data = JSON.parse(jsonStr)
         if (data.mood && data.mood >= 1 && data.mood <= 7) {
-          DB.addMoodLog(Math.round(data.mood) as 1|2|3|4|5|6|7, quickAnswer.trim().slice(0, 100))
+          DB.addMoodLog(Math.round(data.mood) as 1|2|3|4|5|6|7, said.slice(0, 100))
         }
         if (data.wheel) {
           const scores: Partial<Record<DomainKey, { score: number; note: string }>> = {}
@@ -4013,7 +4156,7 @@ Write a warm, personal 2-3 sentence response to them. Rules:
       } catch {}
     } else {
       // Fallback: save raw text as mind memory
-      DB.addMemory('mind', quickAnswer.trim())
+      DB.addMemory('mind', said)
     }
 
     setSomaReply(
@@ -4077,82 +4220,110 @@ Write a warm, personal 2-3 sentence response to them. Rules:
     </View>
   )
 
-  // Phase 9 — Voice intro
+  // Phase 9 — conversation with Soma
   if (phase === 9) {
-    const isReady = quickAnswer.trim().length > 20
+    const draft = (quickAnswer + (transcript ? (quickAnswer ? ' ' : '') + transcript : '')).trim()
+    const canFinish = userTurns >= MIN_TURNS && !somaGenerating
     return (
       <View style={{ flex: 1, backgroundColor: '#080418' }}>
         <View style={{ position: 'absolute', top: -60, left: -60, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(123,110,246,0.08)' }} />
 
         {/* Header */}
-        <View style={{ paddingTop: 60, paddingHorizontal: 28, paddingBottom: 20 }}>
-          <TouchableOpacity onPress={() => { stopListeningRef.current?.(); setListening(false); setTranscript(''); setQuickAnswer(''); setPhase(0) }} style={{ marginBottom: 28 }}>
-            <Text style={{ color: '#7B6EF6', fontSize: 15, fontWeight: '600' }}>← Back</Text>
+        <View style={{ paddingTop: 58, paddingHorizontal: 24, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => { stopListeningRef.current?.(); setListening(false); setTranscript(''); setQuickAnswer(''); setPhase(0) }}>
+            <Ionicons name="arrow-back" size={24} color="#7B6EF6" />
           </TouchableOpacity>
-          <Text style={{ fontSize: 13, fontWeight: '800', color: '#7B6EF6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>Meet Soma</Text>
-          <Text style={{ fontSize: 28, fontWeight: '900', color: '#fff', lineHeight: 36, letterSpacing: -0.5 }}>
-            Tell me about{'\n'}your life
-          </Text>
-          <Text style={{ fontSize: 15, color: 'rgba(168,155,250,0.55)', marginTop: 10, lineHeight: 22 }}>
-            Just talk — Soma will listen and build your profile.
+          <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 17 }}>✦</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Soma</Text>
+            <Text style={{ fontSize: 12, color: somaGenerating ? '#A89BFA' : 'rgba(168,155,250,0.45)' }}>
+              {somaGenerating ? 'typing…' : 'getting to know you'}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.4)', fontWeight: '700' }}>
+            {Math.min(userTurns, MIN_TURNS)}/{MIN_TURNS}
           </Text>
         </View>
 
-        {/* Transcript / type area — always editable */}
-        <View style={{ flex: 1, marginHorizontal: 24, marginBottom: 16 }}>
-          <TextInput
-            value={quickAnswer + (transcript ? (quickAnswer ? ' ' : '') + transcript : '')}
-            onChangeText={(v) => { setQuickAnswer(v); setTranscript('') }}
-            placeholder={"Your story will appear here as you speak...\n\ne.g. I've been feeling a bit lost lately. Work is okay but I miss feeling connected..."}
-            placeholderTextColor="rgba(168,155,250,0.22)"
-            multiline
-            style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20, borderWidth: 1, borderColor: listening ? 'rgba(246,55,155,0.5)' : 'rgba(123,110,246,0.25)', padding: 20, fontSize: 16, color: '#E8E5FF', lineHeight: 26, textAlignVertical: 'top', fontStyle: quickAnswer || transcript ? 'normal' : 'italic' }}
-          />
-          {(quickAnswer || transcript) ? (
-            <TouchableOpacity onPress={() => { setQuickAnswer(''); setTranscript('') }} style={{ alignSelf: 'flex-end', marginTop: 6 }}>
-              <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.35)' }}>Clear ✕</Text>
+        {/* Conversation */}
+        <ScrollView
+          ref={convoScrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16, gap: 10 }}
+          onContentSizeChange={() => convoScrollRef.current?.scrollToEnd({ animated: true })}
+        >
+          {sectionConvo.map((m, i) => {
+            const mine = m.role === 'user'
+            return (
+              <View key={i} style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
+                <View style={{
+                  maxWidth: '85%', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20,
+                  borderBottomRightRadius: mine ? 6 : 20, borderBottomLeftRadius: mine ? 20 : 6,
+                  backgroundColor: mine ? '#7B6EF6' : 'rgba(255,255,255,0.06)',
+                  borderWidth: mine ? 0 : 1, borderColor: 'rgba(123,110,246,0.2)',
+                }}>
+                  <Text style={{ fontSize: 15, lineHeight: 22, color: mine ? '#fff' : '#E8E5FF' }}>{m.text}</Text>
+                </View>
+              </View>
+            )
+          })}
+          {somaGenerating && (
+            <View style={{ alignItems: 'flex-start' }}>
+              <View style={{ paddingHorizontal: 18, paddingVertical: 14, borderRadius: 20, borderBottomLeftRadius: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(123,110,246,0.2)' }}>
+                <ActivityIndicator size="small" color="#A89BFA" />
+              </View>
+            </View>
+          )}
+          {canFinish && (
+            <TouchableOpacity onPress={handleQuickSubmit}
+              style={{ marginTop: 10, backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 16, alignItems: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 6 } }}>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '900' }}>Soma, build my profile →</Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
+          )}
+        </ScrollView>
 
-        {/* Mic + submit */}
+        {/* Input bar */}
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={{ paddingHorizontal: 28, paddingBottom: 44, alignItems: 'center', gap: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30, borderTopWidth: 1, borderTopColor: 'rgba(123,110,246,0.15)' }}>
+            <TextInput
+              value={draft}
+              onChangeText={(v) => { setQuickAnswer(v); setTranscript('') }}
+              placeholder={listening ? 'Listening…' : 'Tell Soma…'}
+              placeholderTextColor="rgba(168,155,250,0.3)"
+              multiline
+              editable={!somaGenerating}
+              onSubmitEditing={() => sendToSoma(draft)}
+              style={{ flex: 1, maxHeight: 120, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, borderWidth: 1, borderColor: listening ? 'rgba(246,55,155,0.5)' : 'rgba(123,110,246,0.25)', paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: '#E8E5FF', lineHeight: 21 }}
+            />
             <TouchableOpacity
+              disabled={somaGenerating}
               onPress={() => {
+                if (draft) { sendToSoma(draft); return }
                 if (listening) {
                   stopListeningRef.current?.()
                   setListening(false)
-                  if (transcript.trim()) setQuickAnswer(q => (q + (q ? ' ' : '') + transcript.trim()).trim())
+                  const said = transcript.trim()
                   setTranscript('')
+                  if (said) sendToSoma(said)
                 } else {
                   if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
                   setListening(true)
                   setTimeout(() => {
-                    const stop = listen(
-                      (text) => { setQuickAnswer(q => (q + (q ? ' ' : '') + text.trim()).trim()); setTranscript(''); setListening(false) },
+                    stopListeningRef.current = listen(
+                      (text) => { setListening(false); setTranscript(''); if (text.trim()) sendToSoma(text) },
                       () => setListening(false),
                       (interim) => setTranscript(interim),
                     )
-                    stopListeningRef.current = stop
                   }, 300)
                 }
               }}
-              style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: listening ? '#F6379B' : '#7B6EF6', alignItems: 'center', justifyContent: 'center', shadowColor: listening ? '#F6379B' : '#7B6EF6', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
-              <Animated.View style={{ transform: [{ scale: listening ? micAnim : new Animated.Value(1) }] }}>
-                <Ionicons name={listening ? 'stop' : 'mic'} size={32} color="#fff" />
+              style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: somaGenerating ? 'rgba(123,110,246,0.35)' : listening ? '#F6379B' : '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+              <Animated.View style={{ transform: [{ scale: listening ? micAnim : 1 }] }}>
+                <Ionicons name={draft ? 'send' : listening ? 'stop' : 'mic'} size={draft ? 20 : 22} color="#fff" />
               </Animated.View>
             </TouchableOpacity>
-            <Text style={{ fontSize: 13, color: listening ? '#F6379B' : 'rgba(168,155,250,0.4)', fontWeight: listening ? '700' : '400' }}>
-              {listening ? 'Listening… tap to stop' : 'Tap to speak · or type above'}
-            </Text>
-
-            {isReady && (
-              <TouchableOpacity onPress={handleQuickSubmit}
-                style={{ width: '100%', backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 6 } }}>
-                <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>Soma, build my profile →</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -6581,12 +6752,19 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
               <View style={{ alignItems: fromMe ? 'flex-end' : 'flex-start' }}>
                 <View style={{ maxWidth: '78%', paddingHorizontal: m.mediaType ? 10 : 14, paddingVertical: m.mediaType ? 8 : 10, borderRadius: 18, borderBottomRightRadius: fromMe ? 4 : 18, borderBottomLeftRadius: fromMe ? 18 : 4, backgroundColor: fromMe ? '#7B6EF6' : theme.card }}>
                   {m.mediaType === 'audio' && m.mediaUrl ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160 }}>
-                      <Ionicons name="mic" size={16} color={fromMe ? '#fff' : '#7B6EF6'} />
-                      <View style={{ flex: 1 }}>
-                        {/* @ts-ignore */}
-                        <audio src={m.mediaUrl} controls style={{ height: 28, maxWidth: 160, outline: 'none' }} />
+                    <View style={{ gap: 4, minWidth: 170 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="mic" size={16} color={fromMe ? '#fff' : '#7B6EF6'} />
+                        <View style={{ flex: 1 }}>
+                          {/* @ts-ignore */}
+                          <audio src={m.mediaUrl} controls style={{ height: 28, maxWidth: 160, outline: 'none' }} />
+                        </View>
                       </View>
+                      {!!m.content && m.content !== '🎤 …' && (
+                        <Text style={{ fontSize: 13, color: fromMe ? 'rgba(255,255,255,0.9)' : theme.textSub, lineHeight: 18, paddingHorizontal: 2 }}>
+                          {m.content}
+                        </Text>
+                      )}
                     </View>
                   ) : (
                     <Text style={{ fontSize: 14, color: fromMe ? '#fff' : theme.text, lineHeight: 20 }}>{m.content}</Text>
@@ -6614,12 +6792,31 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
                 if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
                   const chunks: BlobPart[] = []
                   mediaRecorderRef.current.ondataavailable = (e: any) => { if (e.data.size > 0) chunks.push(e.data) }
-                  mediaRecorderRef.current.onstop = () => {
+                  mediaRecorderRef.current.onstop = async () => {
                     const blob = new Blob(chunks, { type: 'audio/webm' })
                     const url = URL.createObjectURL(blob)
-                    const voiceMsg: DemoMsg = { id: 'u' + Date.now(), from_user_id: 'me', content: '🎤 Voice message', mediaType: 'audio', mediaUrl: url, created_at: new Date().toISOString() }
+                    const id = 'u' + Date.now()
+                    const voiceMsg: DemoMsg = { id, from_user_id: 'me', content: '🎤 …', mediaType: 'audio', mediaUrl: url, created_at: new Date().toISOString() }
                     setDemoMsgs(prev => [...prev, voiceMsg])
-                    if (demoOpen) setExtraDemoThreads(prev => ({ ...prev, [demoOpen.userId]: [...(prev[demoOpen.userId] || []), voiceMsg] }))
+
+                    // Transcribe so the bubble shows what was said and the AI can reply to it.
+                    const text = await transcribe(blob)
+                    const finalMsg: DemoMsg = { ...voiceMsg, content: text || '🎤 Voice message' }
+                    setDemoMsgs(prev => prev.map(m => (m.id === id ? finalMsg : m)))
+                    if (demoOpen) setExtraDemoThreads(prev => ({ ...prev, [demoOpen.userId]: [...(prev[demoOpen.userId] || []), finalMsg] }))
+                    if (!text || !demoOpen) return
+
+                    const history = [...demoMsgs, finalMsg]
+                    const circleId = demoOpen.userId.startsWith('circle_') ? demoOpen.userId.replace('circle_', '') : null
+                    const personInfo = profile.circle.find(p => (circleId && p.id === circleId) || p.somaUserId === demoOpen.userId || p.name === demoOpen.name)
+                    const persona = personInfo
+                      ? `You are ${personInfo.name}, ${profile.name || 'someone'}'s ${personInfo.relationship.toLowerCase()}. ${personInfo.context ? `Context about you: ${personInfo.context}.` : ''} You're chatting on SOMA. Reply warmly and naturally — 1-2 sentences, as if texting. Ask something back. Just your reply, no quotes.`
+                      : `You are ${demoOpen.name}. You just matched with someone on SOMA. Reply warmly and naturally — 1-2 sentences, curious, ask something back. Just your reply, no quotes.`
+                    const reply = await groq(history.map(m => ({ role: m.from_user_id === 'me' ? 'user' as const : 'assistant' as const, content: m.content })), persona, 120)
+                    if (!reply) return
+                    const aiMsg: DemoMsg = { id: 'ai' + Date.now(), from_user_id: demoOpen.userId, content: reply, created_at: new Date().toISOString() }
+                    setDemoMsgs(prev => [...prev, aiMsg])
+                    setExtraDemoThreads(prev => ({ ...prev, [demoOpen.userId]: [...(prev[demoOpen.userId] || []), aiMsg] }))
                   }
                   mediaRecorderRef.current.stop()
                 }

@@ -1339,6 +1339,35 @@ app.post('/ai/chat', async (req, res) => {
   }
 })
 
+// SPEECH → TEXT (Whisper). Body is the raw audio blob, not JSON — the global
+// express.json() 100kb cap can't carry audio, so this route parses its own body.
+app.post('/ai/transcribe', express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
+  if (!req.body?.length) return res.status(400).json({ error: 'audio body required' })
+  try {
+    const contentType = req.get('content-type') || 'audio/webm'
+    const ext = contentType.includes('mp4') ? 'mp4' : contentType.includes('mpeg') ? 'mp3' : contentType.includes('wav') ? 'wav' : 'webm'
+    const form = new FormData()
+    form.append('file', new Blob([req.body], { type: contentType }), `audio.${ext}`)
+    form.append('model', 'whisper-large-v3')
+    form.append('response_format', 'json')
+    // Telling Whisper the language markedly improves accuracy for non-English speech.
+    const lang = String(req.query.lang || '').slice(0, 5)
+    if (lang) form.append('language', lang)
+
+    const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: form,
+    })
+    const d = await r.json()
+    if (!r.ok) return res.status(r.status).json({ error: d.error?.message || 'transcription failed' })
+    res.json({ text: (d.text || '').trim() })
+  } catch (err) {
+    console.error('[transcribe]', err.message)
+    res.status(500).json({ error: 'transcription failed' })
+  }
+})
+
 // ════════════════════════════════════════════════════════════
 // FRIEND CHAT — direct messaging between any two SOMA users
 // No dating match required; both must be authenticated users
