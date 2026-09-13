@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo, Component, createContext, useContext, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useReducer, useMemo, Component, createContext, useContext, type ReactNode } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity,
   TextInput, ScrollView, KeyboardAvoidingView,
   Platform, Animated, Easing, Image, ImageBackground, Switch, Modal, ActivityIndicator,
-  useWindowDimensions
+  PanResponder, FlatList, useWindowDimensions
 } from 'react-native'
 import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline, Defs, RadialGradient, Stop as SvgStop, Ellipse as SvgEllipse, LinearGradient as SvgLinearGradient, Text as SvgText, G as SvgG } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
@@ -30,6 +30,10 @@ WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app 
 //  SOMA — Life OS built on self-knowledge
 //  Pillars: Try Soma · Register · Soma+Memory · Diary · Circle · Dating
 // ════════════════════════════════════════════════════════════
+
+// Read by the boot watchdog in web/index.html: if the bundle hits a parse error
+// this never runs, which distinguishes "never executed" from "threw while rendering".
+if (typeof window !== 'undefined') (window as any).__SOMA_BUNDLE_OK__ = true
 
 const AI_KEY      = process.env.EXPO_PUBLIC_AI_KEY ?? ''
 // Google OAuth client IDs (create in Google Cloud Console; leave blank to disable)
@@ -121,13 +125,13 @@ type Sentiment = 'positive' | 'neutral' | 'negative'
 // ── i18n ───────────────────────────────────────────────────
 const LANGS = [
   { code: 'en', name: 'English',    label: 'English',    flag: '🇬🇧' },
+  { code: 'ru', name: 'Russian',    label: 'Русский',    flag: '🇷🇺' },
+  { code: 'vi', name: 'Vietnamese', label: 'Tiếng Việt', flag: '🇻🇳' },
   { code: 'es', name: 'Spanish',    label: 'Español',    flag: '🇪🇸' },
   { code: 'fr', name: 'French',     label: 'Français',   flag: '🇫🇷' },
   { code: 'de', name: 'German',     label: 'Deutsch',    flag: '🇩🇪' },
   { code: 'it', name: 'Italian',    label: 'Italiano',   flag: '🇮🇹' },
   { code: 'pt', name: 'Portuguese', label: 'Português',  flag: '🇵🇹' },
-  { code: 'ru', name: 'Russian',    label: 'Русский',    flag: '🇷🇺' },
-  { code: 'vi', name: 'Vietnamese', label: 'Tiếng Việt', flag: '🇻🇳' },
   { code: 'zh', name: 'Chinese',    label: '中文',        flag: '🇨🇳' },
   { code: 'ja', name: 'Japanese',   label: '日本語',       flag: '🇯🇵' },
   { code: 'ar', name: 'Arabic',     label: 'العربية',    flag: '🇸🇦' },
@@ -196,7 +200,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     privacyPolicy: 'Privacy Policy', resetData: 'Reset all data', signOut: 'Sign out',
     // Meet & Chat
     meetPeople: 'Meet People', typeMessage: 'Type a message…',
-    ob_hi: "Hi, I'm Soma", ob_tagline: 'Meet yourself before meeting others', ob_explore: 'Start exploring →', ob_intro: "I'll ask you 3 short questions — just talk to me. Your answers build your profile automatically.",
+    ob_hi: "Hi, I'm Soma", ob_tagline: 'Someone Offers Meaning & Answers', ob_companion: 'Your AI companion for life.', ob_feat1: '🎙️ AI that listens', ob_feat2: '🤝 AI building relationships', ob_feat3: '💞 AI finding new connections', ob_browse_first: 'Browse first', ob_explore: 'Start exploring →', ob_intro: "I'll ask you 3 short questions — just talk to me. Your answers build your profile automatically.",
     ob_physical_label: 'Your physical self', ob_social_label: 'Your social world', ob_inner_label: 'Your inner self',
     ob_start: 'Start talking to Soma →',
     ob_q1: "Hi! I'm Soma. I'll ask you three short questions to build your profile. First — tell me about your physical self. How old are you, how do you feel in your body? You can mention your height, weight, health, energy level — whatever feels right.",
@@ -214,6 +218,55 @@ const STRINGS: Record<string, Record<string, string>> = {
     type_friends: 'Friends', type_family: 'Family', type_therapy: 'Therapy & Support', type_romantic: 'Romantic', type_work: 'Work',
     nudge_title: '✦ Message idea', nudge_thinking: 'Soma is thinking…', nudge_send_on: 'Send on SOMA',
     nudge_copy: 'Copy message', nudge_copied: '✓ Copied!', nudge_retry: '↺ Try another', nudge_dismiss: 'Dismiss',
+    // Main screens
+    messages: 'Messages', no_messages: 'No messages yet. Say hello!',
+    outer_world: 'Outer World', soma_picks: "SOMA's Picks",
+    who_likes_me: 'Who Likes Me', likes_you_count: 'people liked you', unlock_likes: 'Unlock to see who liked you',
+    rel_tools: 'Relationship tools', bond_journey: 'Bond Journey', rel_insights: 'Relationship Insights',
+    rel_support: 'Relationship advice & support',
+    feeling_card: 'How are you feeling?', trends: 'Trends →',
+    todays_intention: "Today's Intention", todays_plan: "Today's Plan",
+    activity: 'Activity', diary: 'Diary', life: 'Life',
+    edit_profile: 'Edit profile', edit: 'Edit', edit_entry: "Edit today's entry",
+    no_diary: "No diary entries yet.\nReflect with Soma on the home screen.",
+    grateful_for: 'Today I am grateful for…',
+    feeling_now: 'How are you feeling right now?',
+    health_data: "Today's health data",
+    profile_complete: 'Profile complete',
+    wheel_empty: "Check in over the next days — your balance trend will appear here. 📈",
+    see_who_likes: 'See who likes you', unlock_all: 'Unlock all profiles across all sectors',
+    no_likes_yet: 'No likes yet', keep_exploring: 'Keep exploring to get noticed',
+    bonds: 'Bonds', bond_sub: 'Nurture what matters',
+    today: 'Today', yesterday: 'Yesterday',
+    no_entries: 'No entries yet', start_reflecting: 'Start reflecting with Soma',
+    my_profile: 'My Profile', your_profile: 'Your Profile',
+    gratitude: 'Gratitude', health: 'Health', habits: 'Habits',
+    talk_soma: 'Talk with Soma', start_talking: '✦  Start talking',
+    how_was_day: 'How was\nyour day?',
+    soma_ready: 'Soma is ready.',
+    save_entry: 'Save', home: 'Home', join: 'Join →',
+    no_memories: 'No memories saved yet', memories: 'Memories',
+    pinned: 'Pinned', recent: 'Recent',
+    your_wheel: 'Your Wheel of Life',
+    life_balance: 'Life Balance',
+    good_morning: 'Good morning', good_evening: 'Good evening', good_afternoon: 'Good afternoon',
+    notifications_title: 'Notifications', notif_sub: 'Manage your reminders',
+    mood_log: 'Mood Log', mood_trends: 'Mood Trends',
+    streak_days: '-day streak!', showing_up: "You're showing up every day",
+    check_in_done: 'Checked in ✓', check_in_cta: 'Check in',
+    todays_moments: "Today's Moments", recent_activity: 'Recent Activity',
+    your_diary: 'Your Diary', mood_trends_title: 'Mood Trends',
+    thankful_diary: 'Thankful Diary',
+    diary_entry: 'Diary entry', wrote_today: 'Wrote today',
+    memories_count: 'things Soma knows about you',
+    bonds_label: 'Bonds', memories_label: 'Memories',
+    soma_memories: "Soma's memories", remembered: 'remembered',
+    love_yourself: 'Love Yourself', medications: 'Medications', gratitude: 'Gratitude',
+    mood: 'Mood', open: 'Open →', timeline: 'Timeline',
+    my_soma_code: 'My SOMA Code', share_friends: 'Share with friends',
+    generate_insight: '✦ Generate my insight', insights_btn: 'Generate insights',
+    no_search_results: "No entries match your search.\nTry different keywords or clear the filter.",
+    ask_soma: 'Ask Soma', insights: 'Insights',
   },
   ru: {
     tab_circle: 'Круг', tab_inner: 'Внутри', tab_explore: 'Мир',
@@ -251,7 +304,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'Тёмный режим', notifications: 'Уведомления', account: 'Аккаунт',
     privacyPolicy: 'Политика конфиденциальности', resetData: 'Сбросить все данные', signOut: 'Выйти',
     meetPeople: 'Знакомства', typeMessage: 'Введите сообщение…',
-    ob_hi: 'Привет, я Сома', ob_tagline: 'Познай себя, прежде чем познакомиться с другими', ob_explore: 'Начать исследование →', ob_intro: 'Я задам тебе 3 коротких вопроса — просто поговори со мной. Твои ответы автоматически создадут твой профиль.',
+    ob_hi: 'Привет, я Сома', ob_tagline: 'Познай себя, прежде чем познакомиться с другими', ob_companion: 'Твой ИИ-компаньон по жизни.', ob_feat1: '🎙️ ИИ, который слушает', ob_feat2: '🤝 ИИ, выстраивающий отношения', ob_feat3: '💞 ИИ, находящий новые связи', ob_browse_first: 'Сначала посмотреть', ob_explore: 'Начать исследование →', ob_intro: 'Я задам тебе 3 коротких вопроса — просто поговори со мной. Твои ответы автоматически создадут твой профиль.',
     ob_physical_label: 'Твоё физическое я', ob_social_label: 'Твой социальный мир', ob_inner_label: 'Твоё внутреннее я',
     ob_start: 'Начать разговор с Сомой →',
     ob_q1: 'Привет! Я Сома. Я задам тебе три коротких вопроса, чтобы создать твой профиль. Сначала — расскажи о своём физическом я. Сколько тебе лет, как ты чувствуешь себя в своём теле? Можешь упомянуть рост, вес, здоровье, уровень энергии — всё, что кажется важным.',
@@ -269,6 +322,55 @@ const STRINGS: Record<string, Record<string, string>> = {
     type_friends: 'Друзья', type_family: 'Семья', type_therapy: 'Терапия и поддержка', type_romantic: 'Романтические', type_work: 'Работа',
     nudge_title: '✦ Идея сообщения', nudge_thinking: 'Сома думает…', nudge_send_on: 'Отправить в SOMA',
     nudge_copy: 'Скопировать', nudge_copied: '✓ Скопировано!', nudge_retry: '↺ Попробовать другое', nudge_dismiss: 'Закрыть',
+    // Main screens
+    messages: 'Сообщения', no_messages: 'Сообщений пока нет. Поздоровайтесь!',
+    outer_world: 'Внешний мир', soma_picks: 'Выбор Сомы',
+    who_likes_me: 'Кто меня лайкнул', likes_you_count: 'человек лайкнули вас', unlock_likes: 'Разблокируйте, чтобы увидеть',
+    rel_tools: 'Инструменты отношений', bond_journey: 'Путь отношений', rel_insights: 'Аналитика отношений',
+    rel_support: 'Советы и поддержка по отношениям',
+    feeling_card: 'Как ты себя чувствуешь?', trends: 'Тренды →',
+    todays_intention: 'Намерение на сегодня', todays_plan: 'План на сегодня',
+    activity: 'Активность', diary: 'Дневник', life: 'Жизнь',
+    edit_profile: 'Редактировать профиль', edit: 'Изменить', edit_entry: 'Изменить запись',
+    no_diary: 'Записей в дневнике пока нет.\nРефлексируй с Сомой на главном экране.',
+    grateful_for: 'Сегодня я благодарен за…',
+    feeling_now: 'Как ты себя чувствуешь прямо сейчас?',
+    health_data: 'Данные о здоровье за сегодня',
+    profile_complete: 'Профиль заполнен',
+    wheel_empty: 'Отмечайся ещё несколько дней — здесь появится график твоего баланса. 📈',
+    see_who_likes: 'Узнай, кто тебя лайкнул', unlock_all: 'Разблокируй все профили во всех категориях',
+    no_likes_yet: 'Лайков пока нет', keep_exploring: 'Продолжай знакомиться — тебя заметят',
+    bonds: 'Связи', bond_sub: 'Заботься о важном',
+    today: 'Сегодня', yesterday: 'Вчера',
+    no_entries: 'Записей пока нет', start_reflecting: 'Начни рефлексию с Сомой',
+    my_profile: 'Мой профиль', your_profile: 'Ваш профиль',
+    gratitude: 'Благодарность', health: 'Здоровье', habits: 'Привычки',
+    talk_soma: 'Говорить с Сомой', start_talking: '✦  Начать разговор',
+    how_was_day: 'Как прошёл\nтвой день?',
+    soma_ready: 'Сома готова.',
+    save_entry: 'Сохранить', home: 'Главная', join: 'Присоединиться →',
+    no_memories: 'Воспоминаний пока нет', memories: 'Воспоминания',
+    pinned: 'Закреплённые', recent: 'Недавние',
+    your_wheel: 'Твоё колесо жизни',
+    life_balance: 'Баланс жизни',
+    good_morning: 'Доброе утро', good_evening: 'Добрый вечер', good_afternoon: 'Добрый день',
+    notifications_title: 'Уведомления', notif_sub: 'Управление напоминаниями',
+    mood_log: 'Журнал настроения', mood_trends: 'Тренды настроения',
+    streak_days: '-дневная серия!', showing_up: 'Ты появляешься каждый день',
+    check_in_done: 'Отмечено ✓', check_in_cta: 'Отметиться',
+    todays_moments: 'Моменты дня', recent_activity: 'Недавняя активность',
+    your_diary: 'Мой дневник', mood_trends_title: 'Тренды настроения',
+    thankful_diary: 'Дневник благодарности',
+    diary_entry: 'Запись в дневнике', wrote_today: 'Написал сегодня',
+    memories_count: 'вещей, которые помнит Сома',
+    bonds_label: 'Связи', memories_label: 'Воспоминания',
+    soma_memories: 'Воспоминания Сомы', remembered: 'запомнено',
+    love_yourself: 'Люби себя', medications: 'Лекарства', gratitude: 'Благодарность',
+    mood: 'Настроение', open: 'Открыть →', timeline: 'Хронология',
+    my_soma_code: 'Мой код SOMA', share_friends: 'Поделиться с друзьями',
+    generate_insight: '✦ Сгенерировать инсайт', insights_btn: 'Сгенерировать инсайты',
+    no_search_results: 'Ничего не найдено.\nПопробуй другие ключевые слова или сбрось фильтр.',
+    ask_soma: 'Спросить Сому', insights: 'Инсайты',
   },
   es: {
     tab_circle: 'Círculo', tab_inner: 'Interior', tab_explore: 'Explorar',
@@ -306,7 +408,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'Modo oscuro', notifications: 'Notificaciones', account: 'Cuenta',
     privacyPolicy: 'Política de privacidad', resetData: 'Restablecer todos los datos', signOut: 'Cerrar sesión',
     meetPeople: 'Conocer gente', typeMessage: 'Escribe un mensaje…',
-    ob_hi: 'Hola, soy Soma', ob_tagline: 'Conócete antes de conocer a otros', ob_explore: 'Explorar →', ob_intro: 'Te haré 3 preguntas cortas — solo habla conmigo. Tus respuestas construyen tu perfil automáticamente.',
+    ob_hi: 'Hola, soy Soma', ob_tagline: 'Conócete antes de conocer a otros', ob_companion: 'Tu compañero de IA para la vida.', ob_feat1: '🎙️ IA que escucha', ob_feat2: '🤝 IA que construye relaciones', ob_feat3: '💞 IA que encuentra nuevas conexiones', ob_browse_first: 'Ver primero', ob_explore: 'Explorar →', ob_intro: 'Te haré 3 preguntas cortas — solo habla conmigo. Tus respuestas construyen tu perfil automáticamente.',
     ob_physical_label: 'Tu yo físico', ob_social_label: 'Tu mundo social', ob_inner_label: 'Tu yo interior',
     ob_start: 'Empezar a hablar con Soma →',
     ob_q1: '¡Hola! Soy Soma. Te haré tres preguntas cortas para construir tu perfil. Primero — cuéntame sobre tu yo físico. ¿Cuántos años tienes, cómo te sientes en tu cuerpo? Puedes mencionar tu altura, peso, salud, nivel de energía — lo que te parezca bien.',
@@ -361,7 +463,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'Mode sombre', notifications: 'Notifications', account: 'Compte',
     privacyPolicy: 'Politique de confidentialité', resetData: 'Réinitialiser toutes les données', signOut: 'Se déconnecter',
     meetPeople: 'Rencontrer des gens', typeMessage: 'Écris un message…',
-    ob_hi: 'Bonjour, je suis Soma', ob_tagline: 'Rencontre-toi avant de rencontrer les autres', ob_explore: 'Explorer →', ob_intro: "Je vais te poser 3 courtes questions — parle-moi simplement. Tes réponses construisent ton profil automatiquement.",
+    ob_hi: 'Bonjour, je suis Soma', ob_tagline: 'Rencontre-toi avant de rencontrer les autres', ob_companion: 'Ton compagnon IA pour la vie.', ob_feat1: '🎙️ IA qui écoute', ob_feat2: '🤝 IA qui construit des relations', ob_feat3: '💞 IA qui trouve de nouvelles connexions', ob_browse_first: 'Parcourir d\'abord', ob_explore: 'Explorer →', ob_intro: "Je vais te poser 3 courtes questions — parle-moi simplement. Tes réponses construisent ton profil automatiquement.",
     ob_physical_label: 'Ton moi physique', ob_social_label: 'Ton monde social', ob_inner_label: 'Ton moi intérieur',
     ob_start: 'Commencer à parler à Soma →',
     ob_q1: "Bonjour ! Je suis Soma. Je vais te poser trois courtes questions pour construire ton profil. D'abord — parle-moi de ton moi physique. Quel âge as-tu, comment te sens-tu dans ton corps ? Tu peux mentionner ta taille, ton poids, ta santé, ton niveau d'énergie — ce qui te semble juste.",
@@ -416,7 +518,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'Dunkelmodus', notifications: 'Benachrichtigungen', account: 'Konto',
     privacyPolicy: 'Datenschutzrichtlinie', resetData: 'Alle Daten zurücksetzen', signOut: 'Abmelden',
     meetPeople: 'Menschen treffen', typeMessage: 'Nachricht eingeben…',
-    ob_hi: 'Hallo, ich bin Soma', ob_tagline: 'Lerne dich kennen, bevor du andere kennenlernst', ob_explore: 'Erkunden →', ob_intro: 'Ich stelle dir 3 kurze Fragen — sprich einfach mit mir. Deine Antworten bauen dein Profil automatisch auf.',
+    ob_hi: 'Hallo, ich bin Soma', ob_tagline: 'Lerne dich kennen, bevor du andere kennenlernst', ob_companion: 'Dein KI-Begleiter fürs Leben.', ob_feat1: '🎙️ KI, die zuhört', ob_feat2: '🤝 KI, die Beziehungen aufbaut', ob_feat3: '💞 KI, die neue Verbindungen findet', ob_browse_first: 'Zuerst stöbern', ob_explore: 'Erkunden →', ob_intro: 'Ich stelle dir 3 kurze Fragen — sprich einfach mit mir. Deine Antworten bauen dein Profil automatisch auf.',
     ob_physical_label: 'Dein physisches Selbst', ob_social_label: 'Deine soziale Welt', ob_inner_label: 'Dein inneres Selbst',
     ob_start: 'Gespräch mit Soma beginnen →',
     ob_q1: 'Hallo! Ich bin Soma. Ich stelle dir drei kurze Fragen, um dein Profil zu erstellen. Zuerst — erzähl mir von deinem physischen Selbst. Wie alt bist du, wie fühlst du dich in deinem Körper? Du kannst Größe, Gewicht, Gesundheit, Energieniveau erwähnen — was sich richtig anfühlt.',
@@ -471,7 +573,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'Modalità scura', notifications: 'Notifiche', account: 'Account',
     privacyPolicy: 'Informativa sulla privacy', resetData: 'Reimposta tutti i dati', signOut: 'Esci',
     meetPeople: 'Incontrare persone', typeMessage: 'Scrivi un messaggio…',
-    ob_hi: 'Ciao, sono Soma', ob_tagline: 'Conosci te stesso prima di conoscere gli altri', ob_explore: 'Esplora →', ob_intro: 'Ti farò 3 brevi domande — parla con me. Le tue risposte costruiscono il tuo profilo automaticamente.',
+    ob_hi: 'Ciao, sono Soma', ob_tagline: 'Conosci te stesso prima di conoscere gli altri', ob_companion: 'Il tuo compagno IA per la vita.', ob_feat1: '🎙️ IA che ascolta', ob_feat2: '🤝 IA che costruisce relazioni', ob_feat3: '💞 IA che trova nuove connessioni', ob_browse_first: 'Prima guarda', ob_explore: 'Esplora →', ob_intro: 'Ti farò 3 brevi domande — parla con me. Le tue risposte costruiscono il tuo profilo automaticamente.',
     ob_physical_label: 'Il tuo io fisico', ob_social_label: 'Il tuo mondo sociale', ob_inner_label: 'Il tuo io interiore',
     ob_start: 'Inizia a parlare con Soma →',
     ob_q1: 'Ciao! Sono Soma. Ti farò tre brevi domande per costruire il tuo profilo. Prima — dimmi del tuo io fisico. Quanti anni hai, come ti senti nel tuo corpo? Puoi menzionare altezza, peso, salute, livello di energia — qualunque cosa ti sembri giusta.',
@@ -526,7 +628,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'Modo escuro', notifications: 'Notificações', account: 'Conta',
     privacyPolicy: 'Política de privacidade', resetData: 'Redefinir todos os dados', signOut: 'Sair',
     meetPeople: 'Conhecer pessoas', typeMessage: 'Digite uma mensagem…',
-    ob_hi: 'Olá, sou Soma', ob_tagline: 'Conheça-se antes de conhecer os outros', ob_explore: 'Explorar →', ob_intro: 'Vou te fazer 3 perguntas curtas — só fala comigo. Suas respostas constroem seu perfil automaticamente.',
+    ob_hi: 'Olá, sou Soma', ob_tagline: 'Conheça-se antes de conhecer os outros', ob_companion: 'Seu companheiro de IA para a vida.', ob_feat1: '🎙️ IA que ouve', ob_feat2: '🤝 IA que constrói relacionamentos', ob_feat3: '💞 IA que encontra novas conexões', ob_browse_first: 'Ver primeiro', ob_explore: 'Explorar →', ob_intro: 'Vou te fazer 3 perguntas curtas — só fala comigo. Suas respostas constroem seu perfil automaticamente.',
     ob_physical_label: 'Seu eu físico', ob_social_label: 'Seu mundo social', ob_inner_label: 'Seu eu interior',
     ob_start: 'Começar a conversar com Soma →',
     ob_q1: 'Olá! Sou Soma. Vou te fazer três perguntas curtas para construir seu perfil. Primeiro — me fale sobre seu eu físico. Quantos anos você tem, como se sente no seu corpo? Pode mencionar altura, peso, saúde, nível de energia — o que achar certo.',
@@ -581,7 +683,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'Chế độ tối', notifications: 'Thông báo', account: 'Tài khoản',
     privacyPolicy: 'Chính sách bảo mật', resetData: 'Đặt lại tất cả dữ liệu', signOut: 'Đăng xuất',
     meetPeople: 'Gặp gỡ mọi người', typeMessage: 'Nhập tin nhắn…',
-    ob_hi: 'Xin chào, tôi là Soma', ob_tagline: 'Gặp gỡ bản thân trước khi gặp gỡ người khác', ob_explore: 'Khám phá →', ob_intro: 'Tôi sẽ hỏi bạn 3 câu hỏi ngắn — chỉ cần nói chuyện với tôi. Câu trả lời của bạn tự động xây dựng hồ sơ của bạn.',
+    ob_hi: 'Xin chào, tôi là Soma', ob_tagline: 'Gặp gỡ bản thân trước khi gặp gỡ người khác', ob_companion: 'Người đồng hành AI của bạn cho cuộc sống.', ob_feat1: '🎙️ AI biết lắng nghe', ob_feat2: '🤝 AI xây dựng mối quan hệ', ob_feat3: '💞 AI tìm kiếm kết nối mới', ob_browse_first: 'Xem trước', ob_explore: 'Khám phá →', ob_intro: 'Tôi sẽ hỏi bạn 3 câu hỏi ngắn — chỉ cần nói chuyện với tôi. Câu trả lời của bạn tự động xây dựng hồ sơ của bạn.',
     ob_physical_label: 'Bản thân thể chất', ob_social_label: 'Thế giới xã hội', ob_inner_label: 'Bản thân nội tâm',
     ob_start: 'Bắt đầu nói chuyện với Soma →',
     ob_q1: 'Xin chào! Tôi là Soma. Tôi sẽ hỏi bạn ba câu hỏi ngắn để xây dựng hồ sơ. Đầu tiên — hãy cho tôi biết về bản thân thể chất của bạn. Bạn bao nhiêu tuổi, bạn cảm thấy thế nào trong cơ thể? Có thể đề cập đến chiều cao, cân nặng, sức khỏe, mức năng lượng — bất cứ điều gì cảm thấy phù hợp.',
@@ -636,7 +738,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: '深色模式', notifications: '通知', account: '账户',
     privacyPolicy: '隐私政策', resetData: '重置所有数据', signOut: '退出登录',
     meetPeople: '认识人', typeMessage: '输入消息…',
-    ob_hi: '你好，我是Soma', ob_tagline: '先认识自己，再认识他人', ob_explore: '开始探索 →', ob_intro: '我会问你3个简短的问题——只需和我说话。你的回答会自动建立你的个人资料。',
+    ob_hi: '你好，我是Soma', ob_tagline: '先认识自己，再认识他人', ob_companion: '你的AI人生伴侣。', ob_feat1: '🎙️ AI倾听你', ob_feat2: '🤝 AI建立关系', ob_feat3: '💞 AI寻找新连接', ob_browse_first: '先浏览', ob_explore: '开始探索 →', ob_intro: '我会问你3个简短的问题——只需和我说话。你的回答会自动建立你的个人资料。',
     ob_physical_label: '你的身体自我', ob_social_label: '你的社交世界', ob_inner_label: '你的内心自我',
     ob_start: '开始和Soma交谈 →',
     ob_q1: '你好！我是Soma。我会问你三个简短的问题来建立你的个人资料。首先——告诉我你的身体自我。你多大了，你感觉身体怎么样？可以提到身高、体重、健康状况、精力水平——任何感觉合适的内容。',
@@ -691,7 +793,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'ダークモード', notifications: '通知', account: 'アカウント',
     privacyPolicy: 'プライバシーポリシー', resetData: 'すべてのデータをリセット', signOut: 'サインアウト',
     meetPeople: '人と出会う', typeMessage: 'メッセージを入力…',
-    ob_hi: 'こんにちは、私はSomaです', ob_tagline: '他者と出会う前に、自分自身と出会おう', ob_explore: '探索する →', ob_intro: '3つの短い質問をします — 私に話しかけてください。あなたの回答がプロフィールを自動的に作成します。',
+    ob_hi: 'こんにちは、私はSomaです', ob_tagline: '他者と出会う前に、自分自身と出会おう', ob_companion: 'あなたの人生のAIコンパニオン。', ob_feat1: '🎙️ 耳を傾けるAI', ob_feat2: '🤝 関係を築くAI', ob_feat3: '💞 新しい繋がりを見つけるAI', ob_browse_first: 'まず見る', ob_explore: '探索する →', ob_intro: '3つの短い質問をします — 私に話しかけてください。あなたの回答がプロフィールを自動的に作成します。',
     ob_physical_label: 'あなたの身体的な自己', ob_social_label: 'あなたの社会的な世界', ob_inner_label: 'あなたの内なる自己',
     ob_start: 'Somaと話し始める →',
     ob_q1: 'こんにちは！私はSomaです。プロフィールを作成するために3つの短い質問をします。まず — 身体的な自己について教えてください。何歳ですか、体の調子はどうですか？身長、体重、健康状態、エネルギーレベルなど、気になることは何でも話してください。',
@@ -746,7 +848,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     darkMode: 'الوضع الداكن', notifications: 'الإشعارات', account: 'الحساب',
     privacyPolicy: 'سياسة الخصوصية', resetData: 'إعادة تعيين جميع البيانات', signOut: 'تسجيل الخروج',
     meetPeople: 'مقابلة الناس', typeMessage: 'اكتب رسالة…',
-    ob_hi: 'مرحباً، أنا سوما', ob_tagline: 'اعرف نفسك قبل أن تعرف الآخرين', ob_explore: 'ابدأ الاستكشاف →', ob_intro: 'سأسألك 3 أسئلة قصيرة — فقط تحدث معي. إجاباتك تبني ملفك الشخصي تلقائياً.',
+    ob_hi: 'مرحباً، أنا سوما', ob_tagline: 'اعرف نفسك قبل أن تعرف الآخرين', ob_companion: 'رفيقك الذكي للحياة.', ob_feat1: '🎙️ ذكاء اصطناعي يستمع', ob_feat2: '🤝 ذكاء اصطناعي يبني العلاقات', ob_feat3: '💞 ذكاء اصطناعي يجد روابط جديدة', ob_browse_first: 'تصفح أولاً', ob_explore: 'ابدأ الاستكشاف →', ob_intro: 'سأسألك 3 أسئلة قصيرة — فقط تحدث معي. إجاباتك تبني ملفك الشخصي تلقائياً.',
     ob_physical_label: 'ذاتك الجسدية', ob_social_label: 'عالمك الاجتماعي', ob_inner_label: 'ذاتك الداخلية',
     ob_start: 'ابدأ الحديث مع سوما ←',
     ob_q1: 'مرحباً! أنا سوما. سأسألك ثلاثة أسئلة قصيرة لبناء ملفك الشخصي. أولاً — أخبرني عن ذاتك الجسدية. كم عمرك، كيف تشعر في جسدك؟ يمكنك ذكر طولك ووزنك وصحتك ومستوى طاقتك — أي شيء يبدو مناسباً.',
@@ -770,6 +872,11 @@ function t(key: string): string {
   const c = currentLangCode()
   return (STRINGS[c] && STRINGS[c][key]) || STRINGS.en[key] || key
 }
+
+// Most components do `const { t } = useT()`, which shadows the translator above with the
+// THEME object — calling t('key') there throws "t is not a function" at render. Use tr()
+// for translation inside any component that destructures the theme as `t`.
+const tr = (key: string): string => t(key)
 
 // Fallback sentiment for older memories saved before sentiment was tracked.
 function inferSentiment(text: string): Sentiment {
@@ -845,6 +952,12 @@ interface BondJourneyData {
   logs: BondLog[]
   startedAt: string
 }
+interface CircleInteraction {
+  id: string
+  type: 'met' | 'called' | 'texted' | 'video' | 'meal' | 'activity'
+  note?: string
+  date: string  // ISO
+}
 interface CirclePerson {
   id: string
   name: string
@@ -861,8 +974,13 @@ interface CirclePerson {
   therapistEmail?: string           // email to send reports to (therapy type only)
   shareReports?: boolean            // patient consent to share reports
   lastReportSent?: string           // ISO date of last report sent
+  sessionDay?: number               // 1=Sunday…7=Saturday (for weekly therapy schedule)
+  sessionHour?: number              // 0-23 hour of the therapy session
   journey?: BondJourneyData         // gamified relationship journey
   somaUserId?: string               // Supabase user ID if they have a SOMA account
+  avatar?: string                   // data URL photo of this person
+  birthday?: string                 // MM-DD format
+  interactions?: CircleInteraction[] // real-world interactions logged by user
 }
 interface DiaryEntry { id: string; date: string; mood: string; summary: string; somaReply?: string }
 interface InsightData {
@@ -930,6 +1048,7 @@ interface DatingProfile {
   attachment: string           // one of ATTACHMENT_STYLES
   relationshipValues: string[] // what healthy love means to them
   lookingFor: string
+  connectionType: 'dating' | 'friends' | 'professional' | 'support'
   interests: string[]          // auto-pulled from memories
   // life facts
   work: string
@@ -961,12 +1080,14 @@ interface Connection {
   updatedAt: string
   matchScore: number
   datePlan?: DatePlan
+  connectionType?: 'dating' | 'friends' | 'professional' | 'support'
 }
 interface UserProfile {
   name: string; registered: boolean
   memories: Memory[]; circle: CirclePerson[]; diary: DiaryEntry[]; conversations: number
   dating: DatingProfile
   premium: boolean
+  premiumTrial?: string  // ISO date when 7-day trial ends
   likesToday: number
   likesDate: string
   connections: Connection[]
@@ -986,6 +1107,7 @@ interface UserProfile {
   therapySessions?: TherapySession[]                 // therapy session notes
   healthLogs?: DailyHealthLog[]                      // daily health metrics (steps, sleep, HR…)
   connectedApps?: string[]                           // 'apple_health' | 'google_fit' | 'fitbit' | 'garmin' | 'samsung'
+  agentPicks?: { name: string; score: number; why: string; category: string; cachedAt: string }[]
   notifSettings?: {
     enabled: boolean
     medReminders: boolean
@@ -1018,7 +1140,7 @@ interface UserProfile {
     completedAt: string
   }
   somaMessage?: { text: string; date: string }  // cached daily proactive message from Soma
-  moodLogs?: { date: string; mood: 1|2|3|4|5; note?: string }[]  // daily mood check-ins
+  moodLogs?: { date: string; mood: 1|2|3|4|5|6|7; note?: string }[]  // daily mood check-ins
   insightCache?: { weekKey: string; data: InsightData }  // cached weekly insight
   relInsightCache?: { weekKey: string; data: RelInsightData }  // cached weekly relationship insight
   checkins?: DailyCheckin[]  // daily check-in ritual entries
@@ -1027,15 +1149,21 @@ interface UserProfile {
   profilePhoto?: string      // user's own avatar (data URL)
   profileBio?: string        // personal tagline / about me
   moments?: Moment[]         // circle moments (own + received)
+  sectorProfiles?: {
+    dating?:       { bio?: string; photos?: string[] }
+    friends?:      { bio?: string; photos?: string[] }
+    professional?: { bio?: string; photos?: string[] }
+    support?:      { bio?: string; photos?: string[] }
+  }
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
-const FREE_DAILY_LIKES = 2
-const PREMIUM_DAILY_LIKES = 5
+const FREE_DAILY_LIKES = 999
+const PREMIUM_DAILY_LIKES = 999
 
 const EMPTY_DATING: DatingProfile = {
   complete: false, age: '', location: '', photo: '', photos: [], bio: '',
-  loveLanguage: '', attachment: '', relationshipValues: [], lookingFor: '',
+  loveLanguage: '', attachment: '', relationshipValues: [], lookingFor: '', connectionType: 'dating' as const,
   interests: [], work: '', income: '', children: '', pets: '', idealPartner: '', intimacy: '',
   lastUpdated: '',
 }
@@ -1050,6 +1178,12 @@ const DB = {
         if (!p.dating) p.dating = { ...EMPTY_DATING }
         if (!p.dating.photos) p.dating.photos = p.dating.photo ? [p.dating.photo] : []
         if (p.premium === undefined) p.premium = false
+        // Gift 7-day trial to every user (runs once — sets premiumTrial if not already set)
+        if (!p.premiumTrial && !p.premium) {
+          p.premiumTrial = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        }
+        // Auto-compute premium from trial window
+        if (p.premiumTrial) p.premium = new Date(p.premiumTrial) > new Date()
         if (p.likesToday === undefined) { p.likesToday = 0; p.likesDate = '' }
         if (!p.connections) p.connections = []
         if (!p.likedYou) p.likedYou = []
@@ -1059,6 +1193,20 @@ const DB = {
         if (p.language === undefined) p.language = detectLang()
         if (!p.memories) p.memories = []
         if (!p.circle) p.circle = []
+        // Seed demo circle members on first load so the feed has content
+        if (p.circle.length === 0 && !(p as any).circleSeedDone) {
+          const ts = Date.now()
+          p.circle = [
+            { id: `seed_maya_${ts}`, name: 'Maya', relationship: 'Best friend', context: 'We met at university, she gets me like no one else.', sharedInterests: ['hiking','coffee','books'], lastSeen: '', mentions: 4, type: 'friend', inviteCode: 'MAYA01', invitationStatus: 'active', messages: [], somaMessages: [] },
+            { id: `seed_mom_${ts}`, name: 'Mom', relationship: 'Mom', context: 'Always checks in, loves cooking, worries a lot.', sharedInterests: ['family','cooking'], lastSeen: '', mentions: 6, type: 'family', inviteCode: 'MOM001', invitationStatus: 'active', messages: [], somaMessages: [] },
+            { id: `seed_kai_${ts}`, name: 'Kai', relationship: 'Colleague', context: 'Works on the same team, super collaborative and calm.', sharedInterests: ['tech','design'], lastSeen: '', mentions: 2, type: 'work', inviteCode: 'KAI001', invitationStatus: 'active', messages: [], somaMessages: [] },
+            { id: `seed_alex_${ts}`, name: 'Alex', relationship: 'Friend', context: 'Gym buddy, always down for an adventure.', sharedInterests: ['fitness','travel','music'], lastSeen: '', mentions: 3, type: 'friend', inviteCode: 'ALEX01', invitationStatus: 'active', messages: [], somaMessages: [] },
+            { id: `seed_dad_${ts}`, name: 'Dad', relationship: 'Dad', context: 'Quiet but always there, loves documentaries.', sharedInterests: ['history','nature'], lastSeen: '', mentions: 3, type: 'family', inviteCode: 'DAD001', invitationStatus: 'active', messages: [], somaMessages: [] },
+            { id: `seed_jess_${ts}`, name: 'Jess', relationship: 'Friend', context: 'Creative director, inspires me constantly.', sharedInterests: ['art','film','food'], lastSeen: '', mentions: 2, type: 'friend', inviteCode: 'JESS01', invitationStatus: 'active', messages: [], somaMessages: [] },
+          ];
+          (p as any).circleSeedDone = true
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {}
+        }
         if (!p.diary) p.diary = []
         if (p.conversations === undefined) p.conversations = 0
         return p
@@ -1123,6 +1271,16 @@ const DB = {
       DB.save(p)
     }
   },
+  logInteraction: (circleId: string, type: CircleInteraction['type'], note?: string) => {
+    const p = DB.get()
+    const c = p.circle.find(x => x.id === circleId)
+    if (c) {
+      if (!c.interactions) c.interactions = []
+      c.interactions.unshift({ id: `int_${Date.now()}`, type, note, date: new Date().toISOString() })
+      c.lastSeen = new Date().toLocaleDateString()
+      DB.save(p)
+    }
+  },
   somaMessageCircle: (circleId: string, text: string) => {
     const p = DB.get()
     const c = p.circle.find(x => x.id === circleId)
@@ -1146,6 +1304,12 @@ const DB = {
   setName: (name: string) => { const p = DB.get(); p.name = name; DB.save(p) },
   register: (name: string) => { const p = DB.get(); p.name = name; p.registered = true; DB.save(p) },
   bump: () => { const p = DB.get(); p.conversations++; DB.save(p) },
+  saveSectorProfile: (sector: 'dating' | 'friends' | 'professional' | 'support', patch: { bio?: string; photos?: string[] }) => {
+    const p = DB.get()
+    if (!p.sectorProfiles) p.sectorProfiles = {}
+    p.sectorProfiles[sector] = { ...p.sectorProfiles[sector], ...patch }
+    DB.save(p)
+  },
   saveDating: (d: Partial<DatingProfile>) => {
     const p = DB.get()
     p.dating = { ...p.dating, ...d, lastUpdated: new Date().toLocaleDateString() }
@@ -1174,7 +1338,13 @@ const DB = {
     p.likesToday += 1
     DB.save(p)
   },
-  goPremium: () => { const p = DB.get(); p.premium = true; DB.save(p) },
+  goPremium: () => { const p = DB.get(); p.premium = true; p.premiumTrial = undefined; DB.save(p) },
+  trialDaysLeft: (): number | null => {
+    const p = DB.get()
+    if (!p.premiumTrial) return null
+    const ms = new Date(p.premiumTrial).getTime() - Date.now()
+    return ms > 0 ? Math.ceil(ms / 86400000) : null
+  },
   // Connections + chat persistence
   upsertConnection: (conn: Omit<Connection, 'updatedAt'>) => {
     const p = DB.get()
@@ -1338,7 +1508,7 @@ const DB = {
   setDarkMode: (dark: boolean) => {
     const p = DB.get(); p.darkMode = dark; DB.save(p)
   },
-  addMoodLog: (mood: 1|2|3|4|5, note?: string) => {
+  addMoodLog: (mood: 1|2|3|4|5|6|7, note?: string) => {
     const p = DB.get()
     const today = new Date().toISOString().slice(0, 10)
     const logs = (p.moodLogs || []).filter(l => l.date !== today)
@@ -1347,6 +1517,70 @@ const DB = {
     DB.save(p)
   },
   reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
+}
+
+// ════════════════════════════════════════════════════════════
+//  DEMO DATA — seeds a rich profile for presentation
+// ════════════════════════════════════════════════════════════
+function loadDemoData() {
+  const p = DB.get()
+
+  // Clear existing circle and add demo people
+  p.circle = []
+
+  const demoCircle = [
+    // Family
+    { name: 'Dad', type: 'family', relationship: 'Dad', context: 'Always supportive, calls every Sunday.', lastSeen: '2 days ago', mentions: 12 },
+    { name: 'Mom', type: 'family', relationship: 'Mom', context: 'My go-to for advice and warmth.', lastSeen: '3 days ago', mentions: 18 },
+    { name: 'Brother Jake', type: 'family', relationship: 'Brother', context: 'We game together online every Friday.', lastSeen: '1 week ago', mentions: 7 },
+    { name: 'Sister Emma', type: 'family', relationship: 'Sister', context: 'Creative spirit, we share everything.', lastSeen: '4 days ago', mentions: 9 },
+    { name: 'Grandma Anna', type: 'family', relationship: 'Grandmother', context: 'Tells the best stories. I try to call weekly.', lastSeen: '2 weeks ago', mentions: 5 },
+    { name: 'Grandpa Robert', type: 'family', relationship: 'Grandfather', context: 'Retired engineer, taught me how to think.', lastSeen: '2 weeks ago', mentions: 4 },
+    // Friends
+    { name: 'Chris', type: 'friend', relationship: 'Friend', context: 'Best friend since high school. Honest and hilarious.', lastSeen: '5 days ago', mentions: 14 },
+    { name: 'Sophie', type: 'friend', relationship: 'Friend', context: 'We met at a yoga retreat. She inspires me.', lastSeen: '1 week ago', mentions: 6 },
+    { name: 'David', type: 'friend', relationship: 'Friend', context: 'Study buddy who became a real friend.', lastSeen: '10 days ago', mentions: 5 },
+    // Work
+    { name: 'Zara', type: 'work', relationship: 'Manager', context: 'Great mentor. Pushes me to grow professionally.', lastSeen: '1 day ago', mentions: 20 },
+    { name: 'Kevin', type: 'work', relationship: 'Colleague', context: 'We collaborate on most projects. Reliable team player.', lastSeen: '2 days ago', mentions: 11 },
+    { name: 'Priya', type: 'work', relationship: 'Colleague', context: 'Sharp thinker. We often bounce ideas.', lastSeen: '3 days ago', mentions: 8 },
+    // Therapist
+    { name: 'Dr. Sarah', type: 'work', relationship: 'Therapist', context: 'My therapist. Sessions every 2 weeks. Life-changing.', lastSeen: '1 week ago', mentions: 6 },
+  ]
+
+  demoCircle.forEach(c => {
+    p.circle.push({
+      id: Date.now() + '_' + Math.random().toString(36).slice(2),
+      name: c.name, type: c.type, relationship: c.relationship,
+      context: c.context, sharedInterests: [], lastSeen: c.lastSeen, mentions: c.mentions,
+    })
+  })
+
+  // Seed some memories if empty
+  if (p.memories.length < 5) {
+    const now = new Date()
+    const days = (n: number) => new Date(now.getTime() - n * 86400000).toISOString()
+    p.memories.push(
+      { id: 'd1', content: 'I love hiking in nature and being disconnected from screens', domain: 'hobby', date: days(10), source: 'demo', weight: 1 },
+      { id: 'd2', content: 'My goal is to build a company that creates real value for people', domain: 'purpose', date: days(8), source: 'demo', weight: 1 },
+      { id: 'd3', content: 'I need more balance between work and personal life', domain: 'health', date: days(6), source: 'demo', weight: 1 },
+      { id: 'd4', content: 'I feel most connected when I have deep one-on-one conversations', domain: 'relationship', date: days(4), source: 'demo', weight: 1 },
+      { id: 'd5', content: 'Reading and learning new things gives me energy', domain: 'growth', date: days(2), source: 'demo', weight: 1 },
+    )
+  }
+
+  // Seed a diary entry if empty
+  if (p.diary.length === 0) {
+    p.diary.push({
+      id: 'demo_diary_1',
+      date: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10),
+      content: 'Had a great call with Mom today. She reminded me to slow down and appreciate small wins. Also, first hike of the season — the trail was quiet and the view was everything.',
+      mood: 4,
+      tags: ['family', 'nature', 'reflection'],
+    })
+  }
+
+  DB.save(p)
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1583,6 +1817,39 @@ async function syncDiaryNotification(hour: number, minute: number, enabled: bool
           weekday,
           hour,
           minute,
+          channelId: 'soma-reminders',
+        },
+      })
+    } catch {}
+  }
+}
+
+async function syncTherapyNotifications(circle: CirclePerson[]) {
+  await cancelNotifsByPrefix('therapy_')
+  if (Platform.OS === 'web') return
+  const therapists = circle.filter(p =>
+    p.type === 'therapy' && p.shareReports && p.therapistEmail && p.sessionDay != null && p.sessionHour != null
+  )
+  for (const therapist of therapists) {
+    const day = therapist.sessionDay!
+    const hour = therapist.sessionHour!
+    let reminderHour = hour - 2
+    let reminderDay = day
+    if (reminderHour < 0) { reminderHour += 24; reminderDay = day === 1 ? 7 : day - 1 }
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `therapy_${therapist.id}`,
+        content: {
+          title: `📋 Session with ${therapist.name} in 2 hours`,
+          body: 'Soma has prepared your therapy report and will send it now.',
+          data: { screen: 'circle', autoReport: therapist.id },
+          sound: 'default',
+        },
+        trigger: {
+          type: SchedulableTriggerInputTypes.WEEKLY,
+          weekday: reminderDay,
+          hour: reminderHour,
+          minute: 0,
           channelId: 'soma-reminders',
         },
       })
@@ -1980,6 +2247,7 @@ interface NearbyUser {
   userId: string; name: string; age: number; photo: string; photos: string[]; bio: string
   interests: string[]; values: string[]; loveLanguage: string; attachment: string
   work: string; city: string; distanceKm: number; compatibility: number
+  connectionType?: 'dating' | 'friends' | 'professional' | 'support'
 }
 
 // ── CLOUD SYNC ────────────────────────────────────────────────
@@ -2049,7 +2317,7 @@ const datingApi = {
         photos: d.photos?.length ? d.photos : (d.photo ? [d.photo] : []),
         bio: d.bio, interests: d.interests, values: d.relationshipValues,
         loveLanguage: d.loveLanguage, attachment: d.attachment,
-        lookingFor: d.lookingFor, work: d.work,
+        lookingFor: d.lookingFor, connectionType: d.connectionType || 'dating', work: d.work,
         lat: loc?.lat, lng: loc?.lng, city: d.location,
       }),
     })
@@ -2203,10 +2471,11 @@ const purchaseApi = {
 }
 
 // Map a real backend user into the Candidate card shape used by the UI
-function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string } {
+function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string; connectionType?: string } {
   const hasProfile = !!(u.bio || u.age)
   return {
     realUserId: u.userId,
+    connectionType: u.connectionType,
     name: u.name, age: u.age || 0, emoji: '💜', color: '#7B6EF6',
     photo: u.photo || '', photos: u.photos?.length ? u.photos : (u.photo ? [u.photo] : []),
     location: u.city || (u.distanceKm != null ? 'Nearby' : 'On SOMA'),
@@ -2331,6 +2600,12 @@ PEOPLE IN THEIR LIFE:\n${circle || 'None yet'}`
 }
 
 // Context-aware Soma for different relationship types
+function friendlyName(name: string): string {
+  if (!name) return 'Your contact'
+  if (name.includes('@')) return name.split('@')[0]
+  return name
+}
+
 function somaCircleContext(type: 'therapy' | 'family' | 'friend' | 'work' | 'romantic', circleName: string): string {
   const base = `You are Soma, helping ${circleName} think through a relationship question. Be warm, direct, and wise.`
   switch (type) {
@@ -2499,13 +2774,16 @@ function listen(
   return () => { try { r.stop() } catch {} }
 }
 
-// Web photo upload → data URL
+// Web photo upload → data URL (attached to DOM so iOS Safari keeps the picker open)
 function pickPhoto(onPicked: (dataUrl: string) => void) {
   if (typeof document === 'undefined') { alert('Photo upload works on web'); return }
   const inp = document.createElement('input')
   inp.type = 'file'; inp.accept = 'image/*'
+  Object.assign(inp.style, { position: 'fixed', top: '-9999px', left: '-9999px', opacity: '0' })
+  document.body.appendChild(inp)
   inp.onchange = () => {
     const file = (inp.files && inp.files[0]) || null
+    document.body.removeChild(inp)
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => onPicked(reader.result as string)
@@ -2515,7 +2793,288 @@ function pickPhoto(onPicked: (dataUrl: string) => void) {
 }
 
 type Msg = { role: 'user' | 'assistant'; content: string }
-type Screen = 'splash' | 'language' | 'onboarding' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'synergy' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'forgotpassword' | 'resetpassword' | 'verifyemail' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy' | 'healthhub' | 'moodanalytics' | 'breathing' | 'memories' | 'asksoma' | 'timeline' | 'bondjourney' | 'relinsights' | 'checkin'
+// ════════════════════════════════════════════════════════════
+//  DUOLINGO-STYLE NOTIFICATION ENGINE
+// ════════════════════════════════════════════════════════════
+interface SomaNotif {
+  id: string
+  type: 'streak' | 'circle' | 'birthday' | 'liked' | 'checkin' | 'bond' | 'soma' | 'achievement'
+  title: string
+  body: string
+  emoji: string
+  action?: string   // CTA label
+  screen?: string   // where to navigate on tap
+  read: boolean
+  createdAt: string
+}
+
+const NOTIF_COPY = {
+  streak_at_risk: [
+    { title: "Don't break your streak! 🔥", body: "You haven't journaled today. Soma misses you — just 1 minute is enough." },
+    { title: "Your streak is on the line ⚡", body: "Log your mood before midnight and keep the fire going." },
+    { title: "Come back! ✦", body: "Soma's been saving your seat. One quick check-in is all it takes." },
+  ],
+  streak_milestone: [
+    { title: "🔥 X-day streak!", body: "You've shown up X days in a row. That's real commitment to yourself." },
+    { title: "X days of showing up 🌟", body: "Consistency is the hardest thing. You're doing it." },
+  ],
+  circle_nudge: [
+    { title: "NAME hasn't heard from you 💙", body: "It's been a while. Soma can draft a message in seconds." },
+    { title: "Thinking of NAME? ✨", body: "You haven't connected in X days. A short note goes a long way." },
+    { title: "NAME might be missing you 🤍", body: "Your Circle health with them is dropping. Reach out today." },
+  ],
+  daily_checkin: [
+    { title: "How are you feeling? ✦", body: "Your daily check-in takes 60 seconds. Soma's ready when you are." },
+    { title: "Good morning ☀️", body: "Start the day with a quick mood check. Your future self will thank you." },
+    { title: "Soma's waiting for you 🪐", body: "You haven't checked in today. What's on your mind?" },
+  ],
+  liked: [
+    { title: "X people liked your profile 💜", body: "Someone in your Explore feed is thinking about you." },
+    { title: "New like in Serious Daters 💜", body: "Unlock SOMA+ to see exactly who." },
+  ],
+  bond_level: [
+    { title: "Bond level up with NAME! 🌿", body: "Your relationship with NAME reached LEVEL. Keep nurturing it." },
+  ],
+  achievement: [
+    { title: "New achievement unlocked 🏅", body: "You earned: LABEL" },
+  ],
+}
+
+const notifDB = {
+  get: (): SomaNotif[] => {
+    try { return JSON.parse(localStorage.getItem('soma_notifs') || '[]') } catch { return [] }
+  },
+  save: (notifs: SomaNotif[]) => {
+    try { localStorage.setItem('soma_notifs', JSON.stringify(notifs.slice(0, 50))) } catch {}
+  },
+  add: (n: Omit<SomaNotif, 'id' | 'read' | 'createdAt'>) => {
+    const notifs = notifDB.get()
+    notifs.unshift({ ...n, id: `n_${Date.now()}`, read: false, createdAt: new Date().toISOString() })
+    notifDB.save(notifs)
+    return notifs[0]
+  },
+  markRead: (id: string) => {
+    const notifs = notifDB.get()
+    const n = notifs.find(x => x.id === id)
+    if (n) { n.read = true; notifDB.save(notifs) }
+  },
+  markAllRead: () => {
+    const notifs = notifDB.get()
+    notifs.forEach(n => { n.read = true })
+    notifDB.save(notifs)
+  },
+  unreadCount: () => notifDB.get().filter(n => !n.read).length,
+}
+
+function computeNotifs(profile: UserProfile): Omit<SomaNotif, 'id' | 'read' | 'createdAt'>[] {
+  const now = Date.now()
+  const day = 86400000
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  const name = profile.name || 'friend'
+  const aiName = profile.aiName || 'Soma'
+
+  // ── Mood state ──────────────────────────────────────────────
+  const recentMoods = (profile.moodLogs || []).slice(0, 3)
+  const avgMood = recentMoods.length
+    ? recentMoods.reduce((s, m) => s + m.mood, 0) / recentMoods.length
+    : 4 // default neutral-good
+  const todayMood = (profile.moodLogs || []).find(l => l.date === todayStr)?.mood ?? null
+  const currentMood = todayMood ?? avgMood
+  const isLow    = currentMood <= 2   // Rough / Meh
+  const isNeutral = currentMood > 2 && currentMood < 4
+  const isGood   = currentMood >= 4   // Good and above
+
+  // ── SERIOUS / LOW MOOD — max 2 targeted notifications ───────
+  if (isLow) {
+    return [
+      {
+        type: 'soma', emoji: '🫂',
+        title: `${name}, you matter more than you know`,
+        body: "On hard days, just breathing is enough. Soma is here — no pressure, just presence.",
+        action: '✦ Try breathing now', screen: 'breathing',
+      },
+      {
+        type: 'checkin', emoji: '🌿',
+        title: "One minute for yourself",
+        body: `Even when everything feels heavy, you're still showing up. That counts. ${aiName} sees you.`,
+        action: 'Open breathing', screen: 'breathing',
+      },
+    ]
+  }
+
+  // ── NEUTRAL MOOD — 1 gentle nudge ───────────────────────────
+  if (isNeutral) {
+    const sorted = [...profile.diary].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    const daysSinceJournal = sorted[0] ? Math.floor((now - new Date(sorted[0].date || 0).getTime()) / day) : 99
+    if (daysSinceJournal >= 1) {
+      return [{
+        type: 'checkin', emoji: '✦',
+        title: "How are you doing, really?",
+        body: `A quick check-in with ${aiName} can shift your whole day. Takes 60 seconds.`,
+        action: 'Check in', screen: 'checkin',
+      }]
+    }
+    return []
+  }
+
+  // ── GOOD MOOD — light, max 1 notification ───────────────────
+  const out: Omit<SomaNotif, 'id' | 'read' | 'createdAt'>[] = []
+
+  // Birthday (always show — too important to skip)
+  const mmdd = (s: string) => { const [m, d] = s.split('-').map(Number); return { m, d } }
+  for (const p of profile.circle) {
+    if (!p.birthday) continue
+    const { m, d } = mmdd(p.birthday)
+    const bday = new Date(today.getFullYear(), m - 1, d)
+    if (bday < today) bday.setFullYear(today.getFullYear() + 1)
+    const daysUntil = Math.floor((bday.getTime() - today.getTime()) / day)
+    if (daysUntil <= 3) {
+      out.push({ type: 'birthday', emoji: '🎂', title: daysUntil === 0 ? `${p.name}'s birthday is TODAY 🎉` : `${p.name}'s birthday in ${daysUntil} day${daysUntil > 1 ? 's' : ''} 🎂`, body: "Send them a little love. Soma can write the perfect message.", action: '✦ Write message', screen: 'circle' })
+    }
+  }
+  if (out.length > 0) return out.slice(0, 1)
+
+  // Streak milestone (celebratory)
+  const sorted = [...profile.diary].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  let streak = 0
+  for (const e of sorted) {
+    const d = new Date(e.date || 0)
+    if (Math.floor((today.getTime() - d.getTime()) / day) <= streak + 1) streak++
+    else break
+  }
+  if (streak > 0 && [3, 7, 14, 21, 30, 60, 100].includes(streak)) {
+    return [{ type: 'achievement', emoji: '🔥', title: `${streak}-day streak! 🔥`, body: `You've shown up ${streak} days in a row. That's the real work.`, action: 'Keep going' }]
+  }
+
+  // One circle nudge (most neglected person only)
+  const neglected = profile.circle.filter(p => {
+    const latest = (p.interactions || [])[0]?.date
+    return latest ? Math.floor((now - new Date(latest).getTime()) / day) > 14 : p.messages.length === 0
+  })
+  if (neglected.length > 0) {
+    const p = neglected[0]
+    return [{ type: 'circle', emoji: '💙', title: `Thinking of ${p.name}?`, body: `You haven't connected in a while. A short message means more than you think.`, action: '✦ Reach out', screen: 'circle' }]
+  }
+
+  // Good mood → nothing more to say, they're thriving
+  return []
+}
+
+// Toast component — slides down from top like Duolingo
+function NotifToast({ notif, onDismiss, onAction }: { notif: SomaNotif; onDismiss: () => void; onAction: (n: SomaNotif) => void }) {
+  const { t } = useT()
+  const slideY = useRef(new Animated.Value(-120)).current
+  const opacity = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(slideY, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 200 }),
+      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start()
+    const timer = setTimeout(() => dismiss(), 5000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const dismiss = () => {
+    Animated.parallel([
+      Animated.timing(slideY, { toValue: -120, duration: 250, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start(() => onDismiss())
+  }
+
+  const typeColor: Record<string, string> = {
+    streak: '#F59E0B', circle: '#7B6EF6', birthday: '#F66E8E', liked: '#EC4899',
+    checkin: '#10B981', bond: '#06B6D4', soma: '#7B6EF6', achievement: '#F59E0B',
+  }
+  const color = typeColor[notif.type] || '#7B6EF6'
+
+  return (
+    <Animated.View style={{ position: 'absolute', top: 52, left: 16, right: 16, zIndex: 9999, transform: [{ translateY: slideY }], opacity }}>
+      <TouchableOpacity
+        onPress={() => { onAction(notif); dismiss() }}
+        activeOpacity={0.92}
+        style={{ backgroundColor: t.card, borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderColor: color + '40', shadowColor: color, shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12 }}
+      >
+        {/* Soma orb */}
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: color + '50' }}>
+          <Text style={{ fontSize: 22 }}>{notif.emoji}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: t.text, lineHeight: 18 }}>{notif.title}</Text>
+          <Text style={{ fontSize: 12, color: t.textSub, marginTop: 3, lineHeight: 16 }} numberOfLines={2}>{notif.body}</Text>
+          {notif.action && (
+            <Text style={{ fontSize: 12, fontWeight: '700', color, marginTop: 5 }}>{notif.action} →</Text>
+          )}
+        </View>
+        <TouchableOpacity onPress={dismiss} style={{ padding: 4 }}>
+          <Text style={{ color: t.textSub, fontSize: 18, lineHeight: 18 }}>×</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
+
+// Notification inbox screen
+function NotifInbox({ onBack, onNavigate }: { onBack: () => void; onNavigate: (screen: string) => void }) {
+  const { t } = useT()
+  const [notifs, setNotifs] = useState<SomaNotif[]>([])
+  useEffect(() => { setNotifs(notifDB.get()); notifDB.markAllRead() }, [])
+
+  const typeColor: Record<string, string> = {
+    streak: '#F59E0B', circle: '#7B6EF6', birthday: '#F66E8E', liked: '#EC4899',
+    checkin: '#10B981', bond: '#06B6D4', soma: '#7B6EF6', achievement: '#F59E0B',
+  }
+
+  const timeAgo = (iso: string) => {
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.floor(hrs / 24)}d ago`
+  }
+
+  return (
+    <ScrollView style={[{ flex: 1, backgroundColor: t.bg }]} contentContainerStyle={{ padding: 20, paddingBottom: 80 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+        <TouchableOpacity onPress={onBack}><Text style={{ color: '#7B6EF6', fontSize: 15, fontWeight: '600' }}>← Back</Text></TouchableOpacity>
+        <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '900', color: t.text }}>Notifications</Text>
+        <View style={{ width: 50 }} />
+      </View>
+      {notifs.length === 0 ? (
+        <View style={{ alignItems: 'center', paddingTop: 80 }}>
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>🔔</Text>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: t.text }}>All caught up!</Text>
+          <Text style={{ fontSize: 14, color: t.textSub, marginTop: 6 }}>Soma will nudge you when something needs attention.</Text>
+        </View>
+      ) : notifs.map(n => {
+        const color = typeColor[n.type] || '#7B6EF6'
+        return (
+          <TouchableOpacity
+            key={n.id}
+            onPress={() => { if (n.screen) onNavigate(n.screen) }}
+            style={{ flexDirection: 'row', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border, alignItems: 'flex-start' }}
+          >
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color + '40', flexShrink: 0 }}>
+              <Text style={{ fontSize: 20 }}>{n.emoji}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: t.text, flex: 1 }}>{n.title}</Text>
+                {!n.read && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />}
+              </View>
+              <Text style={{ fontSize: 13, color: t.textSub, marginTop: 3, lineHeight: 18 }}>{n.body}</Text>
+              <Text style={{ fontSize: 11, color: t.textTertiary, marginTop: 4 }}>{timeAgo(n.createdAt)}</Text>
+            </View>
+          </TouchableOpacity>
+        )
+      })}
+    </ScrollView>
+  )
+}
+
+type Screen = 'splash' | 'language' | 'onboarding' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'synergy' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'forgotpassword' | 'resetpassword' | 'verifyemail' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy' | 'healthhub' | 'moodanalytics' | 'breathing' | 'memories' | 'asksoma' | 'timeline' | 'bondjourney' | 'relinsights' | 'checkin' | 'notifs'
 
 // ════════════════════════════════════════════════════════════
 //  ROOT
@@ -2529,6 +3088,15 @@ export default function App() {
   const [verifyToken, setVerifyToken] = useState<string | null>(null)
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null)
   const [pendingAddCode, setPendingAddCode] = useState<string | null>(null)
+  const [tab, setTab] = useState<TabName>('inner')
+  const [dmUnread, setDmUnread] = useState(0)
+  const [meetCategory, setMeetCategory] = useState<'romantic' | 'friends' | 'professional' | 'support'>('romantic')
+  const [meetStartAt, setMeetStartAt] = useState<string | undefined>(undefined)
+  const [pendingMatchChat, setPendingMatchChat] = useState<{ name: string; userId?: string; firstMessage?: string; key: number } | null>(null)
+  const [activeToast, setActiveToast] = useState<SomaNotif | null>(null)
+  const [notifBadge, setNotifBadge] = useState(0)
+  const toastQueue = useRef<SomaNotif[]>([])
+  const toastShowing = useRef(false)
   const screenStack = useRef<Screen[]>([])
   const slideAnim = useRef(new Animated.Value(0)).current
   const fadeAnim = useRef(new Animated.Value(1)).current
@@ -2536,8 +3104,25 @@ export default function App() {
   const themeVal = { t: dark ? DARK_THEME : LIGHT_THEME, dark }
   const refresh = () => setProfile(DB.get())
 
+
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
+    // Telegram Mini App — expand to fill viewport and set dark theme colors
+    const tg = (window as any).Telegram?.WebApp
+    if (tg) {
+      try {
+        tg.expand()
+        tg.ready()
+        // Auto-detect language from Telegram user profile (only if user hasn't chosen manually)
+        const tgLang = tg.initDataUnsafe?.user?.language_code?.slice(0, 2).toLowerCase()
+        if (tgLang && LANGS.some(l => l.code === tgLang)) {
+          const p = DB.get()
+          if (!p.languageChosen) { p.language = tgLang; DB.save(p) }
+        }
+        if (tg.setHeaderColor) tg.setHeaderColor('#0F0A2E')
+        if (tg.setBackgroundColor) tg.setBackgroundColor('#0F0A2E')
+      } catch {}
+    }
     document.title = 'Soma — Your AI Life Companion'
     if (!document.querySelector('link[data-soma-font]')) {
       const pre1 = document.createElement('link'); pre1.rel = 'preconnect'; pre1.href = 'https://fonts.googleapis.com'; document.head.appendChild(pre1)
@@ -2552,13 +3137,14 @@ export default function App() {
       s.textContent = `
         @font-face{font-family:'Ionicons';src:url('/Ionicons.ttf') format('truetype');font-weight:normal;font-style:normal;font-display:block}
         *{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
-        html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important}
+        html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important;background-color:#0F0A2E!important}
+        @supports(padding-top:env(safe-area-inset-top)){body{padding-top:env(safe-area-inset-top);background-color:#0F0A2E!important}}
         ::-webkit-scrollbar{display:none}*{scrollbar-width:none}
         [data-focusable="true"]{transition:transform .12s cubic-bezier(.25,.46,.45,.94),opacity .12s ease}
         [data-focusable="true"]:hover{opacity:.88}
         [data-focusable="true"]:active{transform:scale(.96)!important;opacity:.75}
         input,textarea{font-size:16px!important}
-        .tab-bar-safe{padding-bottom:max(16px,env(safe-area-inset-bottom))!important}
+        .tab-bar-safe{padding-bottom:max(10px,env(safe-area-inset-bottom))!important}
         @media(min-width:600px){
           html,body{height:100%!important;overflow:hidden!important}
           body{display:flex!important;align-items:center!important;justify-content:center!important;background:radial-gradient(ellipse at 30% 20%,#2a1060 0%,#0d0620 50%,#060210 100%)!important}
@@ -2667,6 +3253,33 @@ export default function App() {
       }
     }
 
+    // Auto-send therapy reports on session day
+    ;(async () => {
+      const p = DB.get()
+      const todayDay = new Date().getDay() + 1  // 1=Sunday…7=Saturday
+      const todayDate = new Date().toLocaleDateString()
+      for (const person of p.circle) {
+        if (
+          person.type === 'therapy' &&
+          person.shareReports &&
+          person.therapistEmail &&
+          person.sessionDay === todayDay &&
+          person.lastReportSent?.split('T')[0] !== new Date().toISOString().split('T')[0]
+        ) {
+          const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null
+          if (!authToken) continue
+          try {
+            const reportText = await generateTherapistReport(p, person.name)
+            const result = await sendTherapistReport(authToken, person.therapistEmail, person.name, p.name || 'Your patient', reportText)
+            if (result.ok) {
+              DB.updateCirclePerson(person.id, { lastReportSent: new Date().toISOString() })
+              refresh()
+            }
+          } catch {}
+        }
+      }
+    })()
+
     // Init RevenueCat and sync premium status from the store
     purchaseApi.init()
     purchaseApi.syncPremium().then(active => {
@@ -2770,6 +3383,18 @@ export default function App() {
     ]).start()
   }
 
+  useEffect(() => {
+    const token = auth.getToken()
+    if (!token) return
+    const fetchDm = () => fetch(`${BACKEND_URL}/friends/unread`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.unread) setDmUnread(Object.values(d.unread as Record<string,number>).reduce((s, v) => s + v, 0)) })
+      .catch(() => {})
+    fetchDm()
+    const iv = setInterval(fetchDm, 15000)
+    return () => clearInterval(iv)
+  }, [])
+
   const go = (s: Screen) => {
     refresh()
     screenStack.current.push(screen)
@@ -2791,13 +3416,79 @@ export default function App() {
     return () => { if (typeof window !== 'undefined') window.removeEventListener('popstate', handler) }
   }, [])
 
+  // ── Duolingo-style notification engine ──
+  const showNextToast = () => {
+    if (toastQueue.current.length === 0) { toastShowing.current = false; return }
+    toastShowing.current = true
+    setActiveToast(toastQueue.current.shift()!)
+  }
+
+  const queueToast = (n: SomaNotif) => {
+    toastQueue.current.push(n)
+    if (!toastShowing.current) showNextToast()
+  }
+
+  // Personalize notification voice based on user character
+  const personalizeNotif = (n: Omit<SomaNotif, 'id' | 'read' | 'createdAt'>): Omit<SomaNotif, 'id' | 'read' | 'createdAt'> => {
+    const p = profile
+    const mbti = p.mbtiResult || ''
+    const isIntrovert = mbti.startsWith('I')
+    const isFeeler = mbti.includes('F')
+    const dominant = (p.onboarding?.focusDomains || [])[0] || ''
+    const aiName = p.aiName || 'Soma'
+
+    let { title, body } = n
+    // Introvert: quieter, more reflective tone
+    if (isIntrovert && n.type === 'checkin') {
+      body = body.replace("Soma's waiting for you", `${aiName} is quietly here when you're ready`)
+      body = body.replace("Check in now", "Take a quiet moment")
+    }
+    // Feeler: warmer, emotional language
+    if (isFeeler && n.type === 'circle') {
+      title = title.replace("hasn't heard from you", "might be missing your energy")
+    }
+    // Career-focused: professional framing for achievements
+    if (dominant === 'professional' && n.type === 'achievement') {
+      body = body + " You're building something rare."
+    }
+    // Use custom AI name
+    title = title.replace(/\bSoma\b/g, aiName)
+    body = body.replace(/\bSoma\b/g, aiName)
+    return { ...n, title, body }
+  }
+
+  // Run engine once after home loads, then periodically
+  useEffect(() => {
+    if (!['home', 'circle', 'diary', 'aura', 'checkin'].includes(screen)) return
+    const badge = notifDB.unreadCount()
+    setNotifBadge(badge)
+
+    // Check & fire new notifs (debounced — only when app is active and user settled)
+    const timer = setTimeout(() => {
+      const existing = notifDB.get()
+      const existingTitles = new Set(existing.map(e => e.title))
+      const candidates = computeNotifs(profile)
+      for (const c of candidates) {
+        const personalized = personalizeNotif(c)
+        if (!existingTitles.has(personalized.title)) {
+          const saved = notifDB.add(personalized)
+          queueToast(saved)
+          setNotifBadge(nb => nb + 1)
+          break // one toast at a time per session load
+        }
+      }
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [screen])
+
   const inner = (() => {
+    if (screen === 'notifs') return <NotifInbox onBack={() => { setNotifBadge(0); go('home') }} onNavigate={(s) => go(s as Screen)} />
     if (screen === 'splash')      return <Splash />
     if (screen === 'language')    return <LanguageSelect onDone={() => go('onboarding')} />
-    if (screen === 'onboarding')  return <Onboarding onDone={() => { go('home') }} onBrowse={() => { const p = DB.get(); p.onboarding = { focusDomains: [] } as any; DB.save(p); go('meetpeople') }} onSignIn={() => go('register')} />
-    if (screen === 'try')         return <AuraChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" autoStart={fromOnboarding} />
+    if (screen === 'onboarding')  return <Onboarding onDone={() => { go('home') }} onBrowse={() => { const p = DB.get(); p.onboarding = { focusDomains: [] } as any; DB.save(p); go('meetpeople') }} onSignIn={() => go('login')} />
+    if (screen === 'try')         return <SomaChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" autoStart={fromOnboarding} />
     if (screen === 'register')    return (
-      <RegisterBoundary fallback={<RegisterFallback onDone={(name) => { go('login') }} />}>
+      <RegisterBoundary fallback={<RegisterFallback onDone={(name) => { go('home') }} onSignIn={() => go('login')} />}>
         <Register onDone={(name) => { auth.getToken() ? go('login') : go('home') }} onSignIn={() => go('login')} />
       </RegisterBoundary>
     )
@@ -2805,15 +3496,15 @@ export default function App() {
     if (screen === 'forgotpassword') return <ForgotPasswordScreen onBack={() => go('login')} />
     if (screen === 'resetpassword' && resetToken) return <ResetPasswordScreen token={resetToken} onDone={() => go('login')} />
     if (screen === 'verifyemail' && verifyToken) return <VerifyEmailScreen token={verifyToken} onDone={() => { refresh(); go('home') }} />
-    if (screen === 'aura')        return <AuraChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" />
-    if (screen === 'diary')       return <AuraChat mode="diary" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Today's Diary" isDiary />
+    if (screen === 'aura')        return <SomaChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" />
+    if (screen === 'diary')       return <SomaChat mode="diary" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Today's Diary" isDiary />
     if (screen === 'circle')      return <CircleScreen profile={profile} onBack={() => { setPendingAddCode(null); go('home') }} onStartJourney={(id) => { setBondPersonId(id); go('bondjourney') }} onViewInsights={() => go('relinsights')} onRefresh={refresh} initialFindCode={pendingAddCode} />
     if (screen === 'bondjourney' && bondPersonId) {
       const bp = profile.circle.find(p => p.id === bondPersonId)
       if (bp) return <BondJourney person={bp} profile={profile} onBack={() => go('circle')} onRefresh={refresh} />
     }
     if (screen === 'lifebalance') return <LifeBalance profile={profile} onBack={() => go('home')} />
-    if (screen === 'meetpeople')  return <MeetPeople profile={profile} onBack={() => go('home')} onMyProfile={() => go('myprofile')} onSynergy={() => go('synergy')} onRegister={() => go('register')} />
+    if (screen === 'meetpeople')  return <MeetPeople profile={profile} category={meetCategory} startAtName={meetStartAt} onBack={() => { setMeetStartAt(undefined); go('home') }} onMatchSent={(name, userId?, firstMessage?) => { setPendingMatchChat({ name, userId, firstMessage, key: Date.now() }); setTab('chat'); go('home') }} onMyProfile={() => go('myprofile')} onSynergy={() => go('synergy')} onRegister={() => go('register')} />
     if (screen === 'myprofile')   return <MyProfile profile={profile} onBack={() => go('meetpeople')} />
     if (screen === 'synergy')     return <SynergyScan profile={profile} onBack={() => go('meetpeople')} />
     if (screen === 'connections') return <Connections profile={profile} onBack={() => go('home')} onRefresh={refresh} />
@@ -2833,18 +3524,72 @@ export default function App() {
     if (screen === 'memories')      return <MemoryManager profile={profile} onBack={() => go('settings')} onRefresh={refresh} />
     if (screen === 'asksoma')       return <AskSomaScreen profile={profile} onBack={() => go('home')} />
     if (screen === 'timeline')      return <LifeTimeline profile={profile} onBack={() => go('home')} />
-    return <MainTabs profile={profile} go={go} onReset={() => { DB.reset(); go('language') }} />
+    return <MainTabs profile={profile} go={go} tab={tab} setTab={setTab} dmUnread={dmUnread} onReset={() => { DB.reset(); go('language') }} onMeetPeople={(cat, startAt?) => { setMeetCategory(cat); setMeetStartAt(startAt); go('meetpeople') }} pendingMatchChat={pendingMatchChat} />
   })()
 
   // On web desktop, reserve space for phone chrome (Dynamic Island + status bar = 54px)
-  const webTopInset = Platform.OS === 'web' ? 54 : 0
+  // 54px only for desktop phone-frame chrome; on real mobile devices use 0 (safe area handled by CSS env())
+  const isDesktopWeb = Platform.OS === 'web' && typeof window !== 'undefined' && window.innerWidth >= 600
+  const webTopInset = isDesktopWeb ? 54 : 0
+
+  const noTabBarScreens: Screen[] = ['splash', 'language', 'onboarding', 'try', 'register', 'login', 'forgotpassword', 'resetpassword', 'verifyemail']
+  const showAppTabBar = !noTabBarScreens.includes(screen)
+
+  const partner = getRomanticPartner(profile)
+  const inRelationship = !!partner
+  const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
+  type TabItem = { id: TabName; icon: keyof typeof Ionicons.glyphMap; label: string }
+  const TAB_ITEMS: TabItem[] = [
+    { id: 'inner',  icon: 'sparkles-outline',    label: t('tab_inner') },
+    { id: 'circle', icon: 'people-outline',       label: t('tab_circle') },
+    inRelationship
+      ? { id: 'bond',  icon: 'heart-outline',     label: 'Bond' }
+      : { id: 'outer', icon: 'compass-outline',   label: t('tab_explore') },
+    { id: 'chat',   icon: 'chatbubbles-outline',  label: 'Messages' },
+  ]
+  const appTabBar = (
+    <View dataSet={{ class: 'tab-bar-safe' }} style={{
+      flexDirection: 'row', alignItems: 'flex-end',
+      backgroundColor: themeVal.t.bg,
+      borderTopWidth: 0.5, borderTopColor: themeVal.t.border,
+      paddingBottom: Platform.OS === 'ios' ? 28 : 10, paddingTop: 6, paddingHorizontal: 16,
+    }}>
+      {TAB_ITEMS.map(item => {
+        const active = tab === item.id
+        const showBadge = (item.id === 'circle' && unread > 0) || (item.id === 'chat' && dmUnread > 0)
+        return (
+          <TouchableOpacity key={item.id} onPress={() => { setTab(item.id); if (item.id === 'chat') setDmUnread(0); if (screen !== 'home') go('home') }} style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 }}>
+            <View style={{ position: 'relative' }}>
+              <Ionicons name={item.icon} size={22} color={active ? '#7B6EF6' : themeVal.t.textSub} />
+              {showBadge && (
+                <View style={{ position: 'absolute', top: -2, right: -6, width: 14, height: 14, borderRadius: 7, backgroundColor: '#F66E8E', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: themeVal.t.bg }}>
+                  <Text style={{ fontSize: 8, fontWeight: '800', color: '#fff' }}>{item.id === 'chat' ? dmUnread : unread}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ fontSize: 10, fontWeight: active ? '600' : '500', color: active ? '#7B6EF6' : themeVal.t.textSub }}>{item.label}</Text>
+          </TouchableOpacity>
+        )
+      })}
+    </View>
+  )
 
   return (
     <ThemeCtx.Provider value={themeVal}>
-      <View style={{ flex: 1, backgroundColor: themeVal.t.bg, paddingTop: webTopInset }}>
+      <View style={{ flex: 1, backgroundColor: noTabBarScreens.includes(screen) ? '#080418' : themeVal.t.bg, paddingTop: webTopInset }}>
         <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateX: slideAnim }] }}>
           {inner}
         </Animated.View>
+        {showAppTabBar && appTabBar}
+        {/* Duolingo-style toast overlay */}
+        {activeToast && (
+          <NotifToast
+            key={activeToast.id}
+            notif={activeToast}
+            onDismiss={() => { setActiveToast(null); setTimeout(showNextToast, 400) }}
+            onAction={(n) => { notifDB.markRead(n.id); setNotifBadge(nb => Math.max(0, nb - 1)); if (n.screen) go(n.screen as Screen) }}
+          />
+        )}
       </View>
     </ThemeCtx.Provider>
   )
@@ -2863,7 +3608,7 @@ function LanguageSelect({ onDone }: { onDone: () => void }) {
           <Image source={require('./assets/icon.png')} style={{ width: 80, height: 80, borderRadius: 24, marginBottom: 18 }} />
           <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', letterSpacing: -0.5 }}>SOMA</Text>
           <Text style={{ fontSize: 14, color: '#7B6EF6', fontWeight: '700', textAlign: 'center', marginTop: 6, letterSpacing: 0.3 }}>
-            Meet yourself before meeting others.
+            Someone Offers Meaning & Answers
           </Text>
         </View>
 
@@ -2943,9 +3688,15 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
   const [regPassword, setRegPassword] = useState('')
   const [regLoading, setRegLoading] = useState(false)
   const [regError, setRegError] = useState('')
+  const [tourIdx, setTourIdx] = useState(0)
+  const [tourChatMsg, setTourChatMsg] = useState('')
+  const [tourChatReply, setTourChatReply] = useState('')
+  const [tourChatLoading, setTourChatLoading] = useState(false)
+  const [tourChatSent, setTourChatSent] = useState('')
   const stopListeningRef = useRef<(() => void) | null>(null)
   const sectionConvoRef = useRef<{role:'soma'|'user', text:string}[]>([])
   const convoScrollRef = useRef<ScrollView>(null)
+  const touchStartX = useRef(0)
   const fadeAnim = useRef(new Animated.Value(1)).current
   const pulseAnim = useRef(new Animated.Value(1)).current
   const micAnim = useRef(new Animated.Value(1)).current
@@ -3100,7 +3851,7 @@ Ask ONE short empathetic follow-up question to learn a bit more. 1-2 sentences m
     if (ans.every(a => !a.trim())) {
       DB.setOnboarding([], ['mind', 'body', 'love'] as DomainKey[])
       setProfileSummary("Your profile is ready! Add a photo so others can recognise you.")
-      fadeTransition(() => setPhase(5))
+      fadeTransition(() => setPhase(8))
       return
     }
     try {
@@ -3183,47 +3934,261 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
       ans.forEach((a, i) => { if (a.trim()) DB.addMemory((['body', 'social', 'mind'] as DomainKey[])[i], a.trim()) })
       setProfileSummary("I truly heard you. The way you showed up for this conversation tells me so much about who you are — and I can't wait to walk this journey with you.")
     }
-    fadeTransition(() => setPhase(5))
+    fadeTransition(() => setPhase(8))
   }
 
   const color = phase >= 1 && phase <= 3 ? COLORS[phase - 1] : '#7B6EF6'
+  const [quickAnswer, setQuickAnswer] = useState('')
+  const [somaReply, setSomaReply] = useState('')
+  const [somaReplyLoading, setSomaReplyLoading] = useState(false)
+  const [typeMode, setTypeMode] = useState(false)
 
-  // Phase 0 — Welcome
+  const handleQuickSubmit = async () => {
+    if (!quickAnswer.trim()) return
+    const name = userName.trim()
+    if (name) DB.setName(name)
+    setSomaReplyLoading(true)
+    setPhase(10)
+
+    // Run profile extraction + warm reply in parallel
+    const extractPrompt = `Someone just shared this about themselves: "${quickAnswer.trim()}"
+
+Extract a JSON profile from this text. Return ONLY valid JSON, no markdown, no explanation:
+{
+  "mood": <1-7, where 1=very rough, 4=okay, 7=euphoric — infer from emotional tone>,
+  "wheel": {
+    "health": <0-10>, "career": <0-10>, "finance": <0-10>, "relationship": <0-10>,
+    "family": <0-10>, "growth": <0-10>, "hobby": <0-10>, "purpose": <0-10>,
+    "mind": <0-10>, "environment": <0-10>
+  },
+  "memories": [
+    { "domain": "<health|career|finance|relationship|family|growth|hobby|purpose|mind|environment>", "content": "<key fact about them in this area>" }
+  ]
+}
+Rules: use 5 for any domain not mentioned. Only include memories for domains clearly mentioned. Max 4 memories.`
+
+    const replyPrompt = `You are Soma, a warm and deeply empathetic AI life companion. Someone just joined the app.
+Their name is ${name || 'unknown'}. They wrote: "${quickAnswer.trim()}"
+
+Write a warm, personal 2-3 sentence response to them. Rules:
+- Use their name if you have it
+- Reference something specific they wrote
+- Make them feel truly seen and not alone
+- End with genuine excitement about walking this journey together
+- Tone: wise caring friend, not therapist
+- Under 60 words`
+
+    const [extractRaw, reply] = await Promise.allSettled([
+      groq([{ role: 'user', content: extractPrompt }], 'Return only valid JSON.', 400, 0.3),
+      groq([{ role: 'user', content: replyPrompt }], 'You are Soma. Warm, human, brief.', 150),
+    ])
+
+    // Parse and save extracted profile
+    if (extractRaw.status === 'fulfilled' && extractRaw.value) {
+      try {
+        const jsonStr = extractRaw.value.replace(/```json|```/g, '').trim()
+        const data = JSON.parse(jsonStr)
+        if (data.mood && data.mood >= 1 && data.mood <= 7) {
+          DB.addMoodLog(Math.round(data.mood) as 1|2|3|4|5|6|7, quickAnswer.trim().slice(0, 100))
+        }
+        if (data.wheel) {
+          const scores: Partial<Record<DomainKey, { score: number; note: string }>> = {}
+          for (const [k, v] of Object.entries(data.wheel)) {
+            if (DOMAINS.find(d => d.key === k) && typeof v === 'number') {
+              scores[k as DomainKey] = { score: Math.round((v as number) * 10), note: '' }
+            }
+          }
+          const vals = Object.values(scores).map(s => s!.score)
+          if (vals.length > 0) {
+            DB.setWheel({ scores, overall: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length), basis: 1, at: new Date().toISOString() })
+          }
+        }
+        if (Array.isArray(data.memories)) {
+          for (const m of data.memories.slice(0, 4)) {
+            if (m.domain && m.content && DOMAINS.find(d => d.key === m.domain)) {
+              DB.addMemory(m.domain as DomainKey, m.content)
+            }
+          }
+        }
+      } catch {}
+    } else {
+      // Fallback: save raw text as mind memory
+      DB.addMemory('mind', quickAnswer.trim())
+    }
+
+    setSomaReply(
+      (reply.status === 'fulfilled' && reply.value) ? reply.value
+        : `I hear you. Whatever brought you here today, I'm glad you came. Let's walk this journey together.`
+    )
+    setSomaReplyLoading(false)
+  }
+
+  // Phase 0 — Hero
   if (phase === 0) return (
-    <View style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-        <Image source={require('./assets/icon.png')} style={{ width: 90, height: 90, borderRadius: 26, marginBottom: 24 }} />
-        <Text style={{ fontSize: 28, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', letterSpacing: -0.5, marginBottom: 12 }}>
-          {t('ob_hi')}
-        </Text>
-        <Text style={{ fontSize: 16, color: '#A89BFA', textAlign: 'center', lineHeight: 24, marginBottom: 36 }}>
-          {t('ob_intro')}
-        </Text>
-        <View style={{ width: '100%', gap: 10 }}>
-          {[
-            { emoji: '🧬', label: t('ob_physical_label'), color: '#4CAF7D' },
-            { emoji: '🌐', label: t('ob_social_label'), color: '#7B6EF6' },
-            { emoji: '🧠', label: t('ob_inner_label'), color: '#F59E0B' },
-          ].map(p => (
-            <View key={p.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: 14 }}>
-              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: p.color + '30', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 20 }}>{p.emoji}</Text>
-              </View>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: '#E8E5FF' }}>{p.label}</Text>
+    <View style={{ flex: 1, backgroundColor: '#080418' }}>
+      {/* Background glow */}
+      <View style={{ position: 'absolute', top: -80, left: -80, width: 340, height: 340, borderRadius: 170, backgroundColor: 'rgba(123,110,246,0.12)' }} />
+      <View style={{ position: 'absolute', bottom: 100, right: -60, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(236,72,153,0.08)' }} />
+
+      <View style={{ flex: 1, justifyContent: 'center', padding: 32 }}>
+        {/* Soma mark */}
+        <View style={{ alignItems: 'flex-start', marginBottom: 32 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+            <Text style={{ fontSize: 28, color: '#fff', fontWeight: '900' }}>✦</Text>
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#7B6EF6', letterSpacing: 2.5, textTransform: 'uppercase', marginBottom: 14 }}>SOMA</Text>
+          {DB.get().language === 'en' ? (
+            <Text style={{ fontSize: 30, fontWeight: '900', color: '#FFFFFF', lineHeight: 40, letterSpacing: -0.5 }}>
+              <Text style={{ color: '#A78BFA' }}>S</Text>omeone <Text style={{ color: '#A78BFA' }}>O</Text>ffers{'\n'}
+              <Text style={{ color: '#A78BFA' }}>M</Text>eaning &amp; <Text style={{ color: '#A78BFA' }}>A</Text>nswers
+            </Text>
+          ) : (
+            <Text style={{ fontSize: 28, fontWeight: '900', color: '#FFFFFF', lineHeight: 38, letterSpacing: -0.5 }}>{t('ob_tagline')}</Text>
+          )}
+          <Text style={{ fontSize: 16, color: 'rgba(168,155,250,0.7)', lineHeight: 26, marginTop: 14 }}>
+            {t('ob_companion')}
+          </Text>
+        </View>
+
+        {/* Social proof row */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 40, flexWrap: 'wrap' }}>
+          {[t('ob_feat1'), t('ob_feat2'), t('ob_feat3')].map(tag => (
+            <View key={tag} style={{ backgroundColor: 'rgba(123,110,246,0.15)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(123,110,246,0.3)' }}>
+              <Text style={{ fontSize: 13, color: '#C4B5FD', fontWeight: '600' }}>{tag}</Text>
             </View>
           ))}
         </View>
       </View>
 
-      <View style={{ padding: 24, paddingBottom: 44, gap: 12 }}>
-        <TouchableOpacity onPress={() => setPhase(1)}
-          style={{ backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 17, alignItems: 'center', ...shadowSm }}>
-          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>{t('ob_start')}</Text>
+      <View style={{ padding: 24, paddingBottom: 52, gap: 12 }}>
+        <TouchableOpacity onPress={() => setPhase(9)}
+          style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 0.2 }}>{t('ob_meet')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onSignIn} style={{ alignItems: 'center', paddingVertical: 8 }}>
+        {onBrowse && (
+          <TouchableOpacity onPress={onBrowse} style={{ alignItems: 'center', paddingVertical: 6 }}>
+            <Text style={{ fontSize: 14, color: 'rgba(168,155,250,0.5)' }}>{t('ob_browse_first')}</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity onPress={onSignIn} style={{ alignItems: 'center', paddingVertical: 4 }}>
           <Text style={{ fontSize: 13, color: '#6B68A0' }}>{t('alreadyAccount')} <Text style={{ color: '#A89BFA', fontWeight: '700' }}>{t('signIn')}</Text></Text>
         </TouchableOpacity>
       </View>
+    </View>
+  )
+
+  // Phase 9 — Voice intro
+  if (phase === 9) {
+    const isReady = quickAnswer.trim().length > 20
+    return (
+      <View style={{ flex: 1, backgroundColor: '#080418' }}>
+        <View style={{ position: 'absolute', top: -60, left: -60, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(123,110,246,0.08)' }} />
+
+        {/* Header */}
+        <View style={{ paddingTop: 60, paddingHorizontal: 28, paddingBottom: 20 }}>
+          <TouchableOpacity onPress={() => { stopListeningRef.current?.(); setListening(false); setTranscript(''); setQuickAnswer(''); setPhase(0) }} style={{ marginBottom: 28 }}>
+            <Text style={{ color: '#7B6EF6', fontSize: 15, fontWeight: '600' }}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#7B6EF6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>Meet Soma</Text>
+          <Text style={{ fontSize: 28, fontWeight: '900', color: '#fff', lineHeight: 36, letterSpacing: -0.5 }}>
+            Tell me about{'\n'}your life
+          </Text>
+          <Text style={{ fontSize: 15, color: 'rgba(168,155,250,0.55)', marginTop: 10, lineHeight: 22 }}>
+            Just talk — Soma will listen and build your profile.
+          </Text>
+        </View>
+
+        {/* Transcript / type area — always editable */}
+        <View style={{ flex: 1, marginHorizontal: 24, marginBottom: 16 }}>
+          <TextInput
+            value={quickAnswer + (transcript ? (quickAnswer ? ' ' : '') + transcript : '')}
+            onChangeText={(v) => { setQuickAnswer(v); setTranscript('') }}
+            placeholder={"Your story will appear here as you speak...\n\ne.g. I've been feeling a bit lost lately. Work is okay but I miss feeling connected..."}
+            placeholderTextColor="rgba(168,155,250,0.22)"
+            multiline
+            style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20, borderWidth: 1, borderColor: listening ? 'rgba(246,55,155,0.5)' : 'rgba(123,110,246,0.25)', padding: 20, fontSize: 16, color: '#E8E5FF', lineHeight: 26, textAlignVertical: 'top', fontStyle: quickAnswer || transcript ? 'normal' : 'italic' }}
+          />
+          {(quickAnswer || transcript) ? (
+            <TouchableOpacity onPress={() => { setQuickAnswer(''); setTranscript('') }} style={{ alignSelf: 'flex-end', marginTop: 6 }}>
+              <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.35)' }}>Clear ✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Mic + submit */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={{ paddingHorizontal: 28, paddingBottom: 44, alignItems: 'center', gap: 14 }}>
+            <TouchableOpacity
+              onPress={() => {
+                if (listening) {
+                  stopListeningRef.current?.()
+                  setListening(false)
+                  if (transcript.trim()) setQuickAnswer(q => (q + (q ? ' ' : '') + transcript.trim()).trim())
+                  setTranscript('')
+                } else {
+                  if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
+                  setListening(true)
+                  setTimeout(() => {
+                    const stop = listen(
+                      (text) => { setQuickAnswer(q => (q + (q ? ' ' : '') + text.trim()).trim()); setTranscript(''); setListening(false) },
+                      () => setListening(false),
+                      (interim) => setTranscript(interim),
+                    )
+                    stopListeningRef.current = stop
+                  }, 300)
+                }
+              }}
+              style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: listening ? '#F6379B' : '#7B6EF6', alignItems: 'center', justifyContent: 'center', shadowColor: listening ? '#F6379B' : '#7B6EF6', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
+              <Animated.View style={{ transform: [{ scale: listening ? micAnim : new Animated.Value(1) }] }}>
+                <Ionicons name={listening ? 'stop' : 'mic'} size={32} color="#fff" />
+              </Animated.View>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 13, color: listening ? '#F6379B' : 'rgba(168,155,250,0.4)', fontWeight: listening ? '700' : '400' }}>
+              {listening ? 'Listening… tap to stop' : 'Tap to speak · or type above'}
+            </Text>
+
+            {isReady && (
+              <TouchableOpacity onPress={handleQuickSubmit}
+                style={{ width: '100%', backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 6 } }}>
+                <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>Soma, build my profile →</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    )
+  }
+
+  // Phase 10 — Soma's "wow moment" response
+  if (phase === 10) return (
+    <View style={{ flex: 1, backgroundColor: '#080418', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <View style={{ position: 'absolute', top: -60, left: -60, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(123,110,246,0.1)' }} />
+
+      {/* Soma avatar */}
+      <Animated.View style={{ transform: [{ scale: pulseAnim }], marginBottom: 28 }}>
+        <View style={{ width: 88, height: 88, borderRadius: 28, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.5, shadowRadius: 30, shadowOffset: { width: 0, height: 10 } }}>
+          <Text style={{ fontSize: 40, color: '#fff', fontWeight: '900' }}>✦</Text>
+        </View>
+      </Animated.View>
+
+      {somaReplyLoading ? (
+        <>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#E8E5FF', marginBottom: 8 }}>Soma is thinking...</Text>
+          <Text style={{ fontSize: 14, color: 'rgba(168,155,250,0.5)', textAlign: 'center' }}>Personalizing your experience</Text>
+        </>
+      ) : (
+        <>
+          <View style={{ backgroundColor: 'rgba(123,110,246,0.12)', borderRadius: 24, padding: 22, borderWidth: 1, borderColor: 'rgba(123,110,246,0.25)', marginBottom: 36, width: '100%' }}>
+            <Text style={{ fontSize: 16, color: '#E8E5FF', lineHeight: 26, textAlign: 'center', fontStyle: 'italic' }}>
+              "{somaReply}"
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setPhase(8)}
+            style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, paddingHorizontal: 48, width: '100%', alignItems: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.45, shadowRadius: 22, shadowOffset: { width: 0, height: 7 } }}>
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>Show me what's possible →</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   )
 
@@ -3241,6 +4206,186 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
       </Text>
     </View>
   )
+
+  // Phase 8 — Interactive mini-demos (3 screens)
+  if (phase === 8) {
+    const p = DB.get()
+    const name = p.name || userName || 'you'
+    const goNext = () => tourIdx < 2 ? setTourIdx(i => i + 1) : setPhase(5)
+
+    // Screen 0 — Talk to Soma (live mini chat)
+    if (tourIdx === 0) return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
+        <View style={{ position: 'absolute', top: -40, left: -40, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(123,110,246,0.1)' }} />
+        <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: 56, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' }}>Skip →</Text>
+        </TouchableOpacity>
+
+        <View style={{ flex: 1, padding: 24, paddingTop: 70 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#7B6EF6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>1 of 3</Text>
+          <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', marginBottom: 4, letterSpacing: -0.5 }}>Ask Soma anything</Text>
+          <Text style={{ fontSize: 14, color: 'rgba(168,155,250,0.55)', marginBottom: 20 }}>Try it — send a real message right now.</Text>
+
+          {/* Chat preview */}
+          <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(123,110,246,0.2)', padding: 16, gap: 12 }}>
+            {/* Soma intro bubble */}
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
+              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
+              </View>
+              <View style={{ backgroundColor: 'rgba(123,110,246,0.18)', borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
+                <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 20 }}>
+                  Hey {name.split(' ')[0]}! I'm here for you — ask me anything about your life, goals, or how you're feeling. 💜
+                </Text>
+              </View>
+            </View>
+
+            {/* User sent message */}
+            {tourChatSent ? (
+              <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ backgroundColor: '#7B6EF6', borderRadius: 16, borderBottomRightRadius: 4, padding: 12, maxWidth: '80%' }}>
+                  <Text style={{ color: '#fff', fontSize: 14, lineHeight: 20 }}>{tourChatSent}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Soma reply or loading */}
+            {tourChatLoading && (
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
+                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
+                </View>
+                <View style={{ backgroundColor: 'rgba(123,110,246,0.18)', borderRadius: 16, borderBottomLeftRadius: 4, padding: 12 }}>
+                  <Text style={{ color: 'rgba(168,155,250,0.6)', fontSize: 14 }}>Thinking…</Text>
+                </View>
+              </View>
+            )}
+            {tourChatReply ? (
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
+                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
+                </View>
+                <View style={{ backgroundColor: 'rgba(123,110,246,0.18)', borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
+                  <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 20 }}>{tourChatReply}</Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Input row */}
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, alignItems: 'flex-end' }}>
+            <TextInput
+              value={tourChatMsg}
+              onChangeText={setTourChatMsg}
+              placeholder="Ask me anything..."
+              placeholderTextColor="rgba(168,155,250,0.3)"
+              style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(123,110,246,0.3)', paddingHorizontal: 16, paddingVertical: 13, fontSize: 15, color: '#E8E5FF' }}
+            />
+            <TouchableOpacity
+              onPress={async () => {
+                const msg = tourChatMsg.trim()
+                if (!msg || tourChatLoading) return
+                setTourChatSent(msg); setTourChatMsg(''); setTourChatLoading(true); setTourChatReply('')
+                try {
+                  const context = p.memories.slice(0, 3).map(m => m.content).join('. ')
+                  const reply = await groq([{ role: 'user', content: msg }],
+                    `You are Soma. The user's name is ${name}. Context: ${context || 'new user'}. Reply warmly in 1-2 sentences. Be personal and specific.`, 120)
+                  setTourChatReply(reply || 'I hear you. Let\'s explore that together. 💜')
+                } catch { setTourChatReply('I hear you. Let\'s explore that together. 💜') }
+                finally { setTourChatLoading(false) }
+              }}
+              style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: tourChatMsg.trim() ? '#7B6EF6' : 'rgba(123,110,246,0.3)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="send" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {tourChatReply ? (
+            <TouchableOpacity onPress={goNext} style={{ marginTop: 14, backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 16, alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>See your wellness scores →</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={goNext} style={{ marginTop: 14, alignItems: 'center', paddingVertical: 10 }}>
+              <Text style={{ color: 'rgba(168,155,250,0.35)', fontSize: 13 }}>Skip for now →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    )
+
+    // Screen 1 — Wheel of life (show their actual scores)
+    if (tourIdx === 1) {
+      const wheel = p.wheel?.scores || {}
+      return (
+        <ScrollView style={{ flex: 1, backgroundColor: '#080418' }} contentContainerStyle={{ padding: 24, paddingTop: 70 }}>
+          <View style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(16,185,129,0.08)' }} />
+          <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: 56, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' }}>Skip →</Text>
+          </TouchableOpacity>
+
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#10B981', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>2 of 3</Text>
+          <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', marginBottom: 4, letterSpacing: -0.5 }}>Your wellness scores</Text>
+          <Text style={{ fontSize: 14, color: 'rgba(168,155,250,0.55)', marginBottom: 24 }}>Built from what you shared — tap any area to update.</Text>
+
+          <View style={{ gap: 10, marginBottom: 28 }}>
+            {DOMAINS.map(d => {
+              const score = wheel[d.key]?.score ?? 50
+              return (
+                <View key={d.key} style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 14, color: '#E8E5FF', fontWeight: '600' }}>{d.icon} {d.label}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: d.color }}>{Math.round(score / 10)}/10</Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3 }}>
+                    <View style={{ height: 6, width: `${score}%` as any, backgroundColor: d.color, borderRadius: 3 }} />
+                  </View>
+                </View>
+              )
+            })}
+          </View>
+
+          <TouchableOpacity onPress={goNext} style={{ backgroundColor: '#10B981', borderRadius: 16, paddingVertical: 16, alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Save your profile →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )
+    }
+
+    // Screen 2 — Save profile CTA
+    return (
+      <View style={{ flex: 1, backgroundColor: '#080418', padding: 28, justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', top: -60, left: -60, width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(246,55,155,0.08)' }} />
+        <Text style={{ fontSize: 13, fontWeight: '800', color: '#F6379B', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>3 of 3</Text>
+        <Text style={{ fontSize: 30, fontWeight: '900', color: '#fff', lineHeight: 38, marginBottom: 12, letterSpacing: -0.5 }}>
+          Your profile{'\n'}is ready, {name.split(' ')[0]}.
+        </Text>
+        <Text style={{ fontSize: 15, color: 'rgba(168,155,250,0.6)', lineHeight: 24, marginBottom: 36 }}>
+          Save it so Soma can grow with you — your memories, your scores, your story. Free forever.
+        </Text>
+
+        {/* Profile preview card */}
+        <View style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(246,55,155,0.2)', padding: 18, marginBottom: 28, gap: 10 }}>
+          {[
+            { label: `💜 ${t('memories_label')}`, value: `${p.memories.length} ${t('memories_count')}` },
+            { label: '🎯 Wellness profile', value: p.wheel ? '10 life areas scored' : 'Ready to build' },
+            { label: '📊 Mood baseline', value: (p.moodLogs || []).length > 0 ? 'Set from your words' : 'Ready to track' },
+          ].map(row => (
+            <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, color: '#E8E5FF', fontWeight: '600' }}>{row.label}</Text>
+              <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.5)' }}>{row.value}</Text>
+            </View>
+          ))}
+        </View>
+
+        <TouchableOpacity onPress={() => setPhase(5)}
+          style={{ backgroundColor: '#F6379B', borderRadius: 18, paddingVertical: 18, alignItems: 'center', shadowColor: '#F6379B', shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 6 } }}>
+          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>Save my profile →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setPhase(5)} style={{ alignItems: 'center', marginTop: 14 }}>
+          <Text style={{ fontSize: 13, color: 'rgba(168,155,250,0.35)' }}>Continue without saving</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
 
   // Phase 5 — Profile summary + photo
   if (phase === 5) return (
@@ -3354,6 +4499,11 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
             try {
               await auth.signup(regEmail.trim(), userName.trim(), regPassword.trim())
               DB.setName(userName.trim())
+              // Grant 7-day SOMA+ trial
+              const _p = DB.get()
+              _p.premiumTrial = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+              _p.premium = true
+              DB.save(_p)
               alert(`✉️ Almost there!\n\nWe sent a confirmation link to ${regEmail.trim()}. Click it to activate your account, then sign in.`)
               onDone()
             } catch (err: any) {
@@ -3629,7 +4779,7 @@ function Splash() {
         letterSpacing: 0.3, opacity: tagOpacity, textAlign: 'center',
         paddingHorizontal: 40, lineHeight: 20,
       }}>
-        Meet yourself before meeting others.
+        Someone Offers Meaning & Answers
       </Animated.Text>
     </View>
   )
@@ -3640,6 +4790,22 @@ class RegisterBoundary extends Component<{ children: ReactNode; fallback: ReactN
   state = { crashed: false }
   static getDerivedStateFromError() { return { crashed: true } }
   render() { return this.state.crashed ? this.props.fallback : this.props.children }
+}
+
+// In-frame bottom sheet — replaces Modal presentationStyle="formSheet" on web so it stays inside the 430px phone frame
+function InFrameSheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
+  if (!visible) return null
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}>
+      <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={onClose} />
+      <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' }}>
+        <View style={{ width: 40, height: 4, backgroundColor: '#E0E0E0', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 }} />
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
+          {children}
+        </ScrollView>
+      </View>
+    </View>
+  )
 }
 
 // One-tap banner shown when app is opened inside Telegram Mini App
@@ -3662,11 +4828,11 @@ function TelegramMiniAppBanner({ onAuth }: { onAuth: (data: any) => void }) {
         setDone(true)
         onAuth(data)
       } else {
-        alert(data.error || 'Telegram login failed')
+        // Silent fail — let user use email/password below
         setLoading(false)
       }
     } catch {
-      alert('Could not connect. Please try again.')
+      // Silent fail — let user use email/password below
       setLoading(false)
     }
   }
@@ -3735,7 +4901,8 @@ async function openTelegramAuth(onAuth: (data: any) => void, setTgPending: (v: b
   }
 }
 
-function RegisterFallback({ onDone }: { onDone: (name: string) => void }) {
+function RegisterFallback({ onDone, onSignIn }: { onDone: (name: string) => void; onSignIn?: () => void }) {
+  const { t: theme } = useT()
   const [step, setStep] = useState<'method' | 'email'>('method')
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
@@ -3756,11 +4923,11 @@ function RegisterFallback({ onDone }: { onDone: (name: string) => void }) {
   }
 
   if (step === 'method') return (
-    <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
+    <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={g.registerScroll}>
       <View style={{ alignItems: 'center', marginBottom: 40 }}>
         <View style={{ marginBottom: 14 }}><SomaMark size={80} /></View>
-        <Text style={g.logo}>Save your story</Text>
-        <Text style={g.logoSub}>Keep your conversations with Soma and build your life.</Text>
+        <Text style={[g.logo, { color: '#7B6EF6' }]}>Save your story</Text>
+        <Text style={[g.logoSub, { color: theme.textSub }]}>Keep your conversations with Soma and build your life.</Text>
       </View>
       <TouchableOpacity style={g.primaryBtn} onPress={() => setStep('email')}>
         <Text style={g.primaryBtnTxt}>✉️  Sign up with email</Text>
@@ -3768,24 +4935,29 @@ function RegisterFallback({ onDone }: { onDone: (name: string) => void }) {
       <TouchableOpacity style={{ marginTop: 16, alignItems: 'center' }} onPress={() => { auth.clearTokens(); onDone('Guest') }}>
         <Text style={g.ghostTxt}>Continue as guest</Text>
       </TouchableOpacity>
+      {onSignIn && (
+        <TouchableOpacity style={{ marginTop: 14, alignItems: 'center' }} onPress={onSignIn}>
+          <Text style={{ fontSize: 14, color: '#A89BFA', fontWeight: '600' }}>Already have an account? Sign in →</Text>
+        </TouchableOpacity>
+      )}
       <Text style={g.disclaimerTxt}>By signing up, you agree to our Terms. Your data stays private.</Text>
     </ScrollView>
   )
 
   return (
-    <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
+    <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={g.registerScroll}>
       <TouchableOpacity style={{ marginBottom: 20 }} onPress={() => setStep('method')}>
         <Text style={g.backLink}>{t('back')}</Text>
       </TouchableOpacity>
-      <Text style={g.logo}>{t('createAccount')}</Text>
-      <Text style={g.logoSub}>Your name and email, that's all.</Text>
+      <Text style={[g.logo, { color: '#7B6EF6' }]}>{t('createAccount')}</Text>
+      <Text style={[g.logoSub, { color: theme.textSub }]}>Your name and email, that's all.</Text>
       <View style={{ marginTop: 28 }}>
-        <Text style={g.inputLabel}>{t('whatName')}</Text>
-        <TextInput style={g.authInput} value={name} onChangeText={setName} placeholder="e.g. Alex" placeholderTextColor="#9A9DB2" />
-        <Text style={[g.inputLabel, { marginTop: 16 }]}>{t('emailAddress')}</Text>
-        <TextInput style={g.authInput} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9A9DB2" keyboardType="email-address" autoCapitalize="none" />
-        <Text style={[g.inputLabel, { marginTop: 16 }]}>{t('password')}</Text>
-        <TextInput style={g.authInput} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor="#9A9DB2" secureTextEntry />
+        <Text style={[g.inputLabel, { color: theme.text }]}>{t('whatName')}</Text>
+        <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={name} onChangeText={setName} placeholder="e.g. Alex" placeholderTextColor={theme.textTertiary} />
+        <Text style={[g.inputLabel, { marginTop: 16, color: theme.text }]}>{t('emailAddress')}</Text>
+        <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={theme.textTertiary} keyboardType="email-address" autoCapitalize="none" />
+        <Text style={[g.inputLabel, { marginTop: 16, color: theme.text }]}>{t('password')}</Text>
+        <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={theme.textTertiary} secureTextEntry />
         <TouchableOpacity style={[g.primaryBtn, { marginTop: 28 }, loading && g.off]} disabled={loading} onPress={handleEmailSignup}>
           <Text style={g.primaryBtnTxt}>{loading ? '⏳ Creating...' : `✦  ${t('createAccount')}`}</Text>
         </TouchableOpacity>
@@ -3795,27 +4967,20 @@ function RegisterFallback({ onDone }: { onDone: (name: string) => void }) {
 }
 
 // Brand logos for the sign-up buttons (crisp vector marks).
-function GoogleIcon({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 48 48">
-      <SvgPath fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-      <SvgPath fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-      <SvgPath fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z" />
-      <SvgPath fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-    </Svg>
-  )
-}
-function AppleIcon({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 384 512">
-      <SvgPath fill="#000000" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
-    </Svg>
-  )
-}
 function TelegramIcon({ size = 20 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <SvgPath fill="#2AABEE" d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.44 14.46l-2.94-.918c-.64-.203-.653-.64.136-.954l11.49-4.43c.534-.194 1.002.131.957.073l-.521.017z" />
+    </Svg>
+  )
+}
+function GoogleIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <SvgPath fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <SvgPath fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <SvgPath fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <SvgPath fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
     </Svg>
   )
 }
@@ -3828,15 +4993,19 @@ function FacebookIcon({ size = 20 }: { size?: number }) {
 }
 
 function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSignIn?: () => void }) {
+  const { t: theme } = useT()
   const [step, setStep] = useState<'method' | 'email' | 'verify'>('method')
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [verifyToken, setVerifyToken] = useState('')
+  const isTgMiniApp = typeof window !== 'undefined' && !!(window as any).Telegram?.WebApp?.initData
 
   // ── Real Google OAuth (expo-auth-session) ──
-  const [gRequest, gResponse, gPromptAsync] = Google.useAuthRequest({
+  // useIdTokenAuthRequest, NOT useAuthRequest: the latter defaults to ResponseType.Token
+  // and returns only an access token, which the backend can't verify via tokeninfo?id_token.
+  const [gRequest, gResponse, gPromptAsync] = Google.useIdTokenAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID || null as any,
     iosClientId: GOOGLE_IOS_CLIENT_ID || null as any,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID || null as any,
@@ -3844,8 +5013,8 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
   })
   useEffect(() => {
     if (gResponse?.type !== 'success') return
+    const idToken = (gResponse.params as any)?.id_token || gResponse.authentication?.idToken
     const accessToken = gResponse.authentication?.accessToken
-    const idToken = gResponse.authentication?.idToken
     if (!accessToken && !idToken) return
     setLoading(true)
     ;(async () => {
@@ -3949,7 +5118,7 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
 
   if (step === 'method') {
     return (
-      <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
+      <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={g.registerScroll}>
         <TelegramMiniAppBanner onAuth={async (data) => {
           await auth.saveTokens(data.accessToken, data.refreshToken)
           const userName = data.user?.name || 'Friend'
@@ -3960,8 +5129,8 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
         }} />
         <View style={{ alignItems: 'center', marginBottom: 32 }}>
           <View style={{ marginBottom: 14 }}><SomaMark size={72} /></View>
-          <Text style={g.logo}>Meet yourself first.</Text>
-          <Text style={g.logoSub}>Meet others next. Start exploring now — no account needed.</Text>
+          <Text style={[g.logo, { color: '#7B6EF6' }]}>Someone Offers Meaning & Answers</Text>
+          <Text style={[g.logoSub, { color: theme.textSub }]}>Meet others next. Start exploring now — no account needed.</Text>
         </View>
 
         {/* Primary CTA — guest */}
@@ -3982,12 +5151,14 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
           <View style={g.dividerLine} />
         </View>
 
-        <TouchableOpacity style={g.socialBtn} onPress={() => handleSocial('Google')}>
-          <View style={{ width: 28, alignItems: 'center' }}><GoogleIcon size={20} /></View>
-          <Text style={g.socialLabel}>{t('continueWith').replace('or ', '').replace('ou ', '').replace('oder ', '').trim()} Google</Text>
-        </TouchableOpacity>
+        {!isTgMiniApp && GOOGLE_ENABLED && (
+          <TouchableOpacity style={[g.socialBtn, { backgroundColor: theme.card, borderColor: theme.border }, (!gRequest || loading) && { opacity: 0.7 }]} disabled={!gRequest || loading} onPress={() => handleSocial('Google')}>
+            <View style={{ width: 28, alignItems: 'center' }}><GoogleIcon size={20} /></View>
+            <Text style={[g.socialLabel, { color: theme.text }]}>Continue with Google</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity style={[g.socialBtn, tgPending && { opacity: 0.7 }]} disabled={tgPending} onPress={() => openTelegramAuth(async (data) => {
+        <TouchableOpacity style={[g.socialBtn, { backgroundColor: theme.card, borderColor: theme.border }, tgPending && { opacity: 0.7 }]} disabled={tgPending} onPress={() => openTelegramAuth(async (data) => {
             await auth.saveTokens(data.accessToken, data.refreshToken)
             const userName = data.user?.name || 'Friend'
             const pulled = await cloudSync.pull()
@@ -3998,12 +5169,12 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
           <View style={{ width: 28, alignItems: 'center' }}>
             {tgPending ? <ActivityIndicator size="small" color="#2AABEE" /> : <TelegramIcon size={20} />}
           </View>
-          <Text style={g.socialLabel}>{tgPending ? 'Waiting for Telegram…' : 'Continue with Telegram'}</Text>
+          <Text style={[g.socialLabel, { color: theme.text }]}>{tgPending ? 'Waiting for Telegram…' : 'Continue with Telegram'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[g.socialBtn, { marginTop: 0 }]} onPress={() => setStep('email')}>
+        <TouchableOpacity style={[g.socialBtn, { marginTop: 0, backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => setStep('email')}>
           <View style={{ width: 28, alignItems: 'center' }}><Text style={{ fontSize: 18 }}>✉️</Text></View>
-          <Text style={g.socialLabel}>Sign up with email</Text>
+          <Text style={[g.socialLabel, { color: theme.text }]}>Sign up with email</Text>
         </TouchableOpacity>
 
         <Text style={g.disclaimerTxt}>By signing up, you agree to our Terms. Your data stays private.</Text>
@@ -4024,12 +5195,12 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
 
   if (step === 'verify') {
     return (
-      <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
-        <Text style={g.logo}>Verify your email</Text>
-        <Text style={g.logoSub}>We sent you a confirmation link. Click it to activate your account.</Text>
+      <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={g.registerScroll}>
+        <Text style={[g.logo, { color: '#7B6EF6' }]}>Verify your email</Text>
+        <Text style={[g.logoSub, { color: theme.textSub }]}>We sent you a confirmation link. Click it to activate your account.</Text>
 
-        <View style={{ marginTop: 28, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E9E6F2' }}>
-          <Text style={{ color: '#222540', fontSize: 13, lineHeight: 20 }}>
+        <View style={{ marginTop: 28, backgroundColor: theme.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+          <Text style={{ color: theme.text, fontSize: 13, lineHeight: 20 }}>
             📧 Check {email} for the verification link.{'\n\n'}
             Link expires in 24 hours.{'\n\n'}
             Once verified, you'll be all set!
@@ -4048,23 +5219,23 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
   }
 
   return (
-    <ScrollView style={g.screen} contentContainerStyle={g.registerScroll}>
+    <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={g.registerScroll}>
       <TouchableOpacity style={{ marginBottom: 20 }} onPress={() => setStep('method')}>
         <Text style={g.backLink}>{t('back')}</Text>
       </TouchableOpacity>
 
-      <Text style={g.logo}>{t('createAccount')}</Text>
-      <Text style={g.logoSub}>Your name and email, that's all.</Text>
+      <Text style={[g.logo, { color: '#7B6EF6' }]}>{t('createAccount')}</Text>
+      <Text style={[g.logoSub, { color: theme.textSub }]}>Your name and email, that's all.</Text>
 
       <View style={{ marginTop: 28 }}>
-        <Text style={g.inputLabel}>{t('whatName')}</Text>
-        <TextInput style={g.authInput} value={name} onChangeText={setName} placeholder="e.g. Alex" placeholderTextColor="#9A9DB2" />
+        <Text style={[g.inputLabel, { color: theme.text }]}>{t('whatName')}</Text>
+        <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={name} onChangeText={setName} placeholder="e.g. Alex" placeholderTextColor={theme.textTertiary} />
 
-        <Text style={[g.inputLabel, { marginTop: 16 }]}>{t('emailAddress')}</Text>
-        <TextInput style={g.authInput} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9A9DB2" keyboardType="email-address" autoCapitalize="none" />
+        <Text style={[g.inputLabel, { marginTop: 16, color: theme.text }]}>{t('emailAddress')}</Text>
+        <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={theme.textTertiary} keyboardType="email-address" autoCapitalize="none" />
 
-        <Text style={[g.inputLabel, { marginTop: 16 }]}>{t('password')}</Text>
-        <TextInput style={g.authInput} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor="#9A9DB2" secureTextEntry />
+        <Text style={[g.inputLabel, { marginTop: 16, color: theme.text }]}>{t('password')}</Text>
+        <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={theme.textTertiary} secureTextEntry />
 
         <TouchableOpacity style={[g.primaryBtn, { marginTop: 28 }, loading && g.off]} disabled={loading} onPress={handleEmailSignup}>
           <Text style={g.primaryBtnTxt}>{loading ? '⏳ Creating...' : `✦  ${t('createAccount')}`}</Text>
@@ -4076,6 +5247,7 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
 
 // ── LOGIN ────────────────────────────────────────────────────
 function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) => void; onRegister: () => void; onForgot: () => void }) {
+  const { t: theme } = useT()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -4083,6 +5255,45 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendSent, setResendSent] = useState(false)
+  const isTgMiniApp = typeof window !== 'undefined' && !!(window as any).Telegram?.WebApp?.initData
+
+  // useIdTokenAuthRequest, NOT useAuthRequest — see the signup screen for why.
+  const [gRequest, gResponse, gPromptAsync] = Google.useIdTokenAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID || null as any,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || null as any,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || null as any,
+    redirectUri: GOOGLE_REDIRECT_URI,
+  })
+  useEffect(() => {
+    if (gResponse?.type !== 'success') return
+    const idToken = (gResponse.params as any)?.id_token || gResponse.authentication?.idToken
+    if (!idToken) { alert('Google sign-in did not return an ID token. Please try again.'); return }
+    setLoading(true)
+    ;(async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/auth/social`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'google', token: idToken }),
+        })
+        const data = await res.json()
+        if (res.ok && data.accessToken) {
+          await auth.saveTokens(data.accessToken, data.refreshToken)
+          const userName = data.user?.name || 'Friend'
+          const pulled = await cloudSync.pull()
+          if (!pulled) DB.register(userName)
+          else cloudSync.push().catch(() => {})
+          onDone(userName)
+        } else {
+          alert(data.error || 'Google sign-in failed')
+        }
+      } catch {
+        alert('Google sign-in failed. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [gResponse])
 
   const handleTelegramAuth = async (tgData: any) => {
     if (!BACKEND_URL || BACKEND_URL.includes('localhost')) {
@@ -4146,11 +5357,11 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
   }
 
   return (
-    <ScrollView style={g.screen} contentContainerStyle={g.registerScroll} keyboardShouldPersistTaps="handled">
+    <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={g.registerScroll} keyboardShouldPersistTaps="handled">
       <View style={{ alignItems: 'center', marginBottom: 32 }}>
         <View style={{ marginBottom: 14 }}><SomaMark size={72} /></View>
-        <Text style={g.logo}>Welcome back</Text>
-        <Text style={g.logoSub}>Sign in to continue your journey</Text>
+        <Text style={[g.logo, { color: '#7B6EF6' }]}>Welcome back</Text>
+        <Text style={[g.logoSub, { color: theme.textSub }]}>Sign in to continue your journey</Text>
       </View>
 
       <TelegramMiniAppBanner onAuth={async (data) => {
@@ -4161,11 +5372,11 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
         onDone(userName)
       }} />
 
-      <Text style={g.inputLabel}>{t('emailAddress')}</Text>
-      <TextInput style={g.authInput} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9A9DB2" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+      <Text style={[g.inputLabel, { color: theme.text }]}>{t('emailAddress')}</Text>
+      <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={theme.textTertiary} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
 
-      <Text style={[g.inputLabel, { marginTop: 16 }]}>{t('password')}</Text>
-      <TextInput style={g.authInput} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor="#9A9DB2" secureTextEntry />
+      <Text style={[g.inputLabel, { marginTop: 16, color: theme.text }]}>{t('password')}</Text>
+      <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={theme.textTertiary} secureTextEntry />
 
       <TouchableOpacity style={{ alignSelf: 'flex-end', marginTop: 8 }} onPress={onForgot}>
         <Text style={{ color: '#7B6EF6', fontSize: 13 }}>Forgot password?</Text>
@@ -4175,23 +5386,62 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
         <Text style={g.primaryBtnTxt}>{loading ? '⏳ Signing in...' : 'Sign In'}</Text>
       </TouchableOpacity>
 
-      <View style={[g.dividerRow, { marginTop: 20 }]}>
-        <View style={g.dividerLine} />
-        <Text style={g.dividerTxt}>or</Text>
-        <View style={g.dividerLine} />
-      </View>
-      <TouchableOpacity style={[g.socialBtn, { marginTop: 8 }, tgPending && { opacity: 0.7 }]} disabled={tgPending} onPress={() => openTelegramAuth(async (data) => {
-          await auth.saveTokens(data.accessToken, data.refreshToken)
-          const userName = data.user?.name || 'Friend'
-          const pulled = await cloudSync.pull()
-          if (!pulled) DB.register(userName)
-          else cloudSync.push().catch(() => {})
-          onDone(userName)
-        }, setTgPending)}>
+      {/* Google — not available inside Telegram Mini App */}
+      {!isTgMiniApp && GOOGLE_ENABLED && (
+        <TouchableOpacity
+          style={[g.socialBtn, { marginTop: 10, backgroundColor: theme.card, borderColor: theme.border }, (!gRequest || loading) && { opacity: 0.7 }]}
+          disabled={!gRequest || loading}
+          onPress={() => gPromptAsync()}
+        >
+          <View style={{ width: 28, alignItems: 'center' }}>
+            <GoogleIcon size={20} />
+          </View>
+          <Text style={[g.socialLabel, { color: theme.text }]}>Continue with Google</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Telegram */}
+      <TouchableOpacity style={[g.socialBtn, { marginTop: 10, backgroundColor: theme.card, borderColor: theme.border }, tgPending && { opacity: 0.7 }]} disabled={tgPending} onPress={async () => {
+        // Inside Telegram Mini App — use initData directly instead of bot-link flow
+        const tg = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : null
+        if (tg?.initData) {
+          setTgPending(true)
+          try {
+            const res = await fetch(`${BACKEND_URL}/auth/telegram-webapp`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ initData: tg.initData }),
+            })
+            const data = await res.json()
+            if (res.ok && data.accessToken) {
+              await auth.saveTokens(data.accessToken, data.refreshToken)
+              const userName = data.user?.name || tg.initDataUnsafe?.user?.first_name || 'Friend'
+              const pulled = await cloudSync.pull()
+              if (!pulled) DB.register(userName)
+              else cloudSync.push().catch(() => {})
+              onDone(userName)
+            } else {
+              alert(data.error || 'Telegram login failed. Please try email instead.')
+            }
+          } catch {
+            alert('Could not reach server. Please sign in with email.')
+          } finally { setTgPending(false) }
+        } else {
+          // Regular web — use bot-link flow
+          openTelegramAuth(async (data) => {
+            await auth.saveTokens(data.accessToken, data.refreshToken)
+            const userName = data.user?.name || 'Friend'
+            const pulled = await cloudSync.pull()
+            if (!pulled) DB.register(userName)
+            else cloudSync.push().catch(() => {})
+            onDone(userName)
+          }, setTgPending)
+        }
+      }}>
         <View style={{ width: 28, alignItems: 'center' }}>
           {tgPending ? <ActivityIndicator size="small" color="#2AABEE" /> : <TelegramIcon size={20} />}
         </View>
-        <Text style={g.socialLabel}>{tgPending ? 'Waiting for Telegram…' : 'Continue with Telegram'}</Text>
+        <Text style={[g.socialLabel, { color: theme.text }]}>{tgPending ? 'Signing in via Telegram…' : 'Continue with Telegram'}</Text>
       </TouchableOpacity>
 
       {unverifiedEmail && (
@@ -4211,14 +5461,8 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
         </View>
       )}
 
-      <View style={[g.dividerRow, { marginTop: 28 }]}>
-        <View style={g.dividerLine} />
-        <Text style={g.dividerTxt}>don't have an account?</Text>
-        <View style={g.dividerLine} />
-      </View>
-
-      <TouchableOpacity style={[g.socialBtn, { marginTop: 12 }]} onPress={onRegister}>
-        <Text style={[g.socialLabel, { textAlign: 'center', flex: 1 }]}>Create account</Text>
+      <TouchableOpacity style={[g.socialBtn, { marginTop: 10, backgroundColor: theme.card, borderColor: theme.border }]} onPress={onRegister}>
+        <Text style={[g.socialLabel, { textAlign: 'center', flex: 1, color: theme.text }]}>Create account</Text>
       </TouchableOpacity>
     </ScrollView>
   )
@@ -4226,6 +5470,7 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
 
 // ── FORGOT PASSWORD ───────────────────────────────────────────
 function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
+  const { t: theme } = useT()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -4244,28 +5489,28 @@ function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <ScrollView style={g.screen} contentContainerStyle={g.registerScroll} keyboardShouldPersistTaps="handled">
+    <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={g.registerScroll} keyboardShouldPersistTaps="handled">
       <TouchableOpacity style={{ marginBottom: 20 }} onPress={onBack}>
         <Text style={g.backLink}>{`← Back`}</Text>
       </TouchableOpacity>
 
       <View style={{ alignItems: 'center', marginBottom: 32 }}>
         <View style={{ marginBottom: 14 }}><SomaMark size={72} /></View>
-        <Text style={g.logo}>Reset password</Text>
-        <Text style={g.logoSub}>We'll send a reset link to your email</Text>
+        <Text style={[g.logo, { color: '#7B6EF6' }]}>Reset password</Text>
+        <Text style={[g.logoSub, { color: theme.textSub }]}>We'll send a reset link to your email</Text>
       </View>
 
       {sent ? (
-        <View style={{ backgroundColor: '#F0FDF4', borderRadius: 14, padding: 20, borderWidth: 1, borderColor: '#86EFAC' }}>
-          <Text style={{ color: '#166534', fontSize: 15, fontWeight: '600', marginBottom: 8 }}>Check your email 📧</Text>
-          <Text style={{ color: '#166534', fontSize: 13, lineHeight: 20 }}>
+        <View style={{ backgroundColor: theme.card, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: '#86EFAC50' }}>
+          <Text style={{ color: '#4CAF7D', fontSize: 15, fontWeight: '600', marginBottom: 8 }}>Check your email 📧</Text>
+          <Text style={{ color: theme.textSub, fontSize: 13, lineHeight: 20 }}>
             We sent a reset link to {email}.{'\n'}Click the link in that email to set a new password.{'\n\n'}Link expires in 1 hour.
           </Text>
         </View>
       ) : (
         <>
-          <Text style={g.inputLabel}>Email address</Text>
-          <TextInput style={g.authInput} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9A9DB2" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+          <Text style={[g.inputLabel, { color: theme.text }]}>Email address</Text>
+          <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={theme.textTertiary} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
           <TouchableOpacity style={[g.primaryBtn, { marginTop: 24 }, loading && g.off]} disabled={loading} onPress={handleSubmit}>
             <Text style={g.primaryBtnTxt}>{loading ? '⏳ Sending...' : 'Send Reset Link'}</Text>
           </TouchableOpacity>
@@ -4277,6 +5522,7 @@ function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
 
 // ── VERIFY EMAIL (launched when ?verify=TOKEN in URL) ─────────
 function VerifyEmailScreen({ token, onDone }: { token: string; onDone: () => void }) {
+  const { t } = useT()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -4301,20 +5547,20 @@ function VerifyEmailScreen({ token, onDone }: { token: string; onDone: () => voi
       {status === 'loading' && (
         <>
           <Text style={{ fontSize: 32, marginBottom: 16 }}>✉️</Text>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#222540', textAlign: 'center' }}>Verifying your email…</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: t.text, textAlign: 'center' }}>Verifying your email…</Text>
         </>
       )}
       {status === 'success' && (
         <>
           <Text style={{ fontSize: 48, marginBottom: 16 }}>✅</Text>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: '#222540', textAlign: 'center', marginBottom: 8 }}>Email confirmed!</Text>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 8 }}>Email confirmed!</Text>
           <Text style={{ fontSize: 15, color: '#6E7191', textAlign: 'center', marginBottom: 32 }}>Taking you in…</Text>
         </>
       )}
       {status === 'error' && (
         <>
           <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#222540', textAlign: 'center', marginBottom: 8 }}>Verification failed</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: t.text, textAlign: 'center', marginBottom: 8 }}>Verification failed</Text>
           <Text style={{ fontSize: 14, color: '#6E7191', textAlign: 'center', marginBottom: 32 }}>{errorMsg}</Text>
           <TouchableOpacity style={g.primaryBtn} onPress={onDone}>
             <Text style={g.primaryBtnTxt}>Back to Sign In</Text>
@@ -4327,6 +5573,7 @@ function VerifyEmailScreen({ token, onDone }: { token: string; onDone: () => voi
 
 // ── RESET PASSWORD (launched when ?reset=TOKEN in URL) ────────
 function ResetPasswordScreen({ token, onDone }: { token: string; onDone: () => void }) {
+  const { t: theme } = useT()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
@@ -4360,10 +5607,10 @@ function ResetPasswordScreen({ token, onDone }: { token: string; onDone: () => v
         </TouchableOpacity>
       ) : (
         <>
-          <Text style={g.inputLabel}>New password</Text>
-          <TextInput style={g.authInput} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor="#9A9DB2" secureTextEntry />
-          <Text style={[g.inputLabel, { marginTop: 16 }]}>Confirm password</Text>
-          <TextInput style={g.authInput} value={confirm} onChangeText={setConfirm} placeholder="••••••••" placeholderTextColor="#9A9DB2" secureTextEntry />
+          <Text style={[g.inputLabel, { color: theme.text }]}>New password</Text>
+          <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={theme.textTertiary} secureTextEntry />
+          <Text style={[g.inputLabel, { marginTop: 16, color: theme.text }]}>Confirm password</Text>
+          <TextInput style={[g.authInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={confirm} onChangeText={setConfirm} placeholder="••••••••" placeholderTextColor={theme.textTertiary} secureTextEntry />
           <TouchableOpacity style={[g.primaryBtn, { marginTop: 24 }, loading && g.off]} disabled={loading} onPress={handleReset}>
             <Text style={g.primaryBtnTxt}>{loading ? '⏳ Resetting...' : 'Set New Password'}</Text>
           </TouchableOpacity>
@@ -4374,7 +5621,7 @@ function ResetPasswordScreen({ token, onDone }: { token: string; onDone: () => v
 }
 
 // ── AURA CHAT (try / full / diary) ─────────────────────────
-function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart }: {
+function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart }: {
   mode: 'try' | 'full' | 'diary'; profile: UserProfile; onRefresh: () => void; onDone: () => void; title: string; isDiary?: boolean; autoStart?: boolean
 }) {
   const { t } = useT()
@@ -4495,15 +5742,15 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
             {p.aiPhoto ? <Image source={{ uri: p.aiPhoto }} style={{ width: 44, height: 44, borderRadius: 22 }} /> : <Text style={g.orbIcon}>✦</Text>}
           </Animated.View>
           <View style={{ flex: 1 }}>
-            <Text style={g.auraTitle}>{title}</Text>
-            <Text style={g.auraSub}>
+            <Text style={[g.auraTitle, { color: t.text }]}>{title}</Text>
+            <Text style={[g.auraSub, { color: t.textSub }]}>
               {speaking ? '🔊 Speaking...' : listening ? '🎙 Listening...' : loading ? '💭 Thinking...'
                 : mode === 'try' ? 'Try me — no signup needed' : `Remembers ${p.memories.length} things about you`}
             </Text>
           </View>
           {started && (
             <TouchableOpacity onPress={isDiary ? finishDiary : onDone} style={g.smallBtn}>
-              <Text style={g.smallBtnTxt}>{isDiary ? 'Save' : mode === 'try' ? 'Join →' : 'Home'}</Text>
+              <Text style={g.smallBtnTxt}>{isDiary ? tr('save_entry') : mode === 'try' ? tr('join') : tr('home')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -4515,15 +5762,15 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
               <Image source={p.aiPhoto ? { uri: p.aiPhoto } : require('./assets/icon.png')}
                 style={{ width: 132, height: 132, borderRadius: 34 }} />
             </Animated.View>
-            <Text style={g.startTitle}>{autoStart ? 'Soma is ready.' : mode === 'try' ? 'Talk to Soma.' : isDiary ? 'How was\nyour day?' : `Hi ${p.name}.`}</Text>
+            <Text style={[g.startTitle, { color: t.text }]}>{autoStart ? tr('soma_ready') : mode === 'try' ? tr('talkToSoma') : isDiary ? tr('how_was_day') : `Hi ${p.name}.`}</Text>
             <Text style={g.startSub}>
               {autoStart ? 'Starting your first conversation…'
                 : mode === 'try' ? 'Before you decide anything, just talk.\nShare what is on your mind. Soma is here\nas your friend, right now.'
                 : isDiary ? 'Tell Soma about your day.\nShe will remember it for you.'
                 : `Soma remembers ${p.memories.length} things and\n${p.circle.length} people in your life.`}
             </Text>
-            <TouchableOpacity style={g.primaryBtn} onPress={start}><Text style={g.primaryBtnTxt}>✦  Start talking</Text></TouchableOpacity>
-            {mode !== 'try' && <TouchableOpacity onPress={onDone}><Text style={g.ghostTxt}>Back to home</Text></TouchableOpacity>}
+            <TouchableOpacity style={g.primaryBtn} onPress={start}><Text style={g.primaryBtnTxt}>{tr('start_talking')}</Text></TouchableOpacity>
+            {mode !== 'try' && <TouchableOpacity onPress={onDone}><Text style={g.ghostTxt}>{tr('back')}</Text></TouchableOpacity>}
           </View>
         ) : (
           <>
@@ -4531,16 +5778,16 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
               {msgs.map((m, i) => <Bubble key={i} msg={m} />)}
               {loading && <Typing />}
               {mode === 'try' && msgs.length >= 5 && (
-                <View style={g.joinCard}>
+                <View style={[g.joinCard, { backgroundColor: t.card }]}>
                   <Text style={g.joinTitle}>✦  Keep this forever?</Text>
-                  <Text style={g.joinSub}>Join SOMA and Soma will remember everything and grow with you across your whole life.</Text>
+                  <Text style={[g.joinSub, { color: t.text }]}>Join SOMA and Soma will remember everything and grow with you across your whole life.</Text>
                   <TouchableOpacity style={g.joinBtn} onPress={onDone}><Text style={g.joinBtnTxt}>Create my SOMA →</Text></TouchableOpacity>
                 </View>
               )}
             </ScrollView>
             <View style={g.inputBar}>
               <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#9A9DB2" multiline />
-              <TouchableOpacity style={[g.iconBtn, listening && g.iconOn]} onPress={onMic} disabled={loading}><Text style={{ fontSize: 20 }}>{listening ? '⏹' : '🎙'}</Text></TouchableOpacity>
+              <TouchableOpacity style={[g.iconBtn, { backgroundColor: t.card, borderColor: t.border }, listening && g.iconOn]} onPress={onMic} disabled={loading}><Text style={{ fontSize: 20 }}>{listening ? '⏹' : '🎙'}</Text></TouchableOpacity>
               <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
             </View>
           </>
@@ -4551,7 +5798,7 @@ function AuraChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
 }
 
 // ── MAIN TABS (3-world navigation) ─────────────────────────
-type TabName = 'circle' | 'inner' | 'outer' | 'bond'
+type TabName = 'circle' | 'inner' | 'chat' | 'outer' | 'bond'
 
 // All translations of "Romantic partner" across languages
 const ROMANTIC_LABELS = new Set([
@@ -4566,14 +5813,67 @@ function getRomanticPartner(profile: UserProfile) {
   return profile.circle.find(p => ROMANTIC_LABELS.has(p.relationship) || p.type === 'romantic')
 }
 
-function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => void }) {
+// Demo feed posts generated from circle member data
+function getCircleFeedPosts(circle: CirclePerson[]): Array<{ id: string; authorId: string; authorName: string; relationship: string; type: string; text: string; postedAt: string; reactions: { emoji: string; count: number }[]; myReaction?: string }> {
+  const templates = [
+    { type: 'friend',   texts: ["Just got back from a long walk — sometimes that's all you need 🌿", "Coffee hit different this morning ☕ Grateful for slow mornings.", "Can't stop thinking about that conversation we had last week. You always make me think.", "Good news: the thing I was nervous about went really well 🙌", "Reading a book that's genuinely changing how I see things. Will share when I'm done."] },
+    { type: 'family',   texts: ["Made grandma's recipe tonight. Turned out exactly right. Miss her.", "Had the best Sunday lunch with the whole crew 🥰", "Little moments at home are everything lately.", "Cleaned the whole house, feeling weirdly proud of myself lol", "Just realized how fast time is moving. Trying to slow down and notice more."] },
+    { type: 'romantic', texts: ["The simplest days with you feel like the best ones 💜", "Morning walks > everything. Especially when you're there.", "I think I finally feel settled. Like, truly settled.", "Making dinner tonight — trying that new recipe. Fingers crossed 🤞", "Watched the sunset from the balcony. Perfect."] },
+    { type: 'work',     texts: ["Wrapped a project that took forever. Finally exhaling.", "Best team meeting I've had in months — people really showed up.", "Remember to rest, not just recharge. Big difference.", "Crossed something big off my list today. Small wins matter.", "Got some feedback that actually helped instead of just landing hard."] },
+    { type: 'default',  texts: ["Feeling good today. Hope you are too 🌸", "Some days just click, you know?", "Grateful for the people I get to trust. That's rare.", "Taking it one step at a time. It's working.", "Checked in with myself today. Highly recommend."] },
+  ]
+  const reactionSets = [
+    [{ emoji: '❤️', count: 3 }, { emoji: '🙌', count: 1 }],
+    [{ emoji: '😊', count: 2 }],
+    [{ emoji: '❤️', count: 5 }, { emoji: '😂', count: 2 }, { emoji: '🙌', count: 1 }],
+    [{ emoji: '🔥', count: 1 }, { emoji: '❤️', count: 4 }],
+    [{ emoji: '😊', count: 3 }, { emoji: '🥰', count: 2 }],
+  ]
+  const now = Date.now()
+  const posts: ReturnType<typeof getCircleFeedPosts> = []
+  circle.slice(0, 8).forEach((person, idx) => {
+    const bucket = templates.find(t => t.type === person.type) || templates[4]
+    const text = bucket.texts[idx % bucket.texts.length]
+    const hoursAgo = [1, 3, 6, 10, 14, 20, 26, 34][idx] || 48
+    posts.push({
+      id: `feed_${person.id}`,
+      authorId: person.id,
+      authorName: person.name,
+      relationship: person.relationship || person.type,
+      type: 'text',
+      text,
+      postedAt: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
+      reactions: reactionSets[idx % reactionSets.length],
+    })
+  })
+  return posts.sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime())
+}
+
+function fmtAgo(iso: string) {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+const AVATAR_COLORS = ['#7B6EF6','#F6A86E','#F66E8E','#6EE5F6','#A8F6A0','#F6E96E','#C46EF6','#6E9CF6']
+
+function MyCircleTab({ profile, go, onPersonChat }: { profile: UserProfile; go: (s: Screen) => void; onPersonChat?: (userId: string, name: string) => void }) {
   const { t: theme } = useT()
   const [showPost, setShowPost] = useState(false)
   const [viewMoment, setViewMoment] = useState<Moment | null>(null)
   const [addModal, setAddModal] = useState(false)
   const [addName, setAddName] = useState('')
+  const [addSomaCode, setAddSomaCode] = useState('')
+  const [addSomaFound, setAddSomaFound] = useState<string | null>(null)
   const [addType, setAddType] = useState<'friend' | 'family' | 'romantic' | 'work'>('friend')
   const [addRelationship, setAddRelationship] = useState('Friend')
+  const [postDraft, setPostDraft] = useState('')
+  const [mediaDraft, setMediaDraft] = useState<string | null>(null)
+  const [mediaTypeDraft, setMediaTypeDraft] = useState<'photo' | 'video' | null>(null)
+  const [myPosts, setMyPosts] = useState<Array<{ id: string; text: string; mediaUrl?: string; mediaType?: 'photo' | 'video'; postedAt: string; reactions: { emoji: string; count: number }[] }>>([])
+  const [reacted, setReacted] = useState<Record<string, string>>({})
   const FAMILY_ROLES = ['Dad','Mom','Brother','Sister','Grandmother','Grandfather','Uncle','Aunt','Son','Daughter','Cousin','Other family']
   const ROMANTIC_ROLES = ['Girlfriend','Boyfriend','Spouse','Partner']
   const WORK_ROLES = ['Colleague','Manager','Mentor','Employee']
@@ -4583,150 +5883,337 @@ function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) =>
     DB.addCircle(addName.trim(), addType, '')
     const p = DB.get()
     const member = p.circle.find(c => c.name === addName.trim() && c.type === addType)
-    if (member) { member.relationship = addRelationship; DB.save(p) }
-    setAddModal(false); setAddName(''); setAddType('friend'); setAddRelationship('Friend')
+    if (member) {
+      member.relationship = addRelationship
+      if (addSomaFound && addSomaCode.trim()) member.somaUserId = addSomaCode.trim().toUpperCase()
+      DB.save(p)
+    }
+    setAddModal(false); setAddName(''); setAddSomaCode(''); setAddSomaFound(null); setAddType('friend'); setAddRelationship('Friend')
   }
+
+  const pickMediaDraft = (type: 'photo' | 'video') => {
+    if (typeof document === 'undefined') return
+    const inp = document.createElement('input')
+    inp.type = 'file'
+    inp.accept = type === 'photo' ? 'image/*' : 'video/*'
+    inp.onchange = () => {
+      const file = inp.files?.[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => { setMediaDraft(reader.result as string); setMediaTypeDraft(type) }
+      reader.readAsDataURL(file)
+    }
+    inp.click()
+  }
+
+  const submitPost = () => {
+    if (!postDraft.trim() && !mediaDraft) return
+    const id = `my_${Date.now()}`
+    const now = new Date().toISOString()
+    const newPost = { id, text: postDraft.trim(), mediaUrl: mediaDraft || undefined, mediaType: mediaTypeDraft || undefined, postedAt: now, reactions: [] }
+    setMyPosts(prev => [newPost, ...prev])
+    if (mediaDraft && mediaTypeDraft) {
+      DB.addMoment({ id: `m_${id}`, authorId: 'me', authorName: profile.name || 'You', type: mediaTypeDraft, mediaUrl: mediaDraft, caption: postDraft.trim() || undefined, postedAt: now, reactions: [] })
+    }
+    setPostDraft(''); setMediaDraft(null); setMediaTypeDraft(null)
+  }
+
+  const toggleReact = (postId: string, emoji: string) => {
+    setReacted(prev => prev[postId] === emoji ? { ...prev, [postId]: '' } : { ...prev, [postId]: emoji })
+  }
+
+  const demoPosts = profile.circle.length > 0 ? getCircleFeedPosts(profile.circle) : []
+  const allFeedPosts = [...myPosts.map(p => ({ ...p, authorId: 'me', authorName: profile.name || 'You', relationship: 'You', type: 'text' as const, mediaUrl: p.mediaUrl, mediaType: p.mediaType })), ...demoPosts]
 
   return (
     <>
       <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* Header */}
         <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.greeting, { fontSize: 28 }]}>My Circle</Text>
-            <Text style={[g.auraSub, { marginTop: 4 }]}>Your 20 most important people</Text>
+            <Text style={[g.greeting, { fontSize: 28, color: theme.text }]}>Circle</Text>
+            <Text style={[g.auraSub, { marginTop: 2, color: theme.textSub }]}>Private moments with people you trust</Text>
           </View>
           <TouchableOpacity
-            onPress={() => profile.circle.length < 20 ? setAddModal(true) : null}
-            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', opacity: profile.circle.length >= 20 ? 0.4 : 1 }}>
-            <Text style={{ color: '#fff', fontSize: 26, lineHeight: 30 }}>+</Text>
+            onPress={() => setAddModal(true)}
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#7B6EF615', borderWidth: 1.5, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="person-add-outline" size={18} color="#7B6EF6" />
           </TouchableOpacity>
         </View>
 
+        {/* Stories strip */}
         {profile.circle.length > 0 && (
-          <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSub }}>Today's moments</Text>
-              <Text style={{ fontSize: 11, color: '#F6379B', fontWeight: '600' }}>★ Video with SOMA+</Text>
-            </View>
-            <MomentsStrip profile={profile} onAddPress={() => setShowPost(true)} onViewMoment={setViewMoment} />
+          <View style={{ marginBottom: 4 }}>
+            <MomentsStrip profile={profile} onPost={() => setShowPost(true)} onView={setViewMoment} />
           </View>
         )}
 
-        <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
-          {profile.circle.length === 0 ? (
-            <TouchableOpacity onPress={() => setAddModal(true)} style={{ borderRadius: 20, padding: 24, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border, borderStyle: 'dashed', alignItems: 'center', gap: 12 }}>
-              <Ionicons name="people-outline" size={36} color={theme.textSub} />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text }}>Add your first person</Text>
-              <Text style={{ fontSize: 13, color: theme.textSub, textAlign: 'center' }}>Your circle holds your most important people. Soma helps you stay connected.</Text>
-            </TouchableOpacity>
-          ) : (
-            profile.circle.slice(0, 8).map(person => {
-              const typeIcon: Record<string, keyof typeof Ionicons.glyphMap> = { therapy: 'medical-outline', family: 'home-outline', friend: 'people-outline', work: 'briefcase-outline', romantic: 'heart-outline' }
-              const score = Math.min(100, Math.max(0, 40 + person.mentions * 8))
-              return (
-                <TouchableOpacity key={person.id} onPress={() => go('circle')} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-                  <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name={typeIcon[person.type] || 'person-outline'} size={22} color={theme.accent} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{person.name}</Text>
-                    <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 1 }}>{person.relationship}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                    <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, overflow: 'hidden' }}>
-                      <View style={{ width: `${score}%` as any, height: '100%', backgroundColor: score > 60 ? '#22C55E' : '#F6A86E', borderRadius: 2 }} />
-                    </View>
-                    <Text style={{ fontSize: 10, color: theme.textSub }}>{score}%</Text>
-                  </View>
-                </TouchableOpacity>
-              )
-            })
-          )}
-          {profile.circle.length > 0 && (
-            <TouchableOpacity onPress={() => go('circle')} style={{ marginTop: 12, padding: 14, borderRadius: 14, backgroundColor: '#7B6EF610', borderWidth: 1, borderColor: '#7B6EF630', alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#7B6EF6' }}>Manage circle & journeys →</Text>
-            </TouchableOpacity>
-          )}
-        </View>
 
-        <TouchableOpacity onPress={() => go('relinsights')} style={{ marginHorizontal: 20, borderRadius: 18, padding: 16, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <Ionicons name="analytics-outline" size={28} color={theme.accent} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Relationship Insights</Text>
-            <Text style={{ fontSize: 13, color: theme.textSub }}>Soma's view of your connections</Text>
+        {profile.circle.length === 0 ? (
+          <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+            <TouchableOpacity onPress={() => setAddModal(true)} style={{ borderRadius: 20, padding: 28, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border, borderStyle: 'dashed', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="people-outline" size={40} color={theme.textSub} />
+              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>Add your first person</Text>
+              <Text style={{ fontSize: 13, color: theme.textSub, textAlign: 'center', lineHeight: 20 }}>Your Circle is a private space where the people you trust most can share moments with each other.</Text>
+              <View style={{ paddingHorizontal: 28, paddingVertical: 12, backgroundColor: '#7B6EF6', borderRadius: 22, marginTop: 4 }}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Add someone to your Circle</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-          <Text style={{ color: theme.textSub, fontSize: 18 }}>›</Text>
-        </TouchableOpacity>
+        ) : (
+          <View style={{ paddingHorizontal: 16 }}>
+            {/* Post composer */}
+            <View style={{ backgroundColor: theme.card, borderRadius: 18, borderWidth: 1, borderColor: theme.border, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {profile.profilePhoto
+                    ? <Image source={{ uri: profile.profilePhoto }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                    : <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>{(profile.name || '?')[0].toUpperCase()}</Text>
+                  }
+                </View>
+                <TextInput
+                  value={postDraft}
+                  onChangeText={setPostDraft}
+                  placeholder={mediaDraft ? 'Add a caption…' : `Share a moment with your Circle…`}
+                  placeholderTextColor={theme.textSub}
+                  multiline
+                  style={{ flex: 1, fontSize: 14, color: theme.text, minHeight: 36, paddingTop: 8 }}
+                />
+              </View>
+              {/* Media preview */}
+              {mediaDraft && (
+                <View style={{ marginTop: 10, borderRadius: 14, overflow: 'hidden', position: 'relative' }}>
+                  {mediaTypeDraft === 'photo'
+                    ? <Image source={{ uri: mediaDraft }} style={{ width: '100%', height: 200, borderRadius: 14 }} resizeMode="cover" />
+                    : <View style={{ width: '100%', height: 160, backgroundColor: '#0F0A2E', borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 40 }}>🎥</Text>
+                        <Text style={{ color: '#A89BFA', fontSize: 13, fontWeight: '600' }}>Video ready to share</Text>
+                      </View>
+                  }
+                  <TouchableOpacity onPress={() => { setMediaDraft(null); setMediaTypeDraft(null) }}
+                    style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 14 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {/* Bottom toolbar */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 8 }}>
+                <TouchableOpacity onPress={() => pickMediaDraft('photo')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.border }}>
+                  <Text style={{ fontSize: 15 }}>📷</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSub }}>Photo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => pickMediaDraft('video')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: theme.bg, borderWidth: 1, borderColor: theme.border }}>
+                  <Text style={{ fontSize: 15 }}>🎥</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSub }}>Video</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1 }} />
+                {(postDraft.trim().length > 0 || mediaDraft) && (
+                  <>
+                    <TouchableOpacity onPress={() => { setPostDraft(''); setMediaDraft(null); setMediaTypeDraft(null) }}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}>
+                      <Text style={{ fontSize: 13, color: theme.textSub }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={submitPost} style={{ paddingHorizontal: 16, paddingVertical: 7, borderRadius: 14, backgroundColor: '#7B6EF6' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Share</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {/* Feed */}
+            {allFeedPosts.map((post, idx) => {
+              const isMe = post.authorId === 'me'
+              const color = AVATAR_COLORS[idx % AVATAR_COLORS.length]
+              const myRxn = reacted[post.id]
+              return (
+                <View key={post.id} style={{ backgroundColor: theme.card, borderRadius: 18, borderWidth: 1, borderColor: theme.border, padding: 16, marginBottom: 12 }}>
+                  {/* Author row */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isMe ? '#7B6EF6' : color + '30', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: isMe ? '#7B6EF660' : color + '60' }}>
+                      {isMe && profile.profilePhoto
+                        ? <Image source={{ uri: profile.profilePhoto }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                        : <Text style={{ fontSize: 15, fontWeight: '800', color: isMe ? '#fff' : color }}>{post.authorName[0].toUpperCase()}</Text>
+                      }
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>{isMe ? 'You' : post.authorName}</Text>
+                      <Text style={{ fontSize: 11, color: theme.textSub, marginTop: 1 }}>{post.relationship} · {fmtAgo(post.postedAt)}</Text>
+                    </View>
+                    {!isMe && (
+                      <TouchableOpacity onPress={() => {
+                        const person = profile.circle.find(p => p.id === post.authorId)
+                        if (person && onPersonChat) onPersonChat(person.somaUserId || `circle_${person.id}`, person.name)
+                        else go('circle')
+                      }} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#7B6EF610', borderWidth: 1, borderColor: '#7B6EF630', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="chatbubble-outline" size={11} color="#7B6EF6" />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B6EF6' }}>Message</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Content */}
+                  {post.text ? <Text style={{ fontSize: 15, color: theme.text, lineHeight: 22, marginBottom: (post as any).mediaUrl ? 10 : 14 }}>{post.text}</Text> : null}
+                  {(post as any).mediaUrl && (
+                    <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 14 }}>
+                      {(post as any).mediaType === 'photo' || !(post as any).mediaType
+                        ? <Image source={{ uri: (post as any).mediaUrl }} style={{ width: '100%', height: 220, borderRadius: 14 }} resizeMode="cover" />
+                        : <View style={{ width: '100%', height: 160, backgroundColor: '#0F0A2E', borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                            <Text style={{ fontSize: 40 }}>▶️</Text>
+                            <Text style={{ color: '#A89BFA', fontSize: 13, fontWeight: '600' }}>Video</Text>
+                          </View>
+                      }
+                    </View>
+                  )}
+
+                  {/* Reactions */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {(['❤️','😊','🙌','🔥','🥹'] as const).map(emoji => (
+                      <TouchableOpacity
+                        key={emoji}
+                        onPress={() => toggleReact(post.id, emoji)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14,
+                          backgroundColor: myRxn === emoji ? '#7B6EF620' : theme.bg,
+                          borderWidth: 1, borderColor: myRxn === emoji ? '#7B6EF660' : theme.border }}>
+                        <Text style={{ fontSize: 14 }}>{emoji}</Text>
+                        {post.reactions.find(r => r.emoji === emoji) && (
+                          <Text style={{ fontSize: 11, color: myRxn === emoji ? '#7B6EF6' : theme.textSub, fontWeight: '600' }}>
+                            {(post.reactions.find(r => r.emoji === emoji)?.count || 0) + (myRxn === emoji ? 1 : 0)}
+                          </Text>
+                        )}
+                        {!post.reactions.find(r => r.emoji === emoji) && myRxn === emoji && (
+                          <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '600' }}>1</Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )
+            })}
+
+            {/* Manage + Insights */}
+            <TouchableOpacity onPress={() => go('circle')} style={{ padding: 14, borderRadius: 14, backgroundColor: '#7B6EF610', borderWidth: 1, borderColor: '#7B6EF630', alignItems: 'center', marginTop: 4, marginBottom: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#7B6EF6' }}>Manage your Circle →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => go('relinsights')} style={{ borderRadius: 16, padding: 16, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+              <Ionicons name="analytics-outline" size={24} color={theme.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>Relationship Insights</Text>
+                <Text style={{ fontSize: 12, color: theme.textSub }}>Soma's view of your connections</Text>
+              </View>
+              <Text style={{ color: theme.textSub, fontSize: 18 }}>›</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Add person modal */}
-      <Modal visible={addModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setAddModal(false)}>
-        <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 28, paddingBottom: 60 }}>
-          <TouchableOpacity onPress={() => setAddModal(false)} style={{ marginBottom: 20 }}>
-            <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '600' }}>‹ Cancel</Text>
-          </TouchableOpacity>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: 4 }}>Add someone</Text>
-          <Text style={{ fontSize: 14, color: theme.textSub, marginBottom: 28 }}>Add a person to your circle of 20</Text>
-
-          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 8 }}>Their name</Text>
-          <TextInput
-            value={addName}
-            onChangeText={setAddName}
-            placeholder="e.g. Mom, John, Dr. Smith"
-            placeholderTextColor={theme.textTertiary}
-            autoFocus
-            autoCorrect={false}
-            style={{ backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, color: theme.text, marginBottom: 24 }}
-          />
-
-          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>Who are they?</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-            {([
-              { type: 'family' as const, icon: '👨‍👩‍👧', label: 'Family', defaultRole: 'Mom' },
-              { type: 'friend' as const, icon: '🤝', label: 'Friend', defaultRole: 'Friend' },
-              { type: 'romantic' as const, icon: '💕', label: 'Partner', defaultRole: 'Girlfriend' },
-              { type: 'work' as const, icon: '💼', label: 'Work', defaultRole: 'Colleague' },
-            ]).map(({ type, icon, label, defaultRole }) => (
-              <TouchableOpacity
-                key={type}
-                onPress={() => { setAddType(type); setAddRelationship(defaultRole) }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5,
-                  borderColor: addType === type ? '#7B6EF6' : theme.border,
-                  backgroundColor: addType === type ? '#7B6EF615' : theme.card }}>
-                <Text style={{ fontSize: 18 }}>{icon}</Text>
-                <Text style={{ fontSize: 14, fontWeight: addType === type ? '700' : '500', color: addType === type ? '#7B6EF6' : theme.text }}>{label}</Text>
+      {/* Add person — in-frame slide-up sheet */}
+      {addModal && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 }}>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setAddModal(false)} />
+          <View style={{ backgroundColor: theme.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, maxHeight: '90%' }}>
+            <View style={{ width: 40, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
+            <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+              <TouchableOpacity onPress={() => setAddModal(false)} style={{ marginBottom: 16 }}>
+                <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '600' }}>‹ Cancel</Text>
               </TouchableOpacity>
-            ))}
-          </View>
+              <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: 4 }}>Add someone</Text>
+              <Text style={{ fontSize: 14, color: theme.textSub, marginBottom: 24 }}>Add a person to your circle of 20</Text>
 
-          {addType !== 'friend' && (
-            <>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>
-                {addType === 'family' ? 'Relation' : addType === 'romantic' ? 'Relationship' : 'Role'}
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 8 }}>Their name</Text>
+              <TextInput
+                value={addName}
+                onChangeText={setAddName}
+                placeholder="e.g. Mom, John, Dr. Smith"
+                placeholderTextColor={theme.textTertiary}
+                autoFocus
+                autoCorrect={false}
+                style={{ backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, color: theme.text, marginBottom: 16 }}
+              />
+
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 8 }}>
+                Their SOMA code <Text style={{ fontWeight: '400', color: theme.textTertiary }}>(if they're on SOMA)</Text>
               </Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-                {(addType === 'family' ? FAMILY_ROLES : addType === 'romantic' ? ROMANTIC_ROLES : WORK_ROLES).map(role => (
+              <View style={{ marginBottom: 24 }}>
+                <TextInput
+                  value={addSomaCode}
+                  onChangeText={v => {
+                    const code = v.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                    setAddSomaCode(code)
+                    // Simulate lookup: any 6-char code "finds" a user
+                    if (code.length >= 6) {
+                      setAddSomaFound(addName.trim() || 'this person')
+                    } else {
+                      setAddSomaFound(null)
+                    }
+                  }}
+                  placeholder="e.g. SO5432"
+                  placeholderTextColor={theme.textTertiary}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={8}
+                  style={{ backgroundColor: theme.card, borderRadius: 14, borderWidth: 1.5, borderColor: addSomaFound ? '#10B981' : theme.border, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, color: theme.text, fontFamily: 'monospace', letterSpacing: 2 }}
+                />
+                {addSomaFound && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 4 }}>
+                    <Text style={{ fontSize: 14 }}>✅</Text>
+                    <Text style={{ fontSize: 13, color: '#10B981', fontWeight: '600' }}>Found on SOMA — they'll be connected to your circle</Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>Who are they?</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+                {([
+                  { type: 'family' as const, icon: '👨‍👩‍👧', label: 'Family', defaultRole: 'Mom' },
+                  { type: 'friend' as const, icon: '🤝', label: 'Friend', defaultRole: 'Friend' },
+                  { type: 'romantic' as const, icon: '💕', label: 'Partner', defaultRole: 'Girlfriend' },
+                  { type: 'work' as const, icon: '💼', label: 'Work', defaultRole: 'Colleague' },
+                ]).map(({ type, icon, label, defaultRole }) => (
                   <TouchableOpacity
-                    key={role}
-                    onPress={() => setAddRelationship(role)}
-                    style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 18, borderWidth: 1.5,
-                      borderColor: addRelationship === role ? '#7B6EF6' : theme.border,
-                      backgroundColor: addRelationship === role ? '#7B6EF615' : theme.card }}>
-                    <Text style={{ fontSize: 14, fontWeight: addRelationship === role ? '700' : '400', color: addRelationship === role ? '#7B6EF6' : theme.text }}>{role}</Text>
+                    key={type}
+                    onPress={() => { setAddType(type); setAddRelationship(defaultRole) }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5,
+                      borderColor: addType === type ? '#7B6EF6' : theme.border,
+                      backgroundColor: addType === type ? '#7B6EF615' : theme.card }}>
+                    <Text style={{ fontSize: 18 }}>{icon}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: addType === type ? '700' : '500', color: addType === type ? '#7B6EF6' : theme.text }}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </>
-          )}
 
-          <TouchableOpacity
-            onPress={submitAdd}
-            disabled={!addName.trim()}
-            style={{ backgroundColor: addName.trim() ? '#7B6EF6' : '#C4B9F8', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 }}>
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Add to Circle</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </Modal>
+              {addType !== 'friend' && (
+                <>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>
+                    {addType === 'family' ? 'Relation' : addType === 'romantic' ? 'Relationship' : 'Role'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+                    {(addType === 'family' ? FAMILY_ROLES : addType === 'romantic' ? ROMANTIC_ROLES : WORK_ROLES).map(role => (
+                      <TouchableOpacity
+                        key={role}
+                        onPress={() => setAddRelationship(role)}
+                        style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 18, borderWidth: 1.5,
+                          borderColor: addRelationship === role ? '#7B6EF6' : theme.border,
+                          backgroundColor: addRelationship === role ? '#7B6EF615' : theme.card }}>
+                        <Text style={{ fontSize: 14, fontWeight: addRelationship === role ? '700' : '400', color: addRelationship === role ? '#7B6EF6' : theme.text }}>{role}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              <TouchableOpacity
+                onPress={submitAdd}
+                disabled={!addName.trim()}
+                style={{ backgroundColor: addName.trim() ? '#7B6EF6' : '#C4B9F8', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Add to Circle</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      )}
 
       {showPost && <PostMomentModal profile={profile} onClose={() => setShowPost(false)} onPosted={() => setShowPost(false)} />}
       {viewMoment && <MomentViewer moment={viewMoment} onClose={() => setViewMoment(null)} />}
@@ -4734,94 +6221,970 @@ function MyCircleTab({ profile, go }: { profile: UserProfile; go: (s: Screen) =>
   )
 }
 
-function OuterWorldTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => void }) {
-  const { t } = useT()
-  const isInRelationship = !!getRomanticPartner(profile)
-  const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
+// ── MESSAGES TAB ────────────────────────────────────────────
+type DemoMsg = { id: string; from_user_id: string; content: string; created_at: string; mediaType?: 'audio' | 'video'; mediaUrl?: string }
+const DEMO_MSG_THREADS: Record<string, DemoMsg[]> = {
+  demo_linh: [
+    { id: 'd1a', from_user_id: 'demo_linh', content: 'Hey! I saw we both use Soma. Your profile caught my eye. I\'m Linh, product designer in Hanoi 😊', created_at: new Date(Date.now() - 3*3600*1000).toISOString() },
+    { id: 'd1b', from_user_id: 'me', content: 'Hi Linh! What kind of design work do you focus on?', created_at: new Date(Date.now() - 3*3600*1000 + 5*60*1000).toISOString() },
+    { id: 'd1c', from_user_id: 'demo_linh', content: 'Mostly product design — onboarding flows, design systems. I get a bit obsessed with making things feel obvious without explaining themselves.', created_at: new Date(Date.now() - 2*3600*1000).toISOString() },
+    { id: 'd1d', from_user_id: 'me', content: 'That\'s exactly the craft I find most underrated. Progressive disclosure done right is invisible.', created_at: new Date(Date.now() - 2*3600*1000 + 8*60*1000).toISOString() },
+    { id: 'd1e', from_user_id: 'demo_linh', content: 'Yes! Most onboarding asks too much too early. You earn the info — you don\'t demand it. Glad someone else thinks this way.', created_at: new Date(Date.now() - 90*60*1000).toISOString() },
+    { id: 'd1f', from_user_id: 'me', content: 'Ha — we\'d definitely argue a lot in a design review though 😄', created_at: new Date(Date.now() - 85*60*1000).toISOString() },
+    { id: 'd1g', from_user_id: 'demo_linh', content: 'The best designs come out of those debates. Are you free to grab coffee sometime this week?', created_at: new Date(Date.now() - 20*60*1000).toISOString() },
+  ],
+  demo_minh: [
+    { id: 'd2a', from_user_id: 'demo_minh', content: 'Hey — Minh here. Founder, based in Saigon. Soma matched us at 89%. Curious what brings you to the app?', created_at: new Date(Date.now() - 2*24*3600*1000).toISOString() },
+    { id: 'd2b', from_user_id: 'me', content: 'Honestly still figuring that out. Mostly wanted something that actually understands context instead of just tracking habits.', created_at: new Date(Date.now() - 2*24*3600*1000 + 30*60*1000).toISOString() },
+    { id: 'd2c', from_user_id: 'demo_minh', content: 'That\'s a sharp take. Context is the whole product — most apps miss that completely. What do you work on?', created_at: new Date(Date.now() - 2*24*3600*1000 + 45*60*1000).toISOString() },
+    { id: 'd2d', from_user_id: 'me', content: 'Building software. You?', created_at: new Date(Date.now() - 2*24*3600*1000 + 60*60*1000).toISOString() },
+    { id: 'd2e', from_user_id: 'demo_minh', content: 'Running a logistics-tech startup. Three years in, finally hitting something that feels real. Hard years though.', created_at: new Date(Date.now() - 24*3600*1000).toISOString() },
+    { id: 'd2f', from_user_id: 'demo_minh', content: 'Would love to compare notes sometime if you\'re open to it.', created_at: new Date(Date.now() - 24*3600*1000 + 2*60*1000).toISOString() },
+  ],
+  demo_hana: [
+    { id: 'd3a', from_user_id: 'demo_hana', content: '"Collecting moments not things" — you actually live by that or is it just profile copy? 😄', created_at: new Date(Date.now() - 5*24*3600*1000).toISOString() },
+    { id: 'd3b', from_user_id: 'me', content: 'Ha — fair challenge. I\'ve moved four times in three years. Carrying too much becomes a real problem.', created_at: new Date(Date.now() - 5*24*3600*1000 + 40*60*1000).toISOString() },
+    { id: 'd3c', from_user_id: 'demo_hana', content: 'OK you pass. I\'m Hana. Photographer, currently in Hoi An. Film mostly.', created_at: new Date(Date.now() - 5*24*3600*1000 + 55*60*1000).toISOString() },
+    { id: 'd3d', from_user_id: 'me', content: 'Film is so different to shoot. The patience it forces on you changes what you notice.', created_at: new Date(Date.now() - 4*24*3600*1000).toISOString() },
+    { id: 'd3e', from_user_id: 'demo_hana', content: 'Exactly. You can\'t spray and pray. Every frame costs something so you see differently. Are you a photographer too?', created_at: new Date(Date.now() - 4*24*3600*1000 + 20*60*1000).toISOString() },
+    { id: 'd3f', from_user_id: 'me', content: 'Just an appreciator. I\'d love to see some of your work sometime.', created_at: new Date(Date.now() - 4*24*3600*1000 + 35*60*1000).toISOString() },
+    { id: 'd3g', from_user_id: 'demo_hana', content: 'I\'ll share my portfolio link. Let me know which ones speak to you most — everyone notices something different and I find that fascinating 🎞', created_at: new Date(Date.now() - 3*24*3600*1000).toISOString() },
+  ],
+  demo_zara: [
+    { id: 'd4a', from_user_id: 'demo_zara', content: 'Hi! Zara here — UX researcher. I read your Soma profile and your answer about context vs. tracking really stuck with me.', created_at: new Date(Date.now() - 6*24*3600*1000).toISOString() },
+    { id: 'd4b', from_user_id: 'me', content: 'Hi Zara! What specifically caught your attention?', created_at: new Date(Date.now() - 6*24*3600*1000 + 25*60*1000).toISOString() },
+    { id: 'd4c', from_user_id: 'demo_zara', content: 'The thing about apps demanding instead of earning attention. I study user motivation for a living and most products get this completely backwards.', created_at: new Date(Date.now() - 6*24*3600*1000 + 40*60*1000).toISOString() },
+    { id: 'd4d', from_user_id: 'demo_zara', content: 'Anyway — outside of work I play tennis and obsess over long-form podcasts. What do you do when you\'re not building things?', created_at: new Date(Date.now() - 5*24*3600*1000).toISOString() },
+  ],
+}
+const DEMO_CONVOS: Conversation[] = [
+  { userId: 'demo_linh', name: 'Linh', lastMessage: 'Are you free to grab coffee sometime this week?', lastTime: new Date(Date.now() - 20*60*1000).toISOString(), unread: 1 },
+  { userId: 'demo_minh', name: 'Minh', lastMessage: 'Would love to compare notes sometime if you\'re open to it.', lastTime: new Date(Date.now() - 24*3600*1000).toISOString(), unread: 1 },
+  { userId: 'demo_hana', name: 'Hana', lastMessage: 'I\'ll share my portfolio link. Let me know which ones speak to you most 🎞', lastTime: new Date(Date.now() - 3*24*3600*1000).toISOString(), unread: 0 },
+  { userId: 'demo_zara', name: 'Zara', lastMessage: 'What do you do when you\'re not building things?', lastTime: new Date(Date.now() - 5*24*3600*1000).toISOString(), unread: 1 },
+]
+const DEMO_AVATARS: Record<string, string> = {
+  demo_linh: '#F9A8C9', demo_minh: '#F6906E', demo_hana: '#C4A8F9', demo_zara: '#F6D46E',
+}
+interface Conversation {
+  userId: string; name: string; lastMessage: string; lastTime: string; unread: number
+}
+
+function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: UserProfile; initialChat?: { userId: string; name: string; key: number } | null; pendingMatchChat?: { name: string; userId?: string; firstMessage?: string; key: number } | null }) {
+  const { t: theme } = useT()
+  const [convos, setConvos] = useState<Conversation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [openChat, setOpenChat] = useState<Conversation | null>(null)
+  const [msgs, setMsgs] = useState<{ id: string; from_user_id: string; content: string; created_at: string }[]>([])
+  const [msgLoading, setMsgLoading] = useState(false)
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [demoOpen, setDemoOpen] = useState<Conversation | null>(null)
+  const [showCompose, setShowCompose] = useState(false)
+  const [demoInput, setDemoInput] = useState('')
+  const [demoMsgs, setDemoMsgs] = useState<DemoMsg[]>([])
+  const [extraDemoConvos, setExtraDemoConvos] = useState<Conversation[]>([])
+  const [extraDemoThreads, setExtraDemoThreads] = useState<Record<string, DemoMsg[]>>({})
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const mediaRecorderRef = useRef<any>(null)
+  const recordingTimerRef = useRef<any>(null)
+  const msgListRef = useRef<FlatList<any>>(null)
+  const pollRef = useRef<any>(null)
+  const myId = datingApi.chat.myId()
+  const token = auth.getToken()
+
+  const startVoiceRecording = async (onStop: (url: string, duration: number) => void) => {
+    try {
+      const stream = await (navigator as any).mediaDevices?.getUserMedia({ audio: true })
+      if (!stream) return
+      const recorder = new (window as any).MediaRecorder(stream)
+      const chunks: BlobPart[] = []
+      recorder.ondataavailable = (e: any) => { if (e.data.size > 0) chunks.push(e.data) }
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' })
+        const url = URL.createObjectURL(blob)
+        const dur = recordingTimerRef.current ? recordingSeconds : 0
+        onStop(url, dur)
+        stream.getTracks().forEach((t: any) => t.stop())
+      }
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setIsRecording(true)
+      setRecordingSeconds(0)
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
+    } catch {}
+  }
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    clearInterval(recordingTimerRef.current)
+    setIsRecording(false)
+    setRecordingSeconds(0)
+  }
+
+  const loadConvos = async () => {
+    if (!token) { setLoading(false); return }
+    try {
+      const res = await fetch(`${BACKEND_URL}/friends/conversations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const d = await res.json()
+        // Also add circle members with somaUserId who haven't messaged yet
+        const knownIds = new Set((d.conversations || []).map((c: Conversation) => c.userId))
+        const circleContacts: Conversation[] = profile.circle
+          .filter(p => p.somaUserId && !knownIds.has(p.somaUserId))
+          .map(p => ({ userId: p.somaUserId!, name: p.name, lastMessage: '', lastTime: '', unread: 0 }))
+        setConvos([...(d.conversations || []), ...circleContacts])
+      }
+    } catch {}
+    setLoading(false)
+  }
+
+  useEffect(() => { loadConvos() }, [])
+
+  useEffect(() => {
+    if (!initialChat?.userId) return
+    if (initialChat.userId.startsWith('circle_')) {
+      const convoId = initialChat.userId
+      const convo: Conversation = { userId: convoId, name: initialChat.name, lastMessage: '', lastTime: '', unread: 0 }
+      setDemoMsgs(extraDemoThreads[convoId] || [])
+      setExtraDemoConvos(prev => prev.find(c => c.userId === convoId) ? prev : [convo, ...prev])
+      setExtraDemoThreads(prev => prev[convoId] ? prev : { ...prev, [convoId]: [] })
+      setDemoOpen(convo)
+    } else if (token) {
+      const convo: Conversation = { userId: initialChat.userId, name: initialChat.name, lastMessage: '', lastTime: '', unread: 0 }
+      openConversation(convo)
+    }
+  }, [initialChat?.key])
+
+  // Auto-open a new match from the Explore screen
+  useEffect(() => {
+    if (!pendingMatchChat) return
+    const { name, userId, firstMessage, key } = pendingMatchChat
+    const convoId = userId || `match_${name.toLowerCase().replace(/\s+/g, '_')}`
+    const newConvo: Conversation = { userId: convoId, name, lastMessage: firstMessage || '', lastTime: new Date().toISOString(), unread: 1 }
+
+    if (userId && token) {
+      // Real user — open real chat
+      openConversation(newConvo)
+    } else {
+      // Demo match — inject into demo list and open
+      const firstMsg: DemoMsg = { id: `m_${key}`, from_user_id: convoId, content: firstMessage || `Hey! So happy we matched 😊`, created_at: new Date().toISOString() }
+      setExtraDemoConvos(prev => [newConvo, ...prev.filter(c => c.userId !== convoId)])
+      setExtraDemoThreads(prev => ({ ...prev, [convoId]: [firstMsg] }))
+      setDemoMsgs([firstMsg])
+      setDemoOpen(newConvo)
+    }
+  }, [pendingMatchChat?.key])
+
+  const openConversation = async (c: Conversation) => {
+    setOpenChat(c); setMsgs([]); setMsgLoading(true)
+    await loadMessages(c.userId)
+    setMsgLoading(false)
+    // Mark read
+    fetch(`${BACKEND_URL}/friends/chat/${c.userId}`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(() => loadMessages(c.userId), 4000)
+  }
+
+  const loadMessages = async (userId: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/friends/chat/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.ok) { const d = await res.json(); setMsgs(d.messages || []) }
+    } catch {}
+  }
+
+  const closeChat = () => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    setOpenChat(null); setMsgs([]); setInput('')
+    loadConvos()
+  }
+
+  const sendMsg = async () => {
+    if (!input.trim() || sending || !openChat) return
+    const text = input.trim(); setInput(''); setSending(true)
+    // Optimistic insert so message appears immediately
+    const optimisticMsg = { id: `opt_${Date.now()}`, from_user_id: myId || 'me', content: text, created_at: new Date().toISOString() }
+    setMsgs(prev => [...prev, optimisticMsg])
+    setTimeout(() => msgListRef.current?.scrollToEnd({ animated: true }), 50)
+    try {
+      await fetch(`${BACKEND_URL}/friends/chat/${openChat.userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: text })
+      })
+      await loadMessages(openChat.userId)
+      setTimeout(() => msgListRef.current?.scrollToEnd({ animated: true }), 100)
+    } catch {}
+    setSending(false)
+  }
+
+  const fmtTime = (iso: string) => {
+    if (!iso) return ''
+    const d = new Date(iso), now = new Date()
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
+    if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'short' })
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  }
+
+  const displayName = (name: string) => {
+    if (!name) return 'Unknown'
+    if (name.includes('@')) return name.split('@')[0]
+    return name
+  }
+
+  const initials = (name: string) => displayName(name).slice(0, 2).toUpperCase()
+
+  // ─── Chat view ───
+  if (openChat) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.bg }}>
+        {/* Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.border, backgroundColor: theme.bg }}>
+          <TouchableOpacity onPress={closeChat} style={{ padding: 4 }}>
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
+          </TouchableOpacity>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#7B6EF6' }}>{initials(openChat.name)}</Text>
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, flex: 1 }}>{displayName(openChat.name)}</Text>
+        </View>
+        {/* Messages */}
+        {msgLoading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator color="#7B6EF6" />
+          </View>
+        ) : (
+          <FlatList
+            ref={msgListRef}
+            data={msgs}
+            keyExtractor={m => m.id}
+            contentContainerStyle={{ padding: 16, paddingBottom: 20, gap: 8, flexGrow: 1, justifyContent: msgs.length === 0 ? 'center' : 'flex-start' }}
+            onContentSizeChange={() => msgs.length > 0 && msgListRef.current?.scrollToEnd({ animated: false })}
+            ListEmptyComponent={
+              <Text style={{ textAlign: 'center', color: theme.textSub, fontSize: 14 }}>{t('no_messages')}</Text>
+            }
+            renderItem={({ item: m }) => {
+              const fromMe = m.from_user_id === myId
+              return (
+                <View style={{ alignItems: fromMe ? 'flex-end' : 'flex-start' }}>
+                  <View style={{
+                    maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10,
+                    borderRadius: fromMe ? 18 : 18,
+                    borderBottomRightRadius: fromMe ? 4 : 18,
+                    borderBottomLeftRadius: fromMe ? 18 : 4,
+                    backgroundColor: fromMe ? '#7B6EF6' : theme.card,
+                  }}>
+                    <Text style={{ fontSize: 14, color: fromMe ? '#fff' : theme.text, lineHeight: 20 }}>{m.content}</Text>
+                  </View>
+                  <Text style={{ fontSize: 10, color: theme.textSub, marginTop: 2, marginHorizontal: 4 }}>
+                    {fmtTime(m.created_at)}
+                  </Text>
+                </View>
+              )
+            }}
+          />
+        )}
+        {/* Input bar */}
+        {isRecording ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, paddingBottom: 14, borderTopWidth: 0.5, borderTopColor: theme.border, backgroundColor: theme.bg }}>
+            <TouchableOpacity onPress={stopVoiceRecording} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}>
+              <Ionicons name="trash-outline" size={18} color={theme.textSub} />
+            </TouchableOpacity>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FF444415', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF4444' }} />
+              <Text style={{ color: '#FF4444', fontSize: 14, fontWeight: '600' }}>
+                {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+              </Text>
+              <Text style={{ color: theme.textSub, fontSize: 13, flex: 1 }}>Recording…</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                  const chunks: BlobPart[] = []
+                  mediaRecorderRef.current.ondataavailable = (e: any) => { if (e.data.size > 0) chunks.push(e.data) }
+                  mediaRecorderRef.current.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' })
+                    const url = URL.createObjectURL(blob)
+                    const voiceMsg = { id: `opt_${Date.now()}`, from_user_id: myId || 'me', content: '🎤 Voice message', created_at: new Date().toISOString() }
+                    setMsgs(prev => [...prev, voiceMsg])
+                    setTimeout(() => msgListRef.current?.scrollToEnd({ animated: true }), 50)
+                  }
+                  mediaRecorderRef.current.stop()
+                }
+                clearInterval(recordingTimerRef.current)
+                setIsRecording(false)
+                setRecordingSeconds(0)
+              }}
+              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="send" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, paddingHorizontal: 10, paddingVertical: 10, paddingBottom: 12, borderTopWidth: 0.5, borderTopColor: theme.border, backgroundColor: theme.bg }}>
+            <TouchableOpacity onPress={() => {}} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}>
+              <Ionicons name="attach-outline" size={20} color={theme.textSub} />
+            </TouchableOpacity>
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder="Message…"
+              placeholderTextColor={theme.textSub}
+              multiline
+              style={{ flex: 1, backgroundColor: theme.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: theme.text, maxHeight: 120, borderWidth: 1, borderColor: theme.border }}
+              onSubmitEditing={sendMsg}
+            />
+            <TouchableOpacity
+              onPress={input.trim() ? sendMsg : () => startVoiceRecording(async (url) => {
+                const voiceMsg = { id: `opt_${Date.now()}`, from_user_id: myId || 'me', content: '🎤 Voice message', created_at: new Date().toISOString() }
+                setMsgs(prev => [...prev, voiceMsg])
+                setTimeout(() => msgListRef.current?.scrollToEnd({ animated: true }), 50)
+              })}
+              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: input.trim() ? '#7B6EF6' : theme.card, alignItems: 'center', justifyContent: 'center', borderWidth: input.trim() ? 0 : 1, borderColor: theme.border }}>
+              {sending ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name={input.trim() ? 'send' : 'mic-outline'} size={18} color={input.trim() ? '#fff' : theme.textSub} />}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    )
+  }
+
+  // ─── Demo open chat ───
+  if (demoOpen) {
+    const accentColor = DEMO_AVATARS[demoOpen.userId] || '#7B6EF6'
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.bg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.border, backgroundColor: theme.bg }}>
+          <TouchableOpacity onPress={() => setDemoOpen(null)} style={{ padding: 4 }}>
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
+          </TouchableOpacity>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: accentColor + '30', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: accentColor }}>{demoOpen.name.slice(0,2).toUpperCase()}</Text>
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, flex: 1 }}>{demoOpen.name}</Text>
+        </View>
+        <FlatList
+          data={demoMsgs}
+          keyExtractor={m => m.id}
+          contentContainerStyle={{ padding: 16, paddingBottom: 20, gap: 8, flexGrow: 1, justifyContent: demoMsgs.length === 0 ? 'center' : 'flex-start' }}
+          renderItem={({ item: m }) => {
+            const fromMe = m.from_user_id === 'me'
+            return (
+              <View style={{ alignItems: fromMe ? 'flex-end' : 'flex-start' }}>
+                <View style={{ maxWidth: '78%', paddingHorizontal: m.mediaType ? 10 : 14, paddingVertical: m.mediaType ? 8 : 10, borderRadius: 18, borderBottomRightRadius: fromMe ? 4 : 18, borderBottomLeftRadius: fromMe ? 18 : 4, backgroundColor: fromMe ? '#7B6EF6' : theme.card }}>
+                  {m.mediaType === 'audio' && m.mediaUrl ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160 }}>
+                      <Ionicons name="mic" size={16} color={fromMe ? '#fff' : '#7B6EF6'} />
+                      <View style={{ flex: 1 }}>
+                        {/* @ts-ignore */}
+                        <audio src={m.mediaUrl} controls style={{ height: 28, maxWidth: 160, outline: 'none' }} />
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 14, color: fromMe ? '#fff' : theme.text, lineHeight: 20 }}>{m.content}</Text>
+                  )}
+                </View>
+                <Text style={{ fontSize: 10, color: theme.textSub, marginTop: 2, marginHorizontal: 4 }}>{fmtTime(m.created_at)}</Text>
+              </View>
+            )
+          }}
+        />
+        {isRecording ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, paddingBottom: 14, borderTopWidth: 0.5, borderTopColor: theme.border, backgroundColor: theme.bg }}>
+            <TouchableOpacity onPress={stopVoiceRecording} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}>
+              <Ionicons name="trash-outline" size={18} color={theme.textSub} />
+            </TouchableOpacity>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FF444415', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF4444' }} />
+              <Text style={{ color: '#FF4444', fontSize: 14, fontWeight: '600' }}>
+                {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+              </Text>
+              <Text style={{ color: theme.textSub, fontSize: 13, flex: 1 }}>Recording…</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                  const chunks: BlobPart[] = []
+                  mediaRecorderRef.current.ondataavailable = (e: any) => { if (e.data.size > 0) chunks.push(e.data) }
+                  mediaRecorderRef.current.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' })
+                    const url = URL.createObjectURL(blob)
+                    const voiceMsg: DemoMsg = { id: 'u' + Date.now(), from_user_id: 'me', content: '🎤 Voice message', mediaType: 'audio', mediaUrl: url, created_at: new Date().toISOString() }
+                    setDemoMsgs(prev => [...prev, voiceMsg])
+                    if (demoOpen) setExtraDemoThreads(prev => ({ ...prev, [demoOpen.userId]: [...(prev[demoOpen.userId] || []), voiceMsg] }))
+                  }
+                  mediaRecorderRef.current.stop()
+                }
+                clearInterval(recordingTimerRef.current)
+                setIsRecording(false)
+                setRecordingSeconds(0)
+              }}
+              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="send" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, paddingHorizontal: 10, paddingVertical: 10, paddingBottom: 12, borderTopWidth: 0.5, borderTopColor: theme.border, backgroundColor: theme.bg }}>
+          <TouchableOpacity onPress={() => {}} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }}>
+            <Ionicons name="attach-outline" size={20} color={theme.textSub} />
+          </TouchableOpacity>
+          <TextInput
+            value={demoInput}
+            onChangeText={setDemoInput}
+            placeholder="Message…"
+            placeholderTextColor={theme.textSub}
+            multiline
+            style={{ flex: 1, backgroundColor: theme.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: theme.text, maxHeight: 120, borderWidth: 1, borderColor: theme.border }}
+          />
+          <TouchableOpacity
+            onPress={async () => {
+              if (!demoInput.trim()) { startVoiceRecording(async (url, dur) => {
+                const voiceMsg: DemoMsg = { id: 'u' + Date.now(), from_user_id: 'me', content: `🎤 ${dur}s`, mediaType: 'audio', mediaUrl: url, created_at: new Date().toISOString() }
+                setDemoMsgs(prev => [...prev, voiceMsg])
+                if (demoOpen) setExtraDemoThreads(prev => ({ ...prev, [demoOpen.userId]: [...(prev[demoOpen.userId] || []), voiceMsg] }))
+              }); return }
+              const userMsg: DemoMsg = { id: 'u' + Date.now(), from_user_id: 'me', content: demoInput.trim(), created_at: new Date().toISOString() }
+              setDemoMsgs(prev => [...prev, userMsg])
+              setDemoInput('')
+              // If this is a new match (in extraDemoThreads), reply with AI
+              if (demoOpen) {
+                const history = [...demoMsgs, userMsg]
+                const circleId = demoOpen.userId.startsWith('circle_') ? demoOpen.userId.replace('circle_', '') : null
+                const personInfo = profile.circle.find(p => (circleId && p.id === circleId) || p.somaUserId === demoOpen.userId || p.name === demoOpen.name)
+                const persona = personInfo
+                  ? `You are ${personInfo.name}, ${profile.name || 'someone'}'s ${personInfo.relationship.toLowerCase()}. ${personInfo.context ? `Context about you: ${personInfo.context}.` : ''} You're chatting on SOMA. Reply warmly and naturally — 1-2 sentences, as if texting. Ask something back. Just your reply, no quotes.`
+                  : `You are ${demoOpen.name}. You just matched with someone on SOMA. Reply warmly and naturally — 1-2 sentences, curious, ask something back. Just your reply, no quotes.`
+                const reply = await groq(history.map(m => ({ role: m.from_user_id === 'me' ? 'user' as const : 'assistant' as const, content: m.content })), persona, 120)
+                if (reply) {
+                  const aiMsg: DemoMsg = { id: 'ai' + Date.now(), from_user_id: demoOpen.userId, content: reply, created_at: new Date().toISOString() }
+                  setDemoMsgs(prev => [...prev, aiMsg])
+                  setExtraDemoThreads(prev => ({ ...prev, [demoOpen.userId]: [...(prev[demoOpen.userId] || []), userMsg, aiMsg] }))
+                }
+              }
+            }}
+            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: demoInput.trim() ? '#7B6EF6' : theme.card, alignItems: 'center', justifyContent: 'center', borderWidth: demoInput.trim() ? 0 : 1, borderColor: theme.border }}>
+            <Ionicons name={demoInput.trim() ? 'send' : 'mic-outline'} size={18} color={demoInput.trim() ? '#fff' : theme.textSub} />
+          </TouchableOpacity>
+        </View>
+        )}
+      </View>
+    )
+  }
+
+  // ─── Conversation list ───
+  const listConvos = [...extraDemoConvos, ...convos]
+  const isDemo = false
 
   return (
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, flex: 1 }}>{t('messages')}</Text>
+        <TouchableOpacity onPress={() => setShowCompose(true)}
+          style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#7B6EF615', borderWidth: 1.5, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="create-outline" size={18} color="#7B6EF6" />
+        </TouchableOpacity>
+      </View>
+      {loading && token ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#7B6EF6" />
+        </View>
+      ) : null}
+      {!loading && listConvos.length === 0 && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}>
+          <Text style={{ fontSize: 40, marginBottom: 16 }}>💬</Text>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 8 }}>No conversations yet</Text>
+          <Text style={{ fontSize: 14, color: theme.textSub, textAlign: 'center', paddingHorizontal: 40, marginBottom: 24 }}>
+            {profile.circle.length > 0 ? 'Message someone from your Circle or match on Explore' : 'Match with someone on Explore or add people to your Circle'}
+          </Text>
+          {profile.circle.length > 0 && (
+            <TouchableOpacity onPress={() => setShowCompose(true)}
+              style={{ paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: '#7B6EF6' }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Message someone</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+      {!loading && listConvos.length > 0 && (
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+          {listConvos.map(c => {
+            const accentColor = DEMO_AVATARS[c.userId] || '#7B6EF6'
+            return (
+              <TouchableOpacity
+                key={c.userId}
+                onPress={() => {
+                  if (isDemo) { setDemoMsgs(extraDemoThreads[c.userId] || DEMO_MSG_THREADS[c.userId] || []); setDemoOpen(c) }
+                  else openConversation(c)
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
+                <View style={{ position: 'relative' }}>
+                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: accentColor + '25', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: accentColor }}>{initials(c.name)}</Text>
+                  </View>
+                  {c.unread > 0 && (
+                    <View style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#F66E8E', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.bg }}>
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>{c.unread}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 15, fontWeight: c.unread > 0 ? '700' : '600', color: theme.text }}>{displayName(c.name)}</Text>
+                    {c.lastTime ? <Text style={{ fontSize: 11, color: theme.textSub }}>{fmtTime(c.lastTime)}</Text> : null}
+                  </View>
+                  <Text style={{ fontSize: 13, color: c.unread > 0 ? theme.text : theme.textSub, fontWeight: c.unread > 0 ? '600' : '400' }} numberOfLines={1}>
+                    {c.lastMessage || 'Tap to say hello'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      )}
+
+      {/* Compose sheet */}
+      {showCompose && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 }}>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setShowCompose(false)} />
+          <View style={{ backgroundColor: theme.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '72%' }}>
+            <View style={{ width: 40, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text, flex: 1 }}>New message</Text>
+              <TouchableOpacity onPress={() => setShowCompose(false)}>
+                <Ionicons name="close" size={22} color={theme.textSub} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {profile.circle.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: theme.textSub, fontSize: 14, paddingVertical: 40, paddingHorizontal: 32 }}>
+                  Add people to your Circle first to message them here.
+                </Text>
+              ) : (
+                profile.circle.map(person => {
+                  const color = person.type === 'romantic' ? '#F6379B' : person.type === 'family' ? '#34C759' : person.type === 'work' ? '#378ADD' : '#7B6EF6'
+                  return (
+                    <TouchableOpacity
+                      key={person.id}
+                      onPress={() => {
+                        setShowCompose(false)
+                        const convoId = person.somaUserId || `circle_${person.id}`
+                        if (person.somaUserId && token) {
+                          openConversation({ userId: person.somaUserId, name: person.name, lastMessage: '', lastTime: '', unread: 0 })
+                        } else {
+                          const convo: Conversation = { userId: convoId, name: person.name, lastMessage: '', lastTime: '', unread: 0 }
+                          const existing = extraDemoThreads[convoId] || []
+                          setDemoMsgs(existing)
+                          setExtraDemoConvos(prev => prev.find(c => c.userId === convoId) ? prev : [convo, ...prev])
+                          setExtraDemoThreads(prev => ({ ...prev, [convoId]: existing }))
+                          setDemoOpen(convo)
+                        }
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
+                      <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: color + '50' }}>
+                        <Text style={{ fontSize: 17, fontWeight: '800', color }}>{person.name[0].toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: theme.text }}>{person.name}</Text>
+                        <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 1 }}>{person.relationship}</Text>
+                      </View>
+                      {person.somaUserId ? (
+                        <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: '#7B6EF615', borderWidth: 1, borderColor: '#7B6EF640' }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#7B6EF6' }}>SOMA</Text>
+                        </View>
+                      ) : (
+                        <Ionicons name="chatbubble-outline" size={16} color={theme.textSub} />
+                      )}
+                    </TouchableOpacity>
+                  )
+                })
+              )}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        </View>
+      )}
+    </View>
+  )
+}
+
+const SECTOR_META = {
+  dating:       { label: 'Serious Dater',  emoji: '💜', color: '#F66E8E', bg: '#F66E8E18', icon: 'heart-outline'     as const, prompt: (p: UserProfile) => `You are writing a dating profile bio for someone named ${p.name}. Their love language is "${p.dating.loveLanguage}", attachment style is "${p.dating.attachment}", they are ${p.dating.age} years old, looking for: "${p.dating.lookingFor}". Their interests: ${p.dating.interests.slice(0,5).join(', ')}. Values: ${p.dating.values.slice(0,3).join(', ')}. Write a warm, genuine 2-sentence bio that shows their romantic personality. First person, no quotes.` },
+  friends:      { label: 'New Friends',    emoji: '😊', color: '#10B981', bg: '#10B98118', icon: 'people-outline'    as const, prompt: (p: UserProfile) => `Write a friendly 2-sentence "looking for friends" bio for ${p.name}. Their interests: ${p.dating.interests.slice(0,5).join(', ')}. Vibe/love language: ${p.dating.loveLanguage}. Show their personality and what kind of friend they would be. First person, no quotes.` },
+  professional: { label: 'Professional',   emoji: '💼', color: '#378ADD', bg: '#378ADD18', icon: 'briefcase-outline' as const, prompt: (p: UserProfile) => `Write a 2-sentence professional networking bio for ${p.name}. Their work: "${p.dating.work || 'not specified'}". Values: ${p.dating.values.slice(0,3).join(', ')}. Show their professional mindset and what they can offer collaborators. First person, no quotes.` },
+  support:      { label: 'Support Seeker', emoji: '🤝', color: '#F59E0B', bg: '#F59E0B18', icon: 'headset-outline'  as const, prompt: (p: UserProfile) => `Write a 2-sentence "looking for support / accountability partner" bio for ${p.name}. Attachment style: "${p.dating.attachment}". Their goals touch on: ${p.memories.filter(m=>m.domain==='growth'||m.domain==='health').slice(0,3).map(m=>m.content).join(', ') || 'personal growth'}. Show their openness and what support they seek. First person, no quotes.` },
+} as const
+
+type SectorKey = keyof typeof SECTOR_META
+
+function SectorProfileModal({ sector, profile, onClose }: { sector: SectorKey; profile: UserProfile; onClose: () => void }) {
+  const { t } = useT()
+  const meta = SECTOR_META[sector]
+  const sp = profile.sectorProfiles?.[sector] || {}
+  const defaultPhoto = profile.profilePhoto || profile.dating?.photo || profile.dating?.photos?.[0] || ''
+  const initialPhotos = sp.photos?.length ? sp.photos : (defaultPhoto ? [defaultPhoto] : [])
+  const [bio, setBio] = useState(sp.bio || '')
+  const [photos, setPhotos] = useState<string[]>(initialPhotos)
+  const [generating, setGenerating] = useState(false)
+  const [, force] = useReducer((x: number) => x + 1, 0)
+
+  const generate = async () => {
+    setGenerating(true)
+    try {
+      const prompt = meta.prompt(profile)
+      const res = await groq([{ role: 'user', content: prompt }], 'You write authentic, warm profile bios. Keep them under 60 words, human-sounding, never generic.', 120, 0.85)
+      setBio(res.trim())
+    } catch { setBio('') }
+    setGenerating(false)
+  }
+
+  useEffect(() => { if (!bio && !sp.bio) generate() }, [])
+
+  const save = () => {
+    DB.saveSectorProfile(sector, { bio, photos })
+    onClose()
+  }
+
+  const addPhoto = () => pickPhoto(url => {
+    if (photos.length >= 6) return
+    const next = [...photos, url]
+    setPhotos(next)
+    DB.saveSectorProfile(sector, { bio, photos: next })
+    force()
+  })
+
+  const removePhoto = (i: number) => {
+    const next = photos.filter((_, idx) => idx !== i)
+    setPhotos(next)
+    DB.saveSectorProfile(sector, { bio, photos: next })
+    force()
+  }
+
+  return (
+    <View style={{ position: 'absolute' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 300, justifyContent: 'flex-end' }}>
+      <View style={{ backgroundColor: t.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' }}>
+        {/* Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: t.border, gap: 12 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: meta.bg, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 20 }}>{meta.emoji}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>{meta.label} Profile</Text>
+            <Text style={{ fontSize: 12, color: t.textSub }}>How others see you in this space</Text>
+          </View>
+          <TouchableOpacity onPress={onClose} style={{ padding: 6 }}>
+            <Ionicons name="close" size={22} color={t.textSub} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 40 }}>
+          {/* Photos */}
+          <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.sub, letterSpacing: 0.5 }}>PHOTOS  {photos.length}/6</Text>
+              {photos.length < 6 && (
+                <TouchableOpacity onPress={addPhoto} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: meta.bg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                  <Ionicons name="add" size={14} color={meta.color} />
+                  <Text style={{ color: meta.color, fontSize: 12, fontWeight: '700' }}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {photos.map((uri, i) => (
+                <View key={i} style={{ position: 'relative' }}>
+                  <Image source={{ uri }} style={{ width: 88, height: 88, borderRadius: 12 }} />
+                  {i === 0 && <View style={{ position: 'absolute', bottom: 5, left: 5, backgroundColor: meta.color, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}>
+                    <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800' }}>MAIN</Text>
+                  </View>}
+                  <TouchableOpacity onPress={() => removePhoto(i)}
+                    style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 9, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {photos.length < 6 && (
+                <TouchableOpacity onPress={addPhoto}
+                  style={{ width: 88, height: 88, borderRadius: 12, borderWidth: 1.5, borderColor: meta.color + '60', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: meta.bg, gap: 3 }}>
+                  <Ionicons name="camera-outline" size={22} color={meta.color} />
+                  <Text style={{ fontSize: 10, color: meta.color, fontWeight: '600' }}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Bio */}
+          <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.sub, letterSpacing: 0.5 }}>BIO</Text>
+              <TouchableOpacity onPress={generate} disabled={generating}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: meta.bg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                <Ionicons name="sparkles" size={13} color={meta.color} />
+                <Text style={{ color: meta.color, fontSize: 12, fontWeight: '700' }}>{generating ? 'Writing…' : 'Regenerate'}</Text>
+              </TouchableOpacity>
+            </View>
+            {generating
+              ? <View style={{ backgroundColor: t.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: t.border, alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="sparkles" size={20} color={meta.color} />
+                  <Text style={{ color: t.textSub, fontSize: 13 }}>SOMA is writing your bio…</Text>
+                </View>
+              : <TextInput
+                  value={bio}
+                  onChangeText={setBio}
+                  multiline
+                  placeholder="Tap to write your bio or let SOMA generate one…"
+                  placeholderTextColor={t.textSub}
+                  style={{ backgroundColor: t.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: t.border, fontSize: 15, color: t.text, lineHeight: 22, minHeight: 90, textAlignVertical: 'top' as any }}
+                />
+            }
+          </View>
+
+          {/* Save */}
+          <TouchableOpacity onPress={save}
+            style={{ backgroundColor: meta.color, borderRadius: 16, paddingVertical: 16, alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Save Profile</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </View>
+  )
+}
+
+function HowOthersSeeMe({ profile, onEdit, onClose }: { profile: UserProfile; onEdit: (k: SectorKey) => void; onClose: () => void }) {
+  const { t } = useT()
+  const [generating, setGenerating] = useState(false)
+  const [, force] = useReducer((x: number) => x + 1, 0)
+
+  // Default photo: use the user's own profile photo
+  const defaultPhoto = profile.profilePhoto || profile.dating?.photo || profile.dating?.photos?.[0] || ''
+
+  // Auto-generate all missing profiles on first open
+  useEffect(() => {
+    const keys = Object.keys(SECTOR_META) as SectorKey[]
+    const missing = keys.filter(k => !profile.sectorProfiles?.[k]?.bio)
+    if (missing.length === 0) return
+    setGenerating(true)
+    Promise.all(missing.map(async key => {
+      const meta = SECTOR_META[key]
+      try {
+        const bio = await groq(
+          [{ role: 'user', content: meta.prompt(profile) }],
+          'You write authentic, warm profile bios. Keep them under 60 words, human-sounding, never generic.',
+          120, 0.85
+        )
+        const existing = profile.sectorProfiles?.[key] || {}
+        // Pre-fill profile photo if no photos set yet
+        const photos = existing.photos?.length ? existing.photos : (defaultPhoto ? [defaultPhoto] : [])
+        DB.saveSectorProfile(key, { bio: bio.trim(), photos })
+      } catch {}
+    })).finally(() => { setGenerating(false); force() })
+  }, [])
+
+  const currentProfile = DB.get()
+
+  return (
+    <View style={{ position: 'absolute' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: t.bg, zIndex: 200 }}>
+      {/* Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: t.border, gap: 12 }}>
+        <TouchableOpacity onPress={onClose} style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="arrow-back" size={20} color={t.text} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>How Others See Me</Text>
+          <Text style={{ fontSize: 12, color: t.textSub }}>
+            {generating ? 'SOMA is building your profiles…' : 'Tap any profile to adjust'}
+          </Text>
+        </View>
+        {generating && <ActivityIndicator size="small" color={t.accent} />}
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }}>
+        {(Object.keys(SECTOR_META) as SectorKey[]).map(key => {
+          const meta = SECTOR_META[key]
+          const sp = currentProfile.sectorProfiles?.[key]
+          const photoUri = sp?.photos?.[0] || defaultPhoto
+          const hasBio = !!sp?.bio
+          return (
+            <TouchableOpacity key={key} onPress={() => { onEdit(key); force() }} activeOpacity={0.75}
+              style={{ backgroundColor: t.card, borderRadius: 20, borderWidth: 1, borderColor: t.border, overflow: 'hidden' as any }}>
+              <View style={{ height: 5, backgroundColor: meta.color, opacity: 0.8 }} />
+              <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                {photoUri
+                  ? <Image source={{ uri: photoUri }} style={{ width: 64, height: 64, borderRadius: 14 }} />
+                  : <View style={{ width: 64, height: 64, borderRadius: 14, backgroundColor: meta.bg, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 30 }}>{meta.emoji}</Text>
+                    </View>
+                }
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: t.text, marginBottom: 5 }}>{meta.label}</Text>
+                  {generating && !hasBio
+                    ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <ActivityIndicator size="small" color={meta.color} />
+                        <Text style={{ fontSize: 12, color: t.textSub }}>Writing bio…</Text>
+                      </View>
+                    : <Text style={{ fontSize: 13, color: t.textSub, lineHeight: 18 }} numberOfLines={2}>
+                        {hasBio ? sp!.bio : 'Tap to customize'}
+                      </Text>
+                  }
+                </View>
+                <Ionicons name="pencil-outline" size={18} color={meta.color} />
+              </View>
+            </TouchableOpacity>
+          )
+        })}
+      </ScrollView>
+    </View>
+  )
+}
+
+function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go: (s: Screen) => void; onMeetPeople: (cat: 'romantic' | 'friends' | 'professional' | 'support', startAt?: string) => void }) {
+  const { t } = useT()
+  const isInRelationship = !!getRomanticPartner(profile)
+  const [openSector, setOpenSector] = useState<SectorKey | null>(null)
+  const [showProfiles, setShowProfiles] = useState(false)
+  const [showPicksList, setShowPicksList] = useState(false)
+  const [, force] = useReducer((x: number) => x + 1, 0)
+
+  if (showPicksList) return (
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <TouchableOpacity onPress={() => setShowPicksList(false)}>
+          <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Back</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: t.text }}>✦ {tr('soma_picks')}</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Your AI agent scouted these matches</Text>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, gap: 12 }}>
+        {CANDIDATES.map((c, i) => (
+          <TouchableOpacity
+            key={c.name}
+            onPress={() => { setShowPicksList(false); onMeetPeople('romantic', c.name) }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: t.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: t.border }}>
+            <Image source={{ uri: c.photo }} style={{ width: 64, height: 64, borderRadius: 32 }} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: t.text }}>{c.name}, {c.age}</Text>
+                <View style={{ backgroundColor: '#7B6EF615', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: t.accent }}>{90 - i * 4}% match</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 13, color: t.textSub, lineHeight: 18 }} numberOfLines={2}>{c.bio}</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                {c.interests.slice(0, 3).map(interest => (
+                  <View key={interest} style={{ backgroundColor: t.card2, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 11, color: t.textSub, fontWeight: '600' }}>{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  )
+
+  return (
+    <View style={{ flex: 1 }}>
+    {openSector && (
+      <SectorProfileModal
+        sector={openSector}
+        profile={DB.get()}
+        onClose={() => { setOpenSector(null); force() }}
+      />
+    )}
+    {showProfiles && !openSector && (
+      <HowOthersSeeMe
+        profile={DB.get()}
+        onEdit={key => setOpenSector(key)}
+        onClose={() => { setShowProfiles(false); force() }}
+      />
+    )}
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 100, gap: 14 }}>
       <View style={{ marginBottom: 8 }}>
-        <Text style={[g.greeting, { fontSize: 28 }]}>Outer World</Text>
-        <Text style={[g.auraSub, { marginTop: 4 }]}>Find people aligned with your values</Text>
+        <Text style={[g.greeting, { fontSize: 28, color: t.text }]}>{tr('outer_world')}</Text>
+        <Text style={[g.auraSub, { marginTop: 4, color: t.textSub }]}>Find people aligned with your values</Text>
       </View>
 
       {/* Synergy Scan — always featured */}
-      <TouchableOpacity onPress={() => go('synergy')} style={{ borderRadius: 20, padding: 20, backgroundColor: '#1A1A2E', flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <TouchableOpacity onPress={() => go('synergy')} style={{ borderRadius: 20, padding: 20, backgroundColor: t.card2, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: t.border2 }}>
         <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: '#7B6EF625', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#7B6EF650' }}>
-          <Ionicons name="flash-outline" size={26} color="#7B6EF6" />
+          <Ionicons name="flash-outline" size={26} color={t.accent} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 17, fontWeight: '800', color: '#fff' }}>Synergy Scan</Text>
-          <Text style={{ fontSize: 13, color: '#888', marginTop: 2 }}>Your AIs find your fit in seconds. Private.</Text>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>Synergy Scan</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Your AIs find your fit in seconds. Private.</Text>
         </View>
-        <Text style={{ color: '#7B6EF6', fontSize: 22 }}>›</Text>
+        <Text style={{ color: t.accent, fontSize: 22 }}>›</Text>
       </TouchableOpacity>
 
-      {/* Dating — hidden if in relationship */}
-      {isInRelationship ? (
-        <View style={{ borderRadius: 20, padding: 16, backgroundColor: '#FFF0F6', borderWidth: 1.5, borderColor: '#F6379B40', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Ionicons name="heart-outline" size={28} color="#C4196B" />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#C4196B' }}>You're in a relationship</Text>
-            <Text style={{ fontSize: 13, color: '#C4196B99', marginTop: 2 }}>Dating is hidden while committed.</Text>
-          </View>
+      {/* SOMA's Picks */}
+      <TouchableOpacity onPress={() => setShowPicksList(true)} style={{ borderRadius: 20, padding: 20, backgroundColor: '#7B6EF60E', flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#7B6EF630' }}>
+        <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: '#7B6EF625', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#7B6EF650' }}>
+          <Text style={{ fontSize: 22, color: t.accent }}>✦</Text>
         </View>
-      ) : (
-        <TouchableOpacity onPress={() => go('meetpeople')} style={{ borderRadius: 20, overflow: 'hidden' }}>
-          <ImageBackground source={{ uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=160&fit=crop' }} style={{ height: 160, justifyContent: 'flex-end', padding: 16 }} imageStyle={{ resizeMode: 'cover' }}>
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }} />
-            <View style={{ position: 'relative', zIndex: 1 }}>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff' }}>Serious Daters</Text>
-              <Text style={{ color: '#ddd', fontSize: 13 }}>Goal-driven dating · AI-mediated</Text>
-            </View>
-          </ImageBackground>
-        </TouchableOpacity>
-      )}
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>{tr('soma_picks')}</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Your AI agent scouted these matches for you</Text>
+        </View>
+        <Text style={{ color: t.accent, fontSize: 22 }}>›</Text>
+      </TouchableOpacity>
 
-      {/* Other categories */}
+      {/* Categories */}
       {([
-        { id: 'friends', icon: 'people-outline' as keyof typeof Ionicons.glyphMap, label: 'Friends', sub: 'New friends, activity buddies', color: '#1D9E75' },
-        { id: 'professional', icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap, label: 'Professional', sub: 'Mentors, collaborators, peers', color: '#378ADD' },
-        { id: 'support', icon: 'headset-outline' as keyof typeof Ionicons.glyphMap, label: 'Support', sub: 'Coaches, accountability', color: '#D85A30' },
+        isInRelationship
+          ? { id: 'romantic', icon: 'heart-outline' as keyof typeof Ionicons.glyphMap, label: "You're in a relationship", sub: 'Dating is hidden while committed.', color: '#EC4899', disabled: true }
+          : { id: 'romantic', icon: 'heart-outline' as keyof typeof Ionicons.glyphMap, label: 'Serious Daters', sub: 'Goal-driven dating · AI-mediated', color: '#F6379B', disabled: false },
+        { id: 'friends', icon: 'people-outline' as keyof typeof Ionicons.glyphMap, label: 'Friends', sub: 'New friends, activity buddies', color: '#1D9E75', disabled: false },
+        { id: 'professional', icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap, label: 'Professional', sub: 'Mentors, collaborators, peers', color: '#378ADD', disabled: false },
+        { id: 'support', icon: 'headset-outline' as keyof typeof Ionicons.glyphMap, label: 'Support', sub: 'Coaches, accountability', color: '#D85A30', disabled: false },
       ]).map(cat => (
-        <TouchableOpacity key={cat.id} onPress={() => go('meetpeople')} style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 0.5, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: cat.color + '18', alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name={cat.icon} size={20} color={cat.color} />
+        <TouchableOpacity key={cat.id} onPress={() => !cat.disabled && onMeetPeople(cat.id as any)} activeOpacity={cat.disabled ? 1 : 0.7} style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 0.5, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: cat.color + '18', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={cat.icon} size={22} color={cat.color} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{cat.label}</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: cat.disabled ? cat.color : t.text }}>{cat.label}</Text>
             <Text style={{ fontSize: 13, color: t.textSub }}>{cat.sub}</Text>
           </View>
-          <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
+          {!cat.disabled && <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>}
         </TouchableOpacity>
       ))}
 
-      {/* Connections */}
-      <TouchableOpacity onPress={() => go('connections')} style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <View style={{ position: 'relative' }}>
-          <Ionicons name="chatbubbles-outline" size={28} color={t.accent} />
-          {unread > 0 && <View style={{ position: 'absolute', top: -4, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#F66E8E', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{unread}</Text></View>}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>Connections</Text>
-          <Text style={{ fontSize: 13, color: t.textSub }}>{profile.connections.length > 0 ? `${profile.connections.length} active chats` : 'Your matches will appear here'}</Text>
-        </View>
-        <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
-      </TouchableOpacity>
+      {/* How Others See Me — single entry */}
+      {(() => {
+        const sp = profile.sectorProfiles || {}
+        const setCount = (Object.keys(SECTOR_META) as SectorKey[]).filter(k => sp[k]?.bio || sp[k]?.photos?.length).length
+        return (
+          <TouchableOpacity onPress={() => setShowProfiles(true)} activeOpacity={0.75}
+            style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 0.5, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#7B6EF618', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 22 }}>🪞</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>How Others See Me</Text>
+              <Text style={{ fontSize: 13, color: t.textSub }}>
+                {setCount > 0 ? `${setCount}/4 profiles set · tap to adjust` : '4 profiles · SOMA writes, you refine'}
+              </Text>
+            </View>
+            <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
+          </TouchableOpacity>
+        )
+      })()}
 
-      {/* My Profile */}
-      <TouchableOpacity onPress={() => go('myprofile')} style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#7B6EF640' }}>
-          <Ionicons name={profile.profilePhoto ? 'camera-outline' : 'person-circle-outline'} size={22} color={t.accent} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>My Profile</Text>
-          <Text style={{ fontSize: 13, color: t.textSub }}>How others see you</Text>
-        </View>
-        <Text style={{ color: t.textSub, fontSize: 18 }}>›</Text>
-      </TouchableOpacity>
+      {/* Who Likes Me */}
+      <WhoLikesMe profile={profile} onMeetPeople={onMeetPeople} />
+
+      <View style={{ height: 20 }} />
     </ScrollView>
+    </View>
   )
 }
 
@@ -4846,14 +7209,14 @@ function BondTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => voi
       </View>
 
       {/* Relationship tools */}
-      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textSub, letterSpacing: 0.8, marginBottom: 12, textTransform: 'uppercase' }}>Relationship tools</Text>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textSub, letterSpacing: 0.8, marginBottom: 12, textTransform: 'uppercase' }}>{t('rel_tools')}</Text>
 
       <TouchableOpacity onPress={() => go('bondjourney')} style={{ flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: theme.card, borderRadius: 18, padding: 18, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
         <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#F66E8E20', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 22 }}>🧭</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Bond Journey</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{t('bond_journey')}</Text>
           <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>Shared goals & milestones</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
@@ -4864,7 +7227,7 @@ function BondTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => voi
           <Text style={{ fontSize: 22 }}>💞</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Relationship Insights</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{t('rel_insights')}</Text>
           <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>Compatibility & patterns</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
@@ -4876,7 +7239,7 @@ function BondTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => voi
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>Talk it through with Soma</Text>
-          <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>Relationship advice & support</Text>
+          <Text style={{ fontSize: 12, color: theme.textSub, marginTop: 2 }}>{t('rel_support')}</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
       </TouchableOpacity>
@@ -4899,54 +7262,16 @@ function BondTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => voi
   )
 }
 
-function MainTabs({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void }) {
+function MainTabs({ profile, go, onReset, tab, setTab, dmUnread, onMeetPeople, pendingMatchChat }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void; tab: TabName; setTab: (t: TabName) => void; dmUnread: number; onMeetPeople: (cat: 'romantic' | 'friends' | 'professional' | 'support', startAt?: string) => void; pendingMatchChat?: { name: string; userId?: string; firstMessage?: string; key: number } | null }) {
   const { t: theme } = useT()
-  const [tab, setTab] = useState<TabName>('inner')
+  const [pendingChat, setPendingChat] = useState<{ userId: string; name: string; key: number } | null>(null)
   const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
   const isGuest = !auth.getToken()
   const partner = getRomanticPartner(profile)
   const inRelationship = !!partner
+
   // If user just entered relationship mode, move them off the Explore tab
   useEffect(() => { if (inRelationship && tab === 'outer') setTab('bond') }, [inRelationship])
-
-  type TabItem = { id: TabName; icon: keyof typeof Ionicons.glyphMap; label: string }
-  const TAB_ITEMS: TabItem[] = [
-    { id: 'circle', icon: 'people-outline',   label: t('tab_circle') },
-    { id: 'inner',  icon: 'sparkles-outline', label: t('tab_inner') },
-    inRelationship
-      ? { id: 'bond', icon: 'heart-outline', label: 'Bond' }
-      : { id: 'outer', icon: 'compass-outline', label: t('tab_explore') },
-  ]
-  const tabBar = (
-    <View dataSet={{ class: 'tab-bar-safe' }} style={{
-      position: Platform.OS === 'web' ? 'fixed' as any : 'absolute',
-      bottom: 0, left: 0, right: 0,
-      flexDirection: 'row', alignItems: 'flex-end',
-      backgroundColor: theme.bg,
-      borderTopWidth: 0.5, borderTopColor: theme.border,
-      paddingBottom: Platform.OS === 'ios' ? 34 : 16, paddingTop: 8, paddingHorizontal: 24,
-    }}>
-      {TAB_ITEMS.map(item => {
-        const active = tab === item.id
-        const showBadge = item.id === 'circle' && unread > 0
-        return (
-          <TouchableOpacity key={item.id} onPress={() => setTab(item.id)} style={{ flex: 1, alignItems: 'center', gap: 4, paddingVertical: 4 }}>
-            <View style={{ position: 'relative' }}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: active ? '#7B6EF6' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={item.icon} size={20} color={active ? '#fff' : theme.textSub} />
-              </View>
-              {showBadge && (
-                <View style={{ position: 'absolute', top: -2, right: -4, width: 14, height: 14, borderRadius: 7, backgroundColor: '#F66E8E', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.bg }}>
-                  <Text style={{ fontSize: 8, fontWeight: '800', color: '#fff' }}>{unread}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={{ fontSize: 10, fontWeight: active ? '600' : '500', color: active ? '#7B6EF6' : theme.textSub }}>{item.label}</Text>
-          </TouchableOpacity>
-        )
-      })}
-    </View>
-  )
 
   const guestBanner = isGuest ? (
     <TouchableOpacity onPress={() => go('register')} style={{
@@ -4968,11 +7293,11 @@ function MainTabs({ profile, go, onReset }: { profile: UserProfile; go: (s: Scre
       {guestBanner}
       <View style={{ flex: 1 }}>
         {tab === 'inner' && <Home profile={profile} go={go} onReset={onReset} />}
-        {tab === 'circle' && <MyCircleTab profile={profile} go={go} />}
-        {tab === 'outer' && <OuterWorldTab profile={profile} go={go} />}
+        {tab === 'circle' && <MyCircleTab profile={profile} go={go} onPersonChat={(userId, name) => { setPendingChat({ userId, name, key: Date.now() }); setTab('chat') }} />}
+        {tab === 'chat' && <MessagesTab profile={profile} initialChat={pendingChat} pendingMatchChat={pendingMatchChat} />}
+        {tab === 'outer' && <OuterWorldTab profile={profile} go={go} onMeetPeople={onMeetPeople} />}
         {tab === 'bond' && <BondTab profile={profile} go={go} />}
       </View>
-      {tabBar}
     </View>
   )
 }
@@ -5006,6 +7331,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
   const [moodPicked, setMoodPicked] = useState<number | null>(todayMood?.mood ?? null)
   const [moodNote, setMoodNote] = useState('')
   const [moodExpanded, setMoodExpanded] = useState(false)
+  const [checklistOpen, setChecklistOpen] = useState(true)
 
   const homeScore = (k: DomainKey) => {
     const m = profile.manualScores?.[k]
@@ -5016,7 +7342,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
   }
   const streak = calcActivityStreak(profile)
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const greeting = hour < 12 ? tr('good_morning') : hour < 17 ? tr('good_afternoon') : tr('good_evening')
 
   // Dynamic focus: pick lowest-scoring domain the user cares about, fallback to onboarding pick
   const focusDomain = (() => {
@@ -5039,7 +7365,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     const day = 86400000
 
     // Streak celebration
-    if (streak >= 3) cards.push({ id: 'streak', emoji: '🔥', title: `${streak}-day streak!`, sub: 'You\'re showing up every day', screen: null, color: '#FFF3E0' })
+    if (streak >= 3) cards.push({ id: 'streak', emoji: '🔥', title: `${streak}${tr('streak_days')}`, sub: tr('showing_up'), screen: null, color: '#FFF3E0' })
 
     // Mood dip this week
     const last7moods = (profile.moodLogs || []).slice(0, 7)
@@ -5071,7 +7397,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       const neglected = profile.circle
         .map(p => ({ p, score: circleHealth(p, profile) }))
         .sort((a, b) => a.score - b.score)[0]
-      if (neglected.score < 35) cards.push({ id: 'circle', emoji: '👥', title: `Reconnect with ${neglected.p.name}`, sub: 'You haven\'t mentioned them recently', screen: 'circle', color: '#FFFBF0' })
+      if (neglected.score < 35) cards.push({ id: 'circle', emoji: '👥', title: `Reconnect with ${friendlyName(neglected.p.name)}`, sub: 'You haven\'t mentioned them recently', screen: 'circle', color: '#FFFBF0' })
     }
 
     // Low score domain nudge
@@ -5082,14 +7408,15 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     return cards.slice(0, 5)
   })()
 
-  const MOODS: { emoji: string; label: string; val: 1|2|3|4|5 }[] = [
-    { emoji: '😔', label: 'Rough', val: 1 },
-    { emoji: '😕', label: 'Meh', val: 2 },
-    { emoji: '😐', label: 'Okay', val: 3 },
-    { emoji: '🙂', label: 'Good', val: 4 },
-    { emoji: '😊', label: 'Great', val: 5 },
+  const MOODS: { emoji: string; label: string; val: 1|2|3|4|5|6|7 }[] = [
+    { emoji: '🤩', label: 'Euphoric', val: 7 },
+    { emoji: '🥰', label: 'Amazing',  val: 6 },
+    { emoji: '😊', label: 'Great',    val: 5 },
+    { emoji: '🙂', label: 'Good',     val: 4 },
+    { emoji: '😐', label: 'Okay',     val: 3 },
+    { emoji: '😕', label: 'Meh',      val: 2 },
   ]
-  const saveMood = (val: 1|2|3|4|5) => {
+  const saveMood = (val: 1|2|3|4|5|6|7) => {
     haptic.light()
     setMoodPicked(val)
     DB.addMoodLog(val, moodNote || undefined)
@@ -5123,7 +7450,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     { key: 'wheel',   label: 'Check your Wheel of Life',    done: !!profile.wheel,                   screen: 'lifebalance' },
     { key: 'circle',  label: 'Add someone to your circle',  done: profile.circle.length >= 1,        screen: 'circle' },
     { key: 'diary',   label: 'Write a diary entry',         done: profile.diary.length >= 1,         screen: 'diary' },
-    { key: 'dating',  label: 'Share more with Aura',         done: profile.memories.length >= 10,     screen: 'aura' },
+    { key: 'dating',  label: 'Share more with SOMA',         done: profile.memories.length >= 10,     screen: 'aura' },
     { key: 'mood',    label: 'Log your first mood',         done: (profile.moodLogs || []).length >= 1, screen: null },
   ]
   const completedSteps = profileSteps.filter(s => s.done).length
@@ -5151,7 +7478,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     }
     // Mood
     for (const m of (profile.moodLogs || []).slice(0, 1)) {
-      const MOODLABELS = ['', 'Rough', 'Meh', 'Okay', 'Good', 'Great']
+      const MOODLABELS = ['', 'Rough', 'Meh', 'Okay', 'Good', 'Great', 'Amazing', 'Euphoric']
       items.push({ key: 'mo_' + m.date, icon: 'happy-outline', label: 'Mood logged', sub: MOODLABELS[m.mood], time: fmt(m.date + 'T12:00:00'), color: '#F59E0B' })
     }
     // Gratitude
@@ -5166,208 +7493,352 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     return items.sort((a, b) => b.time.localeCompare(a.time)).slice(0, 4)
   })()
 
+  const wellnessScore = (() => {
+    const keys: DomainKey[] = ['mind', 'health', 'growth', 'relationship', 'career', 'purpose', 'family', 'hobby']
+    const scores = keys.map(k => homeScore(k)).filter(s => s > 0)
+    if (!scores.length) return null
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+  })()
+
+  const domainTiles = [
+    { key: 'mind' as DomainKey,         label: 'Mind',     icon: '🧘', color: '#A89BFA' },
+    { key: 'health' as DomainKey,       label: 'Health',   icon: '❤️', color: '#F66E8E' },
+    { key: 'growth' as DomainKey,       label: 'Growth',   icon: '🌱', color: '#10B981' },
+    { key: 'relationship' as DomainKey, label: 'Love',     icon: '💞', color: '#7B6EF6' },
+  ]
+
   return (
-    <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={g.homePad}>
-      {/* ── HERO CARD ── */}
-      <FadeIn delay={0}><View style={{ backgroundColor: moodIsLow ? 'rgba(59,130,246,0.06)' : moodIsGood ? 'rgba(16,185,129,0.06)' : 'rgba(123,110,246,0.06)', borderRadius: 18, padding: 14, marginBottom: 16, borderWidth: 0.5, borderColor: moodIsLow ? 'rgba(59,130,246,0.15)' : moodIsGood ? 'rgba(16,185,129,0.15)' : 'rgba(123,110,246,0.12)' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, color: t.textSub, marginBottom: 3 }}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </Text>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: t.text }}>
-              {profile.name ? `${greeting}, ${profile.name}` : greeting}
-            </Text>
-            {moodIsLow && <Text style={{ fontSize: 12, color: '#3B82F6', marginTop: 4 }}>Soma is here for you today 💙</Text>}
-            {moodIsGood && <Text style={{ fontSize: 12, color: '#10B981', marginTop: 4 }}>You're doing great ✨</Text>}
-            {!moodPicked && <Text style={{ fontSize: 12, color: t.textSub, marginTop: 4 }}>How are you feeling today?</Text>}
-          </View>
+    <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={[g.homePad, { paddingTop: 8 }]}>
+
+      {/* ── HEADER ROW ── */}
+      <FadeIn delay={0}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <View>
+          <Text style={{ fontSize: 13, color: t.textSub, marginBottom: 2 }}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          </Text>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, letterSpacing: -0.5 }}>
+            {profile.name ? `${greeting}, ${profile.name} 👋` : `${greeting} 👋`}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity onPress={() => go('notifs')} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: t.border }}>
+            <Ionicons name="notifications-outline" size={20} color={t.text} />
+            {(notifDB.unreadCount() > 0 || unreadCount > 0) && (
+              <View style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: '#F6379B' }} />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => go('settings')} onLongPress={onReset}
-            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center', marginLeft: 12 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: '#7B6EF6' }}>{profile.name ? profile.name.charAt(0).toUpperCase() : '⚙'}</Text>
+            style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>
+              {profile.name ? profile.name.charAt(0).toUpperCase() : '✦'}
+            </Text>
           </TouchableOpacity>
         </View>
-        {/* Stats row */}
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-          {streak > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(245,158,11,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 4 }}>
-              <Ionicons name="flame-outline" size={14} color="#F59E0B" />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#F59E0B' }}>{streak} day streak</Text>
-            </View>
-          )}
-          {moodPicked && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(123,110,246,0.12)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 4 }}>
-              <Text style={{ fontSize: 14 }}>{'😔😕😐🙂😊'.split('')[moodPicked - 1]}</Text>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: t.accent }}>{'Rough Meh Okay Good Great'.split(' ')[moodPicked - 1]}</Text>
-            </View>
-          )}
-          {completionPct < 100 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: t.textSub }}>{completionPct}% complete</Text>
-            </View>
-          )}
-        </View>
-      </View></FadeIn>
+      </View>
+      </FadeIn>
 
-      {/* Daily check-in banner */}
-      <FadeIn delay={80}>{(() => {
-        const todayCheckin = (profile.checkins || []).find(c => c.date === todayStr)
-        if (todayCheckin) {
-          return (
-            <View style={{ backgroundColor: 'rgba(16,185,129,0.09)', borderRadius: 16, padding: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Ionicons name="checkmark-circle-outline" size={24} color="#10B981" />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981', marginBottom: 2 }}>Today's intention</Text>
-                <Text style={{ fontSize: 14, color: t.text, fontWeight: '500' }} numberOfLines={1}>{todayCheckin.intention}</Text>
+      {/* ── WELLNESS SCORE HERO ── */}
+      <FadeIn delay={60}>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => go('lifebalance')}
+        style={{ backgroundColor: '#7B6EF6', borderRadius: 24, padding: 20, marginBottom: 14, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+        <View style={{ position: 'absolute', bottom: -20, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>Wellness Score</Text>
+            {wellnessScore != null && (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
+                <Text style={{ fontSize: 56, fontWeight: '900', color: '#fff', lineHeight: 60 }}>{wellnessScore}</Text>
+                <Text style={{ fontSize: 22, fontWeight: '600', color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>/100</Text>
               </View>
+            )}
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+              {wellnessScore == null ? 'Start tracking to see your score'
+                : wellnessScore >= 75 ? 'Thriving — keep it up! ✨'
+                : wellnessScore >= 55 ? 'Good momentum — stay consistent'
+                : 'Room to grow — Soma is with you'}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'center', justifyContent: 'center', width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.15)' }}>
+            <Text style={{ fontSize: 32 }}>
+              {(moodPicked ?? 3) >= 4 ? '😊' : (moodPicked ?? 3) <= 2 ? '😔' : '😐'}
+            </Text>
+          </View>
+        </View>
+        {/* Score bar */}
+        {wellnessScore != null && (
+          <View style={{ marginTop: 16 }}>
+            <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)' }}>
+              <View style={{ width: `${wellnessScore}%` as any, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
             </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>0</Text>
+              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>View details →</Text>
+              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>100</Text>
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+      </FadeIn>
+
+      {/* ── DOMAIN METRIC TILES ── */}
+      <FadeIn delay={100}>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+        {domainTiles.map(d => {
+          const score = homeScore(d.key)
+          return (
+            <TouchableOpacity key={d.key} onPress={() => go('lifebalance')}
+              style={{ flex: 1, backgroundColor: t.card, borderRadius: 18, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: t.border }}>
+              <Text style={{ fontSize: 22, marginBottom: 4 }}>{d.icon}</Text>
+              {score > 0 && <Text style={{ fontSize: 20, fontWeight: '800', color: d.color }}>{score}</Text>}
+              <Text style={{ fontSize: 10, fontWeight: '600', color: t.textSub, marginTop: score > 0 ? 2 : 0 }}>{d.label}</Text>
+              {score > 0 && (
+                <View style={{ height: 3, borderRadius: 2, backgroundColor: t.border, width: '100%', marginTop: 6 }}>
+                  <View style={{ width: `${score}%` as any, height: 3, borderRadius: 2, backgroundColor: d.color }} />
+                </View>
+              )}
+            </TouchableOpacity>
           )
-        }
-        const isEvening = hour >= 17
-        return (
-          <TouchableOpacity onPress={() => go('checkin')}
-            style={{ backgroundColor: 'rgba(123,110,246,0.10)', borderRadius: 16, padding: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: 'rgba(123,110,246,0.18)' }}>
-            <Ionicons name={isEvening ? 'moon-outline' : 'sunny-outline'} size={24} color={t.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, fontWeight: '600', color: t.accent, marginBottom: 2 }}>
-                {isEvening ? 'Evening check-in' : 'Morning check-in'}
-              </Text>
-              <Text style={{ fontSize: 14, color: t.text, fontWeight: '500' }}>
-                {isEvening ? 'Reflect on your day — 30 seconds' : 'Set your intention for today →'}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 18, color: t.accent }}>›</Text>
-          </TouchableOpacity>
-        )
-      })()}</FadeIn>
+        })}
+      </View>
+      </FadeIn>
 
-      {/* Dynamic focus card */}
-      {focusDomainObj && (
-        <FadeIn delay={150}><TouchableOpacity
-          style={{ backgroundColor: moodIsLow ? 'rgba(59,130,246,0.12)' : 'rgba(123,110,246,0.09)', borderRadius: 16, padding: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-          onPress={() => go('aura')}
-        >
-          <Text style={{ fontSize: 22 }}>{moodIsLow ? '💙' : focusDomainObj.icon}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: moodIsLow ? '#3B82F6' : t.accent, marginBottom: 2 }}>
-              {moodIsLow ? 'Soma is with you' : "Today's focus"}
-            </Text>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: t.text }}>
-              {moodIsLow ? 'Talk about how you\'re feeling' : focusLabel}
-            </Text>
-            <Text style={{ fontSize: 12, color: t.textSub, marginTop: 1 }}>
-              {homeScore(focusDomain as DomainKey) < 50 && !moodIsLow
-                ? `${homeScore(focusDomain as DomainKey)}% — room to grow →`
-                : 'Talk to Soma about it →'}
-            </Text>
-          </View>
-        </TouchableOpacity></FadeIn>
-      )}
-
-      <FadeIn delay={220}>
-      {/* Contextual insight strip */}
-      {insightCards.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}>
-          {insightCards.map(card => (
-            <TouchableOpacity
-              key={card.id}
-              onPress={() => card.screen ? go(card.screen) : null}
-              activeOpacity={card.screen ? 0.75 : 1}
-              style={{ backgroundColor: t.card, borderRadius: 16, padding: 14, width: 170, borderWidth: 1, borderColor: t.border }}
-            >
-              <Text style={{ fontSize: 22, marginBottom: 6 }}>{card.emoji}</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: t.text, marginBottom: 2 }}>{card.title}</Text>
-              <Text style={{ fontSize: 11, color: t.textSub, lineHeight: 15 }}>{card.sub}</Text>
-              {card.screen && <Text style={{ fontSize: 11, color: t.accent, marginTop: 6, fontWeight: '600' }}>Open →</Text>}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-
-      {/* Profile completion card — hidden at 100% */}
-      {completionPct < 100 && (
-        <View style={{ backgroundColor: t.card, borderRadius: 18, padding: 16, marginBottom: 14, shadowColor: t.shadow, shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSub }}>Your profile</Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent }}>{completionPct}%</Text>
-          </View>
-          <View style={{ height: 6, borderRadius: 3, backgroundColor: t.accentLight, marginBottom: 10 }}>
-            <View style={{ width: `${completionPct}%` as any, height: 6, borderRadius: 3, backgroundColor: completionPct >= 75 ? '#4CAF7D' : completionPct >= 40 ? t.accent : '#F5A623' }} />
-          </View>
-          {nextStep && (
-            <TouchableOpacity
-              onPress={() => nextStep.screen ? go(nextStep.screen) : null}
-              activeOpacity={nextStep.screen ? 0.75 : 1}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-            >
-              <Text style={{ fontSize: 13, color: t.textSub }}>
-                <Text style={{ color: t.text, fontWeight: '600' }}>Next: </Text>{nextStep.label}
-              </Text>
-              {nextStep.screen && <Text style={{ fontSize: 13, color: t.accent, fontWeight: '600' }}>→</Text>}
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* Mood check-in */}
-      <View style={{ backgroundColor: t.card, borderRadius: 18, padding: 14, marginBottom: 14, shadowColor: t.shadow, shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 } }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moodPicked ? 0 : 10 }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSub }}>How are you feeling?</Text>
+      {/* ── MOOD CHECK-IN ── */}
+      <FadeIn delay={140}>
+      <View style={{ backgroundColor: t.card, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: t.border }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>{tr('feeling_card')}</Text>
           <TouchableOpacity onPress={() => go('moodanalytics')}>
-            <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '600' }}>{(profile.moodLogs || []).length > 0 ? 'View trends →' : (moodPicked ? '✓ Logged' : '')}</Text>
+            <Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '600' }}>
+              {(profile.moodLogs || []).length > 0 ? tr('trends') : ''}
+            </Text>
           </TouchableOpacity>
         </View>
-        {!moodPicked && (
+        {!moodPicked ? (
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             {MOODS.map(m => (
-              <TouchableOpacity key={m.val} onPress={() => saveMood(m.val)} style={{ alignItems: 'center', gap: 3 }}>
-                <Text style={{ fontSize: 28 }}>{m.emoji}</Text>
-                <Text style={{ fontSize: 10, color: '#9A9DB2', fontWeight: '500' }}>{m.label}</Text>
+              <TouchableOpacity key={m.val} onPress={() => saveMood(m.val)}
+                style={{ alignItems: 'center', gap: 5, flex: 1 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: t.border }}>
+                  <Text style={{ fontSize: 24 }}>{m.emoji}</Text>
+                </View>
+                <Text style={{ fontSize: 10, color: t.textSub, fontWeight: '600' }}>{m.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
-        )}
-        {moodPicked && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 24 }}>{MOODS.find(m => m.val === moodPicked)?.emoji}</Text>
-            <Text style={{ fontSize: 14, color: t.text, fontWeight: '500' }}>{MOODS.find(m => m.val === moodPicked)?.label}</Text>
-            <TouchableOpacity onPress={() => { setMoodPicked(null); DB.addMoodLog(3) }} style={{ marginLeft: 'auto' }}>
-              <Text style={{ fontSize: 12, color: '#C4BBFB' }}>Change</Text>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#7B6EF610', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 28 }}>{MOODS.find(m => m.val === moodPicked)?.emoji}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>{MOODS.find(m => m.val === moodPicked)?.label}</Text>
+              <Text style={{ fontSize: 12, color: t.textSub }}>Mood logged today</Text>
+            </View>
+            <TouchableOpacity onPress={() => { setMoodPicked(null); DB.addMoodLog(3) }}>
+              <Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '600' }}>Change</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
-
-      {/* Soma morning message card */}
-      {somaMsg && !somaMsgDismissed && (
-        <TouchableOpacity onPress={() => go('aura')} style={{ backgroundColor: t.card, borderRadius: 18, padding: 16, marginBottom: 16, flexDirection: 'row', gap: 12, shadowColor: t.shadow, shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } }}>
-          <SomaMark size={40} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: t.accent, marginBottom: 4 }}>{profile.aiName || 'Soma'}</Text>
-            <Text style={{ fontSize: 14, color: t.text, lineHeight: 20 }}>{somaMsg}</Text>
-            <Text style={{ fontSize: 12, color: t.textTertiary, marginTop: 6 }}>Tap to reply →</Text>
-          </View>
-          <TouchableOpacity onPress={e => { e.stopPropagation?.(); setSomaMsgDismissed(true) }} style={{ padding: 4 }}>
-            <Text style={{ fontSize: 16, color: '#C4BBFB' }}>×</Text>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      )}
       </FadeIn>
 
-      <FadeIn delay={320}>
-      {/* Recent activity feed */}
-      {recentActivity.length > 0 && (
-        <View style={{ marginBottom: 20 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={g.secLabel}>Recently</Text>
-            <TouchableOpacity onPress={() => go('timeline')}><Text style={[g.secLabel, { color: '#7B6EF6' }]}>Timeline →</Text></TouchableOpacity>
+      {/* ── CHECK-IN BANNER ── */}
+      <FadeIn delay={160}>
+      {(() => {
+        const todayCheckin = (profile.checkins || []).find(c => c.date === todayStr)
+        if (todayCheckin) return (
+          <View style={{ backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: 16, padding: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: 'rgba(16,185,129,0.2)' }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#10B98120', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="checkmark-circle-outline" size={22} color="#10B981" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#10B981', marginBottom: 1 }}>{tr('todays_intention')}</Text>
+              <Text style={{ fontSize: 13, color: t.text, fontWeight: '500' }} numberOfLines={1}>{todayCheckin.intention}</Text>
+            </View>
           </View>
-          <View style={{ backgroundColor: t.card, borderRadius: 18, overflow: 'hidden' }}>
+        )
+        return (
+          <TouchableOpacity onPress={() => go('checkin')}
+            style={{ backgroundColor: 'rgba(123,110,246,0.08)', borderRadius: 16, padding: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: 'rgba(123,110,246,0.18)' }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={hour >= 17 ? 'moon-outline' : 'sunny-outline'} size={20} color="#7B6EF6" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B6EF6', marginBottom: 1 }}>
+                {hour >= 17 ? 'Evening Check-in' : 'Morning Check-in'}
+              </Text>
+              <Text style={{ fontSize: 13, color: t.text, fontWeight: '500' }}>
+                {hour >= 17 ? 'Reflect on your day' : 'Set your intention for today'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward-outline" size={16} color="#7B6EF6" />
+          </TouchableOpacity>
+        )
+      })()}
+      </FadeIn>
+
+      {/* ── STREAKS ROW ── */}
+      {streak > 0 && (
+        <FadeIn delay={180}>
+        <View style={{ backgroundColor: t.card, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: t.border }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Your Streaks</Text>
+          <View style={{ flexDirection: 'row', gap: 0 }}>
+            {[
+              { icon: '🔥', label: tr('activity'), days: streak },
+              { icon: '📖', label: tr('diary'), days: (() => { let s = 0; const sorted = [...profile.diary].sort((a,b) => (b.date||'').localeCompare(a.date||'')); const today = new Date(); for (const e of sorted) { const d = new Date(e.date||0); if (Math.floor((today.getTime()-d.getTime())/86400000) <= s+1) s++; else break; } return s })() },
+              { icon: '🌿', label: 'Gratitude', days: (profile.gratitudeEntries||[]).length },
+            ].map((s2, i, arr) => (
+              <View key={s2.label} style={{ flex: 1, alignItems: 'center', borderRightWidth: i < arr.length-1 ? 1 : 0, borderRightColor: t.border, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 24 }}>{s2.icon}</Text>
+                <Text style={{ fontSize: 22, fontWeight: '900', color: t.text, marginTop: 4 }}>{s2.days}</Text>
+                <Text style={{ fontSize: 11, color: t.textSub, fontWeight: '600' }}>{s2.label}</Text>
+                <Text style={{ fontSize: 10, color: t.textTertiary }}>{s2.days === 1 ? 'day' : 'days'}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        </FadeIn>
+      )}
+
+      {/* ── SOMA AI INSIGHT CARD ── */}
+      {somaMsg && !somaMsgDismissed && (
+        <FadeIn delay={200}>
+        <TouchableOpacity onPress={() => go('aura')}
+          style={{ backgroundColor: '#1E1646', borderRadius: 22, padding: 18, marginBottom: 14, overflow: 'hidden' }}>
+          <View style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(123,110,246,0.3)' }} />
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(123,110,246,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 18 }}>✦</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#C4BBFB', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>AI Insight · {profile.aiName || 'Soma'}</Text>
+              <Text style={{ fontSize: 14, color: '#fff', lineHeight: 21, fontWeight: '400' }}>{somaMsg}</Text>
+              <Text style={{ fontSize: 12, color: '#C4BBFB', marginTop: 8, fontWeight: '600' }}>Reply to Soma →</Text>
+            </View>
+            <TouchableOpacity onPress={e => { e.stopPropagation?.(); setSomaMsgDismissed(true) }} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 18, color: '#C4BBFB' }}>×</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+        </FadeIn>
+      )}
+
+      {/* ── INSIGHT CARDS STRIP ── */}
+      {insightCards.length > 0 && (
+        <FadeIn delay={220}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14, marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}>
+          {insightCards.map(card => (
+            <TouchableOpacity key={card.id} onPress={() => card.screen ? go(card.screen) : null}
+              activeOpacity={card.screen ? 0.75 : 1}
+              style={{ backgroundColor: t.card, borderRadius: 18, padding: 14, width: 162, borderWidth: 1, borderColor: t.border }}>
+              <Text style={{ fontSize: 24, marginBottom: 8 }}>{card.emoji}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.text, marginBottom: 3 }}>{card.title}</Text>
+              <Text style={{ fontSize: 11, color: t.textSub, lineHeight: 15 }}>{card.sub}</Text>
+              {card.screen && <Text style={{ fontSize: 11, color: '#7B6EF6', marginTop: 8, fontWeight: '700' }}>Open →</Text>}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        </FadeIn>
+      )}
+
+      {/* ── TODAY's RITUALS ── */}
+      <FadeIn delay={260}>
+      {(() => {
+        const todayStr2 = new Date().toISOString().slice(0, 10)
+        const diaryToday = profile.diary.some(e => e.date?.slice(0, 10) === todayStr2)
+        const loveToday = profile.loveEntries?.some(e => e.date?.slice(0, 10) === todayStr2) ?? false
+        const gratToday = profile.gratitudeEntries?.some(e => e.date?.slice(0, 10) === todayStr2) ?? false
+        const activeMeds = (profile.medications || []).filter(m => m.active)
+        const medLog2 = (profile.medLogs || []).find(l => l.date === todayStr2)
+        const medsDone = activeMeds.length > 0 && activeMeds.every(m => medLog2?.doses?.[m.id] !== undefined)
+        const rituals: { icon: keyof typeof Ionicons.glyphMap; label: string; done: boolean; screen: Screen; color: string }[] = [
+          { icon: 'happy-outline',   label: tr('feeling_card'), done: !!moodPicked, screen: 'home' as Screen,        color: '#7B6EF6' },
+          { icon: 'book-outline',    label: tr('diary'),         done: diaryToday,   screen: 'diary' as Screen,       color: '#F6379B' },
+          { icon: 'heart-outline',   label: tr('love_yourself') || 'Love Yourself', done: loveToday,    screen: 'loveyourself' as Screen, color: '#EC4899' },
+          { icon: 'leaf-outline',    label: tr('gratitude'),     done: gratToday,    screen: 'gratitude' as Screen,   color: '#10B981' },
+          ...(activeMeds.length > 0 ? [{ icon: 'medical-outline' as keyof typeof Ionicons.glyphMap, label: tr('medications') || 'Medications', done: medsDone, screen: 'medication' as Screen, color: '#F59E0B' }] : []),
+        ]
+        const doneCount = rituals.filter(r => r.done).length
+        return (
+          <View style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{tr('todays_plan')}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: doneCount === rituals.length ? '#22C55E' : '#7B6EF6' }}>{doneCount}/{rituals.length}</Text>
+            </View>
+            {/* Progress bar */}
+            <View style={{ height: 6, borderRadius: 3, backgroundColor: t.border, marginBottom: 12 }}>
+              <View style={{ width: `${(doneCount / rituals.length) * 100}%` as any, height: 6, borderRadius: 3, backgroundColor: doneCount === rituals.length ? '#22C55E' : '#7B6EF6' }} />
+            </View>
+            <View style={{ backgroundColor: t.card, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: t.border }}>
+              {rituals.map((r, i) => (
+                <TouchableOpacity key={r.label} onPress={() => r.screen === 'home' ? undefined : go(r.screen)}
+                  style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: i < rituals.length - 1 ? 1 : 0, borderBottomColor: t.border, gap: 12, opacity: r.done ? 0.65 : 1 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: r.done ? '#22C55E15' : r.color + '15', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name={r.icon} size={18} color={r.done ? '#22C55E' : r.color} />
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: r.done ? '500' : '600', color: r.done ? t.textSub : t.text }}>{r.label}</Text>
+                  <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: r.done ? '#22C55E' : t.border, alignItems: 'center', justifyContent: 'center' }}>
+                    {r.done && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>✓</Text>}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )
+      })()}
+      </FadeIn>
+
+      {/* ── QUICK SHORTCUTS ── */}
+      <FadeIn delay={300}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}>
+        {([
+          { icon: 'chatbubble-ellipses-outline', label: tr('talkToSoma'), screen: 'asksoma'     as Screen, color: '#7B6EF6' },
+          { icon: 'book-outline',                label: tr('diary'),     screen: 'diaryhistory' as Screen, color: '#F6379B' },
+          { icon: 'analytics-outline',           label: tr('yourInsights'), screen: 'insights'    as Screen, color: '#10B981' },
+          { icon: 'calendar-outline',            label: tr('timeline') || 'Timeline', screen: 'timeline'    as Screen, color: '#F59E0B' },
+          { icon: 'heart-circle-outline',        label: tr('bonds_label'), screen: 'relinsights' as Screen, color: '#EC4899' },
+          { icon: 'people-outline',              label: tr('tab_circle'), screen: 'circle'      as Screen, color: '#378ADD' },
+        ] as { icon: keyof typeof Ionicons.glyphMap; label: string; screen: Screen; color: string }[]).map(item => (
+          <TouchableOpacity key={item.screen} onPress={() => go(item.screen)} style={{ alignItems: 'center', gap: 7 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: item.color + '15', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: item.color + '30' }}>
+              <Ionicons name={item.icon} size={24} color={item.color} />
+            </View>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSub, textAlign: 'center' }}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      </FadeIn>
+
+      {/* ── AURA BANNER ── */}
+      <FadeIn delay={320}>
+      <TouchableOpacity style={[g.auraMain, { marginBottom: 14 }]} onPress={() => go('aura')}>
+        <View style={g.orbSm}><Text style={{ color: '#fff', fontSize: 13 }}>✦</Text></View>
+        <View style={{ flex: 1 }}>
+          <Text style={g.cardTag}>SOMA · AI partner</Text>
+          <Text style={[g.auraMainTitle, { color: t.text }]}>Talk about anything</Text>
+          <Text style={g.auraMainSub}>{totalMem > 0 ? `${totalMem} memories · ${profile.circle.length} people` : 'Start building your story'}</Text>
+        </View>
+        <Text style={g.arrow}>→</Text>
+      </TouchableOpacity>
+      </FadeIn>
+
+      {/* ── RECENT ACTIVITY ── */}
+      {recentActivity.length > 0 && (
+        <FadeIn delay={340}>
+        <View style={{ marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{tr('recent_activity')}</Text>
+            <TouchableOpacity onPress={() => go('timeline')}>
+              <Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '600' }}>Timeline →</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ backgroundColor: t.card, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: t.border }}>
             {recentActivity.map((item, i) => (
               <View key={item.key} style={{ flexDirection: 'row', alignItems: 'center', padding: 13, gap: 12, borderBottomWidth: i < recentActivity.length - 1 ? 1 : 0, borderBottomColor: t.border }}>
-                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: item.color + '18', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={item.icon} size={18} color={item.color} />
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: item.color + '18', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={item.icon} size={19} color={item.color} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: t.text }}>{item.label}</Text>
@@ -5378,104 +7849,85 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
             ))}
           </View>
         </View>
+        </FadeIn>
       )}
 
-      {/* Circle of Life — the hero of the home screen */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <Text style={g.secLabel}>Circle of life</Text>
-        <TouchableOpacity onPress={() => go('lifebalance')}><Text style={[g.secLabel, { color: '#7B6EF6' }]}>Details →</Text></TouchableOpacity>
-      </View>
-      <TouchableOpacity activeOpacity={0.9} onPress={() => go('lifebalance')} style={{ alignItems: 'center', marginBottom: 4 }}>
-        <WheelOfLifeChart domains={DOMAINS} scoreOf={homeScore} size={320} />
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[g.auraMain, { marginTop: 20 }]} onPress={() => go('aura')}>
-        <View style={g.orbSm}><Text style={{ color: '#fff', fontSize: 13 }}>✦</Text></View>
-        <View style={{ flex: 1 }}>
-          <Text style={g.cardTag}>Aura · AI partner</Text>
-          <Text style={g.auraMainTitle}>Talk about anything</Text>
-          <Text style={g.auraMainSub}>{totalMem > 0 ? `${totalMem} memories · ${profile.circle.length} people` : 'Start building your story'}</Text>
+      {/* ── GETTING STARTED CHECKLIST ── */}
+      {completionPct < 100 && (
+        <FadeIn delay={360}>
+        <View style={{ backgroundColor: t.card, borderRadius: 18, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: t.border }}>
+          {/* Header row */}
+          <TouchableOpacity onPress={() => setChecklistOpen(o => !o)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: checklistOpen ? 10 : 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: t.text }}>Getting started</Text>
+              <View style={{ backgroundColor: '#7B6EF6' + '20', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B6EF6' }}>{completedSteps}/{profileSteps.length}</Text>
+              </View>
+            </View>
+            <Ionicons name={checklistOpen ? 'chevron-up-outline' : 'chevron-down-outline'} size={16} color={t.textSub} />
+          </TouchableOpacity>
+          {/* Progress bar */}
+          {checklistOpen && (
+            <>
+              <View style={{ height: 4, borderRadius: 2, backgroundColor: t.border, marginBottom: 14 }}>
+                <View style={{ width: `${completionPct}%` as any, height: 4, borderRadius: 2, backgroundColor: completionPct >= 75 ? '#22C55E' : '#7B6EF6' }} />
+              </View>
+              {/* Step list */}
+              {profileSteps.map((step, i) => (
+                <TouchableOpacity key={step.key} onPress={() => step.screen && !step.done ? go(step.screen) : null}
+                  activeOpacity={step.screen && !step.done ? 0.7 : 1}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7, borderTopWidth: i === 0 ? 0 : 0.5, borderTopColor: t.border }}>
+                  <View style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: step.done ? '#22C55E' : 'transparent',
+                    borderWidth: step.done ? 0 : 1.5, borderColor: t.border }}>
+                    {step.done && <Ionicons name="checkmark" size={13} color="#fff" />}
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 13, color: step.done ? t.textSub : t.text, fontWeight: step.done ? '400' : '600',
+                    textDecorationLine: step.done ? 'line-through' : 'none' }}>{step.label}</Text>
+                  {!step.done && step.screen && <Ionicons name="chevron-forward-outline" size={13} color="#7B6EF6" />}
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
         </View>
-        <Text style={g.arrow}>→</Text>
-      </TouchableOpacity>
+        </FadeIn>
+      )}
+
+      {/* ── CIRCLE OF LIFE WHEEL ── */}
+      <FadeIn delay={380}>
+      <View style={{ marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>Circle of Life</Text>
+          <TouchableOpacity onPress={() => go('lifebalance')}>
+            <Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '600' }}>Details →</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity activeOpacity={0.9} onPress={() => go('lifebalance')} style={{ alignItems: 'center' }}>
+          <WheelOfLifeChart domains={DOMAINS} scoreOf={homeScore} size={320} />
+        </TouchableOpacity>
+      </View>
       </FadeIn>
 
-      <FadeIn delay={440}>
-      {/* Daily rituals card */}
-      {(() => {
-        const todayStr = new Date().toISOString().slice(0, 10)
-        const diaryToday = profile.diary.some(e => e.date?.slice(0, 10) === todayStr)
-        const loveToday = profile.loveEntries?.some(e => e.date?.slice(0, 10) === todayStr) ?? false
-        const gratToday = profile.gratitudeEntries?.some(e => e.date?.slice(0, 10) === todayStr) ?? false
-        const activeMeds = (profile.medications || []).filter(m => m.active)
-        const medLog = (profile.medLogs || []).find(l => l.date === todayStr)
-        const medsDone = activeMeds.length > 0 && activeMeds.every(m => medLog?.doses?.[m.id] !== undefined)
-        const rituals: { icon: keyof typeof Ionicons.glyphMap; label: string; done: boolean; screen: Screen }[] = [
-          { icon: 'happy-outline',   label: 'Mood',          done: !!moodPicked, screen: 'home' as Screen },
-          { icon: 'book-outline',    label: 'Diary',         done: diaryToday,   screen: 'diary' as Screen },
-          { icon: 'heart-outline',   label: 'Love Yourself', done: loveToday,    screen: 'loveyourself' as Screen },
-          { icon: 'leaf-outline',    label: 'Gratitude',     done: gratToday,    screen: 'gratitude' as Screen },
-          ...(activeMeds.length > 0 ? [{ icon: 'medical-outline' as keyof typeof Ionicons.glyphMap, label: 'Medications', done: medsDone, screen: 'medication' as Screen }] : []),
-        ]
-        const doneCount = rituals.filter(r => r.done).length
-        return (
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Text style={g.secLabel}>Today</Text>
-              <Text style={{ fontSize: 12, color: doneCount === rituals.length ? '#22C55E' : t.textTertiary, fontWeight: '600' }}>{doneCount}/{rituals.length} done</Text>
-            </View>
-            <View style={{ backgroundColor: t.card, borderRadius: 18, overflow: 'hidden', shadowColor: t.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 2 } }}>
-              {rituals.map((r, i) => (
-                <TouchableOpacity key={r.label} onPress={() => r.screen === 'home' ? undefined : go(r.screen)} style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: i < rituals.length - 1 ? 1 : 0, borderBottomColor: t.border, gap: 12 }}>
-                  <Ionicons name={r.icon} size={20} color={r.done ? '#22C55E' : t.textSub} style={{ width: 28, textAlign: 'center' }} />
-                  <Text style={{ flex: 1, fontSize: 15, fontWeight: '500', color: t.text }}>{r.label}</Text>
-                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: r.done ? '#22C55E' : t.accentLight, alignItems: 'center', justifyContent: 'center' }}>
-                    {r.done && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>✓</Text>}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {/* Quick-nav icon strip */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14, marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}>
-              {([
-                { icon: 'book-outline',                 label: 'Diary',    screen: 'diaryhistory' as Screen },
-                { icon: 'calendar-outline',             label: 'Timeline', screen: 'timeline'     as Screen },
-                { icon: 'analytics-outline',            label: 'Insights', screen: 'insights'     as Screen },
-                { icon: 'chatbubble-ellipses-outline',  label: 'Ask Soma', screen: 'asksoma'      as Screen },
-                { icon: 'heart-circle-outline',         label: 'Bonds',    screen: 'relinsights'  as Screen },
-                { icon: 'people-outline',               label: 'Circle',   screen: 'circle'       as Screen },
-              ] as { icon: keyof typeof Ionicons.glyphMap; label: string; screen: Screen }[]).map(item => (
-                <TouchableOpacity key={item.screen} onPress={() => go(item.screen)} style={{ alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: t.border }}>
-                    <Ionicons name={item.icon} size={22} color={t.accent} />
-                  </View>
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: t.textSub, textAlign: 'center' }}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )
-      })()}
-
-      {/* Healing Path row */}
+      {/* ── HEALTH & SUPPORT ROW ── */}
+      <FadeIn delay={400}>
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: t.card, borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: t.border }} onPress={() => go('healthhub')}>
-          <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#FBEAF0', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: t.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: t.border }} onPress={() => go('healthhub')}>
+          <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FBEAF0', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
             <Ionicons name="fitness-outline" size={20} color="#993556" />
           </View>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: t.text, marginBottom: 2 }}>Health Hub</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: t.text, marginBottom: 3 }}>Health Hub</Text>
           <Text style={{ fontSize: 12, color: t.textSub }}>{(() => {
             const todayLog = (profile.healthLogs || []).find(l => l.date === new Date().toISOString().slice(0,10))
-            if (todayLog?.steps) return `${todayLog.steps.toLocaleString()} steps today`
+            if (todayLog?.steps) return `${todayLog.steps.toLocaleString()} steps`
             const meds = (profile.medications || []).filter(m => m.active).length
             return meds > 0 ? `${meds} med${meds>1?'s':''} tracked` : 'Track your health'
           })()}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: t.card, borderRadius: 16, padding: 14, borderWidth: 0.5, borderColor: t.border }} onPress={() => go('therapy')}>
-          <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#E1F5EE', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: t.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: t.border }} onPress={() => go('therapy')}>
+          <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#E1F5EE', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
             <Ionicons name="pulse-outline" size={20} color="#0F6E56" />
           </View>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: t.text, marginBottom: 2 }}>Therapy & Support</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: t.text, marginBottom: 3 }}>Support</Text>
           <Text style={{ fontSize: 12, color: t.textSub }}>{(profile.therapySessions?.length ?? 0) > 0 ? `${profile.therapySessions!.length} sessions` : "You're not alone"}</Text>
         </TouchableOpacity>
       </View>
@@ -5532,7 +7984,7 @@ function WheelSegment({ domain, profile, angle, index, score }: { domain: typeof
 
 // A real Wheel of Life: radial chart with a spoke per domain, scores plotted as
 // Wheel of Life — segmented pie chart with colored sectors, numbered rings, and score polygon
-function WheelOfLifeChart({ domains, scoreOf, size = 340 }: { domains: typeof DOMAINS; scoreOf: (k: DomainKey) => number; size?: number }) {
+function WheelOfLifeChart({ domains, scoreOf, size = 340, onDomainPress }: { domains: typeof DOMAINS; scoreOf: (k: DomainKey) => number; size?: number; onDomainPress?: (key: DomainKey) => void }) {
   const C = size / 2
   const R = size / 2 - 52 // inner chart radius (leaves room for labels)
   const N = domains.length
@@ -5650,25 +8102,16 @@ function WheelOfLifeChart({ domains, scoreOf, size = 340 }: { domains: typeof DO
           )
         })}
 
-        {/* Score numbers inside each sector */}
-        {domains.map((d, i) => {
-          const score = Math.round(scores1to9[i])
-          const labelAngle = midDeg(i)
-          const labelR = R * 0.62
-          const lp = ptOnArc(labelAngle, labelR)
+        {/* Tappable transparent sector overlays */}
+        {onDomainPress && domains.map((d, i) => {
+          const a1 = startDeg(i), a2 = endDeg(i)
           return (
-            <SvgText
-              key={d.key}
-              x={lp.x}
-              y={lp.y + 10}
-              textAnchor="middle"
-              fontSize={22}
-              fontWeight="bold"
-              fill="white"
-              fillOpacity={0.9}
-            >
-              {score}
-            </SvgText>
+            <SvgPath
+              key={d.key + '_tap'}
+              d={arcPath(a1, a2, 0, R)}
+              fill="transparent"
+              onPress={() => onDomainPress(d.key)}
+            />
           )
         })}
 
@@ -5719,7 +8162,7 @@ function WheelHistory({ history }: { history: WheelSnapshot[] }) {
       <View style={{ paddingHorizontal: 24, marginTop: 16 }}>
         <Text style={g.secLabel}>Progress over time</Text>
         <View style={[g.matchCard, { marginBottom: 0, backgroundColor: t.card, borderColor: t.border }]}>
-          <Text style={{ fontSize: 13, color: t.textSub }}>Check in over the next days — your balance trend will appear here. 📈</Text>
+          <Text style={{ fontSize: 13, color: t.textSub }}>{tr('wheel_empty')}</Text>
         </View>
       </View>
     )
@@ -5938,6 +8381,8 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
   const [goalDeadline, setGoalDeadline] = useState('')
   const [goalProgress, setGoalProgress] = useState(0)
 
+  const [ratingModal, setRatingModal] = useState<DomainKey | null>(null)
+
   const openGoalModal = (key: DomainKey, label: string, color: string) => {
     const existing = goals[key]
     setGoalText(existing?.text || '')
@@ -5989,15 +8434,15 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
       <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>{t('back')}</Text></TouchableOpacity></View>
 
       <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
-        <Text style={g.greeting}>{t('wheelTitle')}</Text>
-        <Text style={g.auraSub} style={{ marginTop: 6, fontSize: 13, color: theme.textSub }}>
+        <Text style={[g.greeting, { color: theme.text }]}>{t('wheelTitle')}</Text>
+        <Text style={[g.auraSub, { marginTop: 6, fontSize: 13, color: theme.textSub }]}>
           {assessing ? t('reflecting') : t('wheelSub')}
         </Text>
       </View>
 
       {/* Wheel of Life — real radial chart */}
       <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 12 }}>
-        <WheelOfLifeChart domains={DOMAINS} scoreOf={domScore} size={340} />
+        <WheelOfLifeChart domains={DOMAINS} scoreOf={domScore} size={340} onDomainPress={k => setRatingModal(k)} />
         {(() => {
           const sc = DOMAINS.map(d => domScore(d.key))
           const spread = Math.max(...sc) - Math.min(...sc)
@@ -6027,7 +8472,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                   <Ionicons name={DOMAIN_ICONS[d.key]} size={20} color={d.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={g.lbTitle}>{d.label}</Text>
+                  <Text style={[g.lbTitle, { color: theme.text }]}>{d.label}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
                     <View style={{ flex: 1, height: 4, backgroundColor: theme.border2, borderRadius: 2, overflow: 'hidden' }}>
                       <View style={{ width: `${Math.min(score, 100)}%`, height: '100%', backgroundColor: d.color, borderRadius: 2 }} />
@@ -6102,33 +8547,33 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                 if (!hasAnyData) return null
                 return (
                   <View style={g.healthDataPanel}>
-                    <Text style={g.lbSectionLabel}>Today's health data</Text>
+                    <Text style={g.lbSectionLabel}>{t('health_data')}</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       {todayHealth?.steps !== undefined && (
                         <View style={g.healthMetricChip}>
                           <Ionicons name="footsteps-outline" size={16} color="#6E8BF6" />
-                          <Text style={g.healthMetricVal}>{todayHealth.steps.toLocaleString()}</Text>
+                          <Text style={[g.healthMetricVal, { color: theme.text }]}>{todayHealth.steps.toLocaleString()}</Text>
                           <Text style={g.healthMetricLbl}>steps</Text>
                         </View>
                       )}
                       {todayHealth?.sleepHours !== undefined && (
                         <View style={g.healthMetricChip}>
                           <Ionicons name="moon-outline" size={16} color="#A89BFA" />
-                          <Text style={g.healthMetricVal}>{todayHealth.sleepHours}h</Text>
+                          <Text style={[g.healthMetricVal, { color: theme.text }]}>{todayHealth.sleepHours}h</Text>
                           <Text style={g.healthMetricLbl}>sleep</Text>
                         </View>
                       )}
                       {todayHealth?.heartRate !== undefined && (
                         <View style={g.healthMetricChip}>
                           <Ionicons name="heart-outline" size={16} color="#F66E8E" />
-                          <Text style={g.healthMetricVal}>{todayHealth.heartRate}</Text>
+                          <Text style={[g.healthMetricVal, { color: theme.text }]}>{todayHealth.heartRate}</Text>
                           <Text style={g.healthMetricLbl}>bpm</Text>
                         </View>
                       )}
                       {todayHealth?.activeMinutes !== undefined && (
                         <View style={g.healthMetricChip}>
                           <Ionicons name="flash-outline" size={16} color="#6EE6C0" />
-                          <Text style={g.healthMetricVal}>{todayHealth.activeMinutes}m</Text>
+                          <Text style={[g.healthMetricVal, { color: theme.text }]}>{todayHealth.activeMinutes}m</Text>
                           <Text style={g.healthMetricLbl}>active</Text>
                         </View>
                       )}
@@ -6158,7 +8603,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                   {items.slice(0, 3).map((m, i) => (
                     <View key={i} style={g.lbItem}>
                       <View style={[g.lbDot, { backgroundColor: d.color }]} />
-                      <Text style={g.lbItemTxt}>{m.content}</Text>
+                      <Text style={[g.lbItemTxt, { color: theme.text }]}>{m.content}</Text>
                     </View>
                   ))}
                   {items.length > 3 && <Text style={[g.lbEmpty, { marginTop: 4 }]}>+{items.length - 3} more entries</Text>}
@@ -6230,8 +8675,8 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
       {/* Mood trend */}
       {(profile.moodLogs || []).length > 0 && (() => {
-        const MOOD_COLORS = ['#F66E8E', '#F6A86E', '#F6E86E', '#6EE6C0', '#7B6EF6']
-        const MOOD_LABELS = ['Rough', 'Meh', 'Okay', 'Good', 'Great']
+        const MOOD_COLORS = ['#F66E8E', '#F6A86E', '#F6E86E', '#6EE6C0', '#7B6EF6', '#F66EC8', '#FFD700']
+        const MOOD_LABELS = ['Rough', 'Meh', 'Okay', 'Good', 'Great', 'Amazing', 'Euphoric']
         const days = Array.from({ length: 14 }, (_, i) => {
           const d = new Date(); d.setDate(d.getDate() - (13 - i))
           return d.toISOString().slice(0, 10)
@@ -6243,8 +8688,8 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 52 }}>
               {days.map(day => {
                 const log = logs.find(l => l.date === day)
-                const color = log ? MOOD_COLORS[log.mood - 1] : theme.border2
-                const h = log ? 10 + (log.mood - 1) * 9 : 6
+                const color = log ? (MOOD_COLORS[log.mood - 1] ?? MOOD_COLORS[MOOD_COLORS.length - 1]) : theme.border2
+                const h = log ? 6 + (log.mood / 7) * 46 : 6
                 return (
                   <View key={day} style={{ alignItems: 'center', gap: 3 }}>
                     <View style={{ width: 16, height: h, borderRadius: 4, backgroundColor: color }} />
@@ -6268,6 +8713,47 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
       <WheelHistory history={hist} />
       <View style={{ height: 40 }} />
+
+      {/* Rating modal — tap a wheel sector to rate */}
+      <Modal visible={!!ratingModal} transparent animationType="slide" onRequestClose={() => setRatingModal(null)}>
+        {(() => {
+          const d = ratingModal ? DOMAINS.find(x => x.key === ratingModal) : null
+          if (!d) return null
+          const cur = manual[d.key]
+          return (
+            <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+              <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: d.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name={DOMAIN_ICONS[d.key]} size={20} color={d.color} />
+                  </View>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>{d.label}</Text>
+                  {typeof cur === 'number' && (
+                    <TouchableOpacity onPress={() => { setRating(d.key, cur); setRatingModal(null) }} style={{ marginLeft: 'auto' as any }}>
+                      <Text style={{ fontSize: 12, color: theme.textSub }}>Clear</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Text style={{ fontSize: 13, color: theme.textSub, marginBottom: 20 }}>How satisfied are you in this area? (1 = low, 10 = thriving)</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+                  {[1,2,3,4,5,6,7,8,9,10].map(n => {
+                    const active = cur === n
+                    return (
+                      <TouchableOpacity key={n} onPress={() => { setRating(d.key, n); setRatingModal(null) }}
+                        style={{ width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? d.color : d.color + '15', borderWidth: active ? 0 : 1.5, borderColor: d.color + '40' }}>
+                        <Text style={{ fontSize: 20, fontWeight: '700', color: active ? '#fff' : d.color }}>{n}</Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+                <TouchableOpacity onPress={() => setRatingModal(null)} style={{ alignItems: 'center', paddingVertical: 12 }}>
+                  <Text style={{ fontSize: 15, color: theme.textSub }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )
+        })()}
+      </Modal>
 
       {/* Goal edit modal */}
       <Modal visible={!!goalModal} transparent animationType="slide" onRequestClose={() => setGoalModal(null)}>
@@ -6345,12 +8831,18 @@ function circleHealth(person: CirclePerson, profile: UserProfile): number {
   const msgCount = person.messages?.length || 0
   const chatScore = Math.min(msgCount / 5, 1)
 
-  // Combine: frequency + recency + sentiment + chat
-  const freq = Math.min(recent7.length * 15 + recent30.length * 5, 50)
-  const sent = Math.min(Math.max(sentimentScore * 5, -10), 20)
-  const chat = chatScore * 20
+  // Real-world interactions (highest weight — these are actual contact)
+  const interactions = person.interactions || []
+  const recentInts7  = interactions.filter(i => now - new Date(i.date).getTime() < 7  * day)
+  const recentInts30 = interactions.filter(i => now - new Date(i.date).getTime() < 30 * day)
+  const intScore = Math.min(recentInts7.length * 20 + recentInts30.length * 8, 50)
 
-  return Math.max(0, Math.min(100, Math.round(freq + sent + chat + 10)))
+  // Combine: interactions + frequency + recency + sentiment + chat
+  const freq = Math.min(recent7.length * 10 + recent30.length * 3, 30)
+  const sent = Math.min(Math.max(sentimentScore * 5, -10), 15)
+  const chat = chatScore * 15
+
+  return Math.max(0, Math.min(100, Math.round(intScore + freq + sent + chat + 5)))
 }
 
 function healthColor(score: number): string {
@@ -6767,12 +9259,13 @@ function DailyCheckinScreen({ profile, onDone, onBack }: {
   const isEvening = hour >= 17
   const name = profile.name || 'friend'
 
-  const MOODS: { emoji: string; label: string; val: 1|2|3|4|5 }[] = [
-    { emoji: '😔', label: 'Rough', val: 1 },
-    { emoji: '😕', label: 'Meh', val: 2 },
-    { emoji: '😐', label: 'Okay', val: 3 },
-    { emoji: '🙂', label: 'Good', val: 4 },
-    { emoji: '😊', label: 'Great', val: 5 },
+  const MOODS: { emoji: string; label: string; val: 1|2|3|4|5|6|7 }[] = [
+    { emoji: '🤩', label: 'Euphoric', val: 7 },
+    { emoji: '🥰', label: 'Amazing',  val: 6 },
+    { emoji: '😊', label: 'Great',    val: 5 },
+    { emoji: '🙂', label: 'Good',     val: 4 },
+    { emoji: '😐', label: 'Okay',     val: 3 },
+    { emoji: '😕', label: 'Meh',      val: 2 },
   ]
 
   const INTENTION_CHIPS = isEvening
@@ -7007,7 +9500,7 @@ Include all ${people.length} people in the "people" array. Use the exact personI
           <Text style={{ fontSize: 13, color: t.accent, fontWeight: '600' }}>{refreshing ? '…' : '↻ Refresh'}</Text>
         </TouchableOpacity>
       </View>
-      <Text style={[g.logo, { color: t.text }]}>Relationship{'\n'}Insights</Text>
+      <Text style={[g.logo, { color: t.text }]}>{tr('rel_insights')}</Text>
       <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2, marginBottom: 20 }}>
         {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} · {weekKey}
       </Text>
@@ -7374,6 +9867,8 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   const [reportLoading, setReportLoading] = useState(false)
   const [reportSent, setReportSent] = useState(false)
   const [sendingReport, setSendingReport] = useState(false)
+  const [sessionDay, setSessionDay] = useState<number | undefined>(undefined)
+  const [sessionHour, setSessionHour] = useState<number>(10)
 
   const [nudgeModal, setNudgeModal] = useState<{ person: CirclePerson } | null>(null)
   const [nudgeText, setNudgeText] = useState('')
@@ -7383,6 +9878,11 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   const [agentModal, setAgentModal] = useState<{ person: CirclePerson } | null>(null)
   const [agentLines, setAgentLines] = useState<{ speaker: 'A' | 'B'; text: string }[]>([])
   const [agentLoading, setAgentLoading] = useState(false)
+
+  const [logModal, setLogModal] = useState<{ person: CirclePerson } | null>(null)
+  const [logNote, setLogNote] = useState('')
+  const [logType, setLogType] = useState<CircleInteraction['type']>('met')
+  const [editAvatarId, setEditAvatarId] = useState<string | null>(null)
 
   const openAgentChat = async (p: CirclePerson) => {
     setAgentModal({ person: p }); setAgentLines([]); setAgentLoading(true)
@@ -7411,6 +9911,7 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   const [addType, setAddType] = useState<'friend' | 'family' | 'romantic' | 'work'>('friend')
   const [addRelationship, setAddRelationship] = useState('Friend')
   const [addContext, setAddContext] = useState('')
+  const [addBirthday, setAddBirthday] = useState('')
 
   const FAMILY_ROLES = ['Dad','Mom','Brother','Sister','Grandmother','Grandfather','Uncle','Aunt','Son','Daughter','Cousin','Other family']
   const ROMANTIC_ROLES = ['Girlfriend','Boyfriend','Spouse','Partner']
@@ -7419,11 +9920,14 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   const submitAddPerson = () => {
     if (!addName.trim()) return
     DB.addCircle(addName.trim(), addType, addContext.trim())
-    // Patch the relationship field with the specific label
     const p = DB.get()
     const member = p.circle.find(c => c.name === addName.trim() && c.type === addType)
-    if (member) { member.relationship = addRelationship; DB.save(p) }
-    setAddModal(false); setAddName(''); setAddType('friend'); setAddRelationship('Friend'); setAddContext('')
+    if (member) {
+      member.relationship = addRelationship
+      if (addBirthday.trim()) member.birthday = addBirthday.trim()
+      DB.save(p)
+    }
+    setAddModal(false); setAddName(''); setAddType('friend'); setAddRelationship('Friend'); setAddContext(''); setAddBirthday('')
     onRefresh?.()
   }
 
@@ -7464,6 +9968,29 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   )
   const neglected = profile.circle.filter(p => scores[p.id] < 40).slice(0, 3)
 
+  const upcomingBirthdays = useMemo(() => {
+    const today = new Date()
+    const mm = today.getMonth() + 1
+    const dd = today.getDate()
+    return profile.circle
+      .filter(p => p.birthday)
+      .map(p => {
+        const [bm, bd] = (p.birthday || '').split('-').map(Number)
+        let daysUntil = (bm - mm) * 30 + (bd - dd)
+        if (daysUntil < 0) daysUntil += 365
+        return { person: p, daysUntil, bm, bd }
+      })
+      .filter(b => b.daysUntil <= 14)
+      .sort((a, b) => a.daysUntil - b.daysUntil)
+  }, [profile.circle])
+
+  const lastContactDays = (p: CirclePerson) => {
+    const latest = (p.interactions || [])[0]?.date
+    if (!latest) return null
+    const days = Math.floor((Date.now() - new Date(latest).getTime()) / 86400000)
+    return days
+  }
+
   const openNudge = async (p: CirclePerson) => {
     setNudgeModal({ person: p }); setNudgeText(''); setNudgeCopied(false); setNudgeLoading(true)
     const text = await generateReachOut(p, profile)
@@ -7478,6 +10005,8 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   const openReportModal = (p: CirclePerson) => {
     setTherapistEmail(p.therapistEmail || '')
     setConsentOn(p.shareReports ?? false)
+    setSessionDay(p.sessionDay)
+    setSessionHour(p.sessionHour ?? 10)
     setReportText('')
     setReportSent(false)
     setReportModal({ person: p })
@@ -7497,8 +10026,10 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
     if (!authToken) { alert('Please log in to send reports.'); return }
     setSendingReport(true)
     DB.updateCirclePerson(reportModal.person.id, {
-      therapistEmail, shareReports: consentOn, lastReportSent: new Date().toISOString()
+      therapistEmail, shareReports: consentOn, lastReportSent: new Date().toISOString(),
+      sessionDay, sessionHour
     })
+    syncTherapyNotifications(DB.get().circle)
     const result = await sendTherapistReport(authToken, therapistEmail, reportModal.person.name, profile.name || 'Your patient', reportText)
     setSendingReport(false)
     if (result.ok) { setReportSent(true) } else { alert(result.error || 'Failed to send report.') }
@@ -7509,7 +10040,7 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
   types.forEach(t => { byType[t] = profile.circle.filter(c => c.type === t) })
 
   const typeIcon: Record<string, string> = { therapy: '🩺', family: '👨‍👩‍👧', friend: '🤝', work: '💼', romantic: '💕' }
-  const typeLabel: Record<string, string> = { therapy: t('type_therapy'), family: t('type_family'), friend: t('type_friends'), work: t('type_work'), romantic: t('type_romantic') }
+  const typeLabel: Record<string, string> = { therapy: tr('type_therapy'), family: tr('type_family'), friend: tr('type_friends'), work: tr('type_work'), romantic: tr('type_romantic') }
 
   const [realMsgs, setRealMsgs] = useState<{ id: string; from_user_id: string; content: string; created_at: string }[]>([])
   const pollRef = useRef<any>(null)
@@ -7604,10 +10135,10 @@ Be specific and human. Under 120 words total.`
     if (!isRealChat) {
       return (
         <View style={[g.screen, { backgroundColor: t.bg }]}>
-          <View style={g.chatHeader}>
-            <TouchableOpacity style={g.dBack} onPress={() => { setOpenChat(null) }}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
+          <View style={[g.chatHeader, { borderBottomColor: t.border, backgroundColor: t.bg }]}>
+            <TouchableOpacity style={[g.dBack, { backgroundColor: t.card, borderWidth: 1, borderColor: t.border }]} onPress={() => { setOpenChat(null) }}><Text style={[g.dBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={g.chatName}>{p.name}</Text>
+              <Text style={[g.chatName, { color: t.text }]}>{p.name}</Text>
               <Text style={g.chatStatus}>{p.type}</Text>
             </View>
           </View>
@@ -7649,10 +10180,10 @@ Be specific and human. Under 120 words total.`
 
     return (
       <KeyboardAvoidingView style={[g.screen, { backgroundColor: t.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={g.chatHeader}>
-          <TouchableOpacity style={g.dBack} onPress={() => { setOpenChat(null); setSomaPanel(false); if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
+        <View style={[g.chatHeader, { borderBottomColor: t.border, backgroundColor: t.bg }]}>
+          <TouchableOpacity style={[g.dBack, { backgroundColor: t.card, borderWidth: 1, borderColor: t.border }]} onPress={() => { setOpenChat(null); setSomaPanel(false); if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }}><Text style={[g.dBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={g.chatName}>{p.name}</Text>
+            <Text style={[g.chatName, { color: t.text }]}>{p.name}</Text>
             <Text style={g.chatStatus}>🟢 Direct message</Text>
           </View>
           <TouchableOpacity
@@ -7705,8 +10236,8 @@ Be specific and human. Under 120 words total.`
           })}
           {loading && <Typing />}
         </ScrollView>
-        <View style={g.inputBar}>
-          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
+        <View style={[g.inputBar, { borderTopColor: t.border, backgroundColor: t.bg }]}>
+          <TextInput style={[g.input, { backgroundColor: t.card, color: t.text, borderColor: t.border }]} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
           <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -7732,7 +10263,7 @@ Be specific and human. Under 120 words total.`
       {profile.circle.length > 0 && (
         <View style={{ marginHorizontal: -20, borderBottomWidth: 1, borderBottomColor: t.border, marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 0 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textTertiary, textTransform: 'uppercase', letterSpacing: 0.6 }}>Today's Moments</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textTertiary, textTransform: 'uppercase', letterSpacing: 0.6 }}>{tr('todays_moments')}</Text>
             {!profile.premium && <Text style={{ fontSize: 11, color: t.accent, fontWeight: '700' }}>★ Video with SOMA+</Text>}
           </View>
           <MomentsStrip
@@ -7740,6 +10271,26 @@ Be specific and human. Under 120 words total.`
             onPost={() => setShowPostMoment(true)}
             onView={(m) => setViewingMoment(m)}
           />
+        </View>
+      )}
+
+      {/* Upcoming birthdays */}
+      {upcomingBirthdays.length > 0 && (
+        <View style={{ marginBottom: 12 }}>
+          {upcomingBirthdays.map(({ person: bp, daysUntil }) => (
+            <View key={bp.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F59E0B12', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#F59E0B40', marginBottom: 6 }}>
+              <Text style={{ fontSize: 22 }}>🎂</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>
+                  {bp.name}'s birthday {daysUntil === 0 ? 'is today! 🎉' : daysUntil === 1 ? 'is tomorrow' : `is in ${daysUntil} days`}
+                </Text>
+                <Text style={{ fontSize: 12, color: t.textSub, marginTop: 1 }}>{bp.birthday?.replace('-', '/')}</Text>
+              </View>
+              <TouchableOpacity onPress={() => openNudge(bp)} style={{ backgroundColor: '#F59E0B', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✦ Send</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
       )}
 
@@ -7770,7 +10321,7 @@ Be specific and human. Under 120 words total.`
       {/* Needs Attention */}
       {neglected.length > 0 && (
         <View style={g.healthSection}>
-          <Text style={g.healthSectionTitle}>💛  Needs attention</Text>
+          <Text style={[g.healthSectionTitle, { color: t.text }]}>💛  Needs attention</Text>
           <Text style={g.healthSectionSub}>You haven't mentioned these people much lately. Soma can help you reach out.</Text>
           {neglected.map(p => (
             <TouchableOpacity key={p.id} style={g.healthNudgeRow} onPress={() => openNudge(p)}>
@@ -7778,7 +10329,7 @@ Be specific and human. Under 120 words total.`
                 <Text style={[g.avatarTxt, { fontSize: 15 }]}>{p.name.charAt(0).toUpperCase()}</Text>
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={g.personName}>{p.name}</Text>
+                <Text style={[g.personName, { color: t.text }]}>{p.name}</Text>
                 <View style={g.healthBarBg}>
                   <View style={[g.healthBarFill, { width: `${scores[p.id]}%` as any, backgroundColor: healthColor(scores[p.id]) }]} />
                 </View>
@@ -7798,28 +10349,61 @@ Be specific and human. Under 120 words total.`
         types.map(type => {
           const people = byType[type]
           if (people.length === 0) return null
+          const relEmoji: Record<string, string> = {
+            Mom:'👩', Dad:'👨', Brother:'👦', Sister:'👧', Grandmother:'👵', Grandfather:'👴',
+            Uncle:'👨', Aunt:'👩', Son:'👦', Daughter:'👧', Cousin:'🧑', 'Other family':'👪',
+            Girlfriend:'💑', Boyfriend:'💑', Spouse:'💍', Partner:'💑',
+            Colleague:'💼', Manager:'🧑‍💼', Mentor:'🎓', Employee:'💼', 'Business partner':'🤝',
+            Friend:'🤝', 'Best friend':'⭐',
+          }
           return (
             <View key={type}>
-              <Text style={[g.secLabel, { marginTop: 16, marginBottom: 10 }]}>{typeIcon[type]}  {typeLabel[type]}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: t.border }}>
+                <Text style={{ fontSize: 18 }}>{typeIcon[type]}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: t.textSub, textTransform: 'uppercase', letterSpacing: 0.8 }}>{typeLabel[type]}</Text>
+                <Text style={{ fontSize: 12, color: t.textSub, marginLeft: 'auto' as any }}>{people.length} {people.length === 1 ? 'person' : 'people'}</Text>
+              </View>
               {people.map(p => {
                 const score = scores[p.id] ?? 0
+                const rEmoji = relEmoji[p.relationship] || typeIcon[type]
                 return (
-                <View key={p.id} style={g.circleMember}>
+                <View key={p.id} style={[g.circleMember, { backgroundColor: t.card, borderColor: t.border }]}>
                   <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => openMsg(p)}>
-                    <View style={g.avatar}><Text style={g.avatarTxt}>{p.name.charAt(0).toUpperCase()}</Text></View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={g.personName}>{p.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                        <View style={[g.healthBarBg, { flex: 1, maxWidth: 80 }]}>
+                    {/* Avatar — photo or emoji */}
+                    <TouchableOpacity onPress={() => pickPhoto(dataUrl => { DB.updateCirclePerson(p.id, { avatar: dataUrl }); onRefresh?.() })} style={{ position: 'relative' }}>
+                      {p.avatar
+                        ? <Image source={{ uri: p.avatar }} style={{ width: 50, height: 50, borderRadius: 25, borderWidth: 2, borderColor: healthColor(score) }} />
+                        : <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: type === 'family' ? '#F6A86E30' : type === 'friend' ? '#7B6EF620' : type === 'romantic' ? '#F66E8E20' : type === 'work' ? '#6E9CF620' : '#A89BFA20', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: type === 'family' ? '#F6A86E50' : type === 'friend' ? '#7B6EF640' : type === 'romantic' ? '#F66E8E40' : type === 'work' ? '#6E9CF640' : '#A89BFA40' }}>
+                            <Text style={{ fontSize: 22 }}>{rEmoji}</Text>
+                          </View>
+                      }
+                      <View style={{ position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: t.border }}>
+                        <Text style={{ fontSize: 9 }}>📷</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[g.personName, { color: t.text, fontSize: 16 }]}>{p.name}</Text>
+                      <Text style={{ fontSize: 12, color: t.textSub, marginTop: 2, fontWeight: '500' }}>{p.relationship || typeLabel[type]}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                        <View style={[g.healthBarBg, { flex: 1, maxWidth: 70 }]}>
                           <View style={[g.healthBarFill, { width: `${score}%` as any, backgroundColor: healthColor(score) }]} />
                         </View>
-                        {p.invitationStatus === 'invited' && <Text style={g.invitePending}>📧 Invite pending</Text>}
-                        {p.invitationStatus === 'accepted' && <Text style={g.inviteCode}>Code: {p.inviteCode.slice(0, 4)}</Text>}
-                        {p.messages.length > 0 && <Text style={g.msgCount}>{p.messages.length} messages</Text>}
-                        {type === 'therapy' && p.lastReportSent && <Text style={[g.msgCount, { color: t.accent }]}>📋 Report sent</Text>}
+                        <Text style={{ fontSize: 10, color: t.textSub }}>{score}%</Text>
+                        {(() => {
+                          const days = lastContactDays(p)
+                          if (days === null) return null
+                          const label = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days}d ago`
+                          const color = days <= 3 ? '#10B981' : days <= 10 ? '#F59E0B' : '#EF4444'
+                          return <Text style={{ fontSize: 10, color, fontWeight: '700' }}>● {label}</Text>
+                        })()}
+                        {p.somaUserId && <View style={{ backgroundColor: '#7B6EF615', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}><Text style={{ fontSize: 10, color: '#7B6EF6', fontWeight: '700' }}>On SOMA</Text></View>}
+                        {type === 'therapy' && p.lastReportSent && <Text style={[g.msgCount, { color: t.accent }]}>📋 sent</Text>}
                       </View>
                     </View>
                     <Text style={g.arrow}>→</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setLogModal({ person: p }); setLogType('met'); setLogNote('') }} style={{ paddingLeft: 4 }}>
+                    <Text style={{ fontSize: 12, color: '#10B981', fontWeight: '700', paddingVertical: 4 }}>+ Log</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => openNudge(p)} style={{ paddingLeft: 4 }}>
                     <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', paddingVertical: 4 }}>✦ Draft</Text>
@@ -7845,7 +10429,7 @@ Be specific and human. Under 120 words total.`
                       onRefresh?.()
                     }
                   }} style={{ paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', paddingVertical: 4 }}>{t('circle_remove')}</Text>
+                    <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', paddingVertical: 4 }}>{tr('circle_remove')}</Text>
                   </TouchableOpacity>
                 </View>
                 )
@@ -7856,16 +10440,81 @@ Be specific and human. Under 120 words total.`
       )}
       <View style={{ height: 80 }} />
 
+      {/* Log Interaction Modal */}
+      <Modal visible={!!logModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setLogModal(null)}>
+        <View style={[g.screen, { backgroundColor: t.bg, padding: 24 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={{ fontSize: 20, fontWeight: '900', color: t.text, flex: 1 }}>Log time with {logModal?.person.name}</Text>
+            <TouchableOpacity onPress={() => setLogModal(null)}><Text style={{ fontSize: 22, color: t.textSub }}>×</Text></TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>What did you do?</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {([
+              { key: 'met',      label: '🤝 Met in person' },
+              { key: 'called',   label: '📞 Phone call' },
+              { key: 'video',    label: '📹 Video call' },
+              { key: 'texted',   label: '💬 Texted' },
+              { key: 'meal',     label: '🍽 Had a meal' },
+              { key: 'activity', label: '🎯 Activity together' },
+            ] as const).map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => setLogType(opt.key)}
+                style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: logType === opt.key ? '#10B981' : t.card, borderWidth: 1.5, borderColor: logType === opt.key ? '#10B981' : t.border }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: logType === opt.key ? '#fff' : t.text }}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Note (optional)</Text>
+          <TextInput
+            style={{ backgroundColor: t.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: t.border, marginBottom: 20, fontSize: 15, color: t.text, minHeight: 80, textAlignVertical: 'top' }}
+            value={logNote}
+            onChangeText={setLogNote}
+            placeholder="What did you talk about?"
+            placeholderTextColor={t.textTertiary}
+            multiline
+          />
+          <TouchableOpacity
+            style={[g.primaryBtn, { backgroundColor: '#10B981' }]}
+            onPress={() => {
+              if (!logModal) return
+              DB.logInteraction(logModal.person.id, logType, logNote.trim() || undefined)
+              onRefresh?.()
+              setLogModal(null)
+            }}
+          >
+            <Text style={g.primaryBtnTxt}>✓ Log interaction</Text>
+          </TouchableOpacity>
+          {/* Recent interactions */}
+          {(logModal?.person.interactions || []).length > 0 && (
+            <View style={{ marginTop: 20 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6 }}>{tr('recent')}</Text>
+              {(logModal?.person.interactions || []).slice(0, 5).map(i => {
+                const labels: Record<string, string> = { met: '🤝 Met in person', called: '📞 Call', video: '📹 Video', texted: '💬 Texted', meal: '🍽 Meal', activity: '🎯 Activity' }
+                const days = Math.floor((Date.now() - new Date(i.date).getTime()) / 86400000)
+                return (
+                  <View key={i.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: t.border }}>
+                    <Text style={{ fontSize: 13, color: t.text, flex: 1 }}>{labels[i.type] || i.type}{i.note ? ` · ${i.note}` : ''}</Text>
+                    <Text style={{ fontSize: 11, color: t.textSub }}>{days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days}d ago`}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          )}
+        </View>
+      </Modal>
+
       {/* Reach-Out Nudge Modal */}
       <Modal visible={!!nudgeModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setNudgeModal(null)}>
         <View style={[g.screen, { backgroundColor: t.bg, padding: 28, justifyContent: 'center' }]}>
-          <Text style={[g.logo, { fontSize: 20, marginBottom: 4 }]}>{t('nudge_title')}</Text>
+          <Text style={[g.logo, { fontSize: 20, marginBottom: 4 }]}>{tr('nudge_title')}</Text>
           <Text style={[g.logoSub, { marginBottom: 24 }]}>For {nudgeModal?.person.name} — edit and send</Text>
 
           {nudgeLoading ? (
             <View style={{ alignItems: 'center', paddingVertical: 32 }}>
               <ActivityIndicator color="#7B6EF6" />
-              <Text style={{ color: t.textTertiary, marginTop: 12 }}>{t('nudge_thinking')}</Text>
+              <Text style={{ color: t.textTertiary, marginTop: 12 }}>{tr('nudge_thinking')}</Text>
             </View>
           ) : (
             <TextInput
@@ -7895,18 +10544,18 @@ Be specific and human. Under 120 words total.`
                   alert(`✅ Message sent to ${p.name}!`)
                 } catch { alert('Could not send. Check your connection.') }
               }}>
-              <Text style={g.primaryBtnTxt}>{t('nudge_send_on')} — {nudgeModal.person.name}</Text>
+              <Text style={g.primaryBtnTxt}>{tr('nudge_send_on')} — {nudgeModal.person.name}</Text>
             </TouchableOpacity>
           ) : null}
 
           <TouchableOpacity style={[nudgeModal?.person.somaUserId ? g.secondaryBtn : g.primaryBtn, { marginBottom: 12, opacity: nudgeLoading ? 0.4 : 1 }]} onPress={copyNudge} disabled={nudgeLoading}>
-            <Text style={nudgeModal?.person.somaUserId ? g.secondaryBtnTxt : g.primaryBtnTxt}>{nudgeCopied ? t('nudge_copied') : t('nudge_copy')}</Text>
+            <Text style={nudgeModal?.person.somaUserId ? g.secondaryBtnTxt : g.primaryBtnTxt}>{nudgeCopied ? tr('nudge_copied') : tr('nudge_copy')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[g.secondaryBtn, { marginBottom: 12 }]} onPress={() => openNudge(nudgeModal!.person)}>
-            <Text style={g.secondaryBtnTxt}>{t('nudge_retry')}</Text>
+            <Text style={g.secondaryBtnTxt}>{tr('nudge_retry')}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setNudgeModal(null)} style={{ alignItems: 'center', paddingVertical: 8 }}>
-            <Text style={{ color: '#9A9DB2', fontSize: 14 }}>{t('nudge_dismiss')}</Text>
+            <Text style={{ color: '#9A9DB2', fontSize: 14 }}>{tr('nudge_dismiss')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -7938,9 +10587,39 @@ Be specific and human. Under 120 words total.`
           />
 
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-            <Switch value={consentOn} onValueChange={setConsentOn} trackColor={{ true: '#7B6EF6', false: '#E0DFF6' }} thumbColor="#fff" />
-            <Text style={{ marginLeft: 12, fontSize: 14, color: '#3A3D56', flex: 1 }}>I consent to sharing my emotional summary with my therapist before sessions</Text>
+            <Switch value={consentOn} onValueChange={v => { setConsentOn(v); DB.updateCirclePerson(reportModal!.person.id, { shareReports: v }); syncTherapyNotifications(DB.get().circle) }} trackColor={{ true: '#7B6EF6', false: '#E0DFF6' }} thumbColor="#fff" />
+            <Text style={{ marginLeft: 12, fontSize: 14, color: '#3A3D56', flex: 1 }}>Auto-send report to therapist before each session</Text>
           </View>
+
+          {consentOn && (
+            <View style={{ backgroundColor: '#F3F1FE', borderRadius: 14, padding: 16, marginBottom: 20 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#7B6EF6', marginBottom: 10 }}>📅 Session schedule (for auto-send)</Text>
+              <Text style={{ fontSize: 12, color: '#9A9DB2', marginBottom: 8 }}>Soma will auto-send the report 2 hours before your session.</Text>
+              <Text style={{ fontSize: 13, color: '#3A3D56', marginBottom: 6 }}>Day of week</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => (
+                  <TouchableOpacity key={d} onPress={() => { setSessionDay(i + 1); DB.updateCirclePerson(reportModal!.person.id, { sessionDay: i + 1, sessionHour }); syncTherapyNotifications(DB.get().circle) }}
+                    style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: sessionDay === i + 1 ? '#7B6EF6' : '#E5E3F5' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: sessionDay === i + 1 ? '#fff' : '#7B6EF6' }}>{d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={{ fontSize: 13, color: '#3A3D56', marginBottom: 6 }}>Session time</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {[8,9,10,11,12,13,14,15,16,17,18,19,20].map(h => (
+                  <TouchableOpacity key={h} onPress={() => { setSessionHour(h); if (sessionDay) { DB.updateCirclePerson(reportModal!.person.id, { sessionDay, sessionHour: h }); syncTherapyNotifications(DB.get().circle) } }}
+                    style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, backgroundColor: sessionHour === h ? '#7B6EF6' : '#E5E3F5' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: sessionHour === h ? '#fff' : '#7B6EF6' }}>{h}:00</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {sessionDay != null && (
+                <Text style={{ marginTop: 10, fontSize: 12, color: '#7B6EF6' }}>
+                  ✓ Auto-send on {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][sessionDay - 1]} at {sessionHour - 2 < 0 ? sessionHour - 2 + 24 : sessionHour - 2}:00
+                </Text>
+              )}
+            </View>
+          )}
 
           {!reportText && !reportLoading && (
             <TouchableOpacity style={[g.primaryBtn, { marginBottom: 16 }]} onPress={generateReport}>
@@ -8035,8 +10714,7 @@ Be specific and human. Under 120 words total.`
       </Modal>
 
       {/* Add Person Modal — unified: find on SOMA or add manually */}
-      <Modal visible={addModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => { setAddModal(false); setFindCode(''); setFindResults([]); setFindError('') }}>
-        <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ padding: 28, paddingBottom: 60 }}>
+      <InFrameSheet visible={addModal} onClose={() => { setAddModal(false); setFindCode(''); setFindResults([]); setFindError('') }}>
           <TouchableOpacity onPress={() => { setAddModal(false); setFindCode(''); setFindResults([]); setFindError('') }} style={{ marginBottom: 20 }}>
             <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Close</Text>
           </TouchableOpacity>
@@ -8062,7 +10740,7 @@ Be specific and human. Under 120 words total.`
                     borderColor: addType === type ? '#10B981' : t.border,
                     backgroundColor: addType === type ? '#10B98120' : t.bg }}>
                   <Text style={{ fontSize: 13 }}>{icon}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: addType === type ? '#10B981' : t.textSub }}>{t(labelKey[type])}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: addType === type ? '#10B981' : t.textSub }}>{tr(labelKey[type])}</Text>
                 </TouchableOpacity>
               )})}
             </View>
@@ -8165,7 +10843,17 @@ Be specific and human. Under 120 words total.`
               placeholderTextColor={t.textTertiary}
               multiline
               numberOfLines={2}
-              style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: t.text, marginBottom: 20, minHeight: 64, textAlignVertical: 'top' }}
+              style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: t.text, marginBottom: 14, minHeight: 64, textAlignVertical: 'top' }}
+            />
+
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 6 }}>🎂 Birthday <Text style={{ fontWeight: '400' }}>(optional, MM-DD)</Text></Text>
+            <TextInput
+              value={addBirthday}
+              onChangeText={setAddBirthday}
+              placeholder="e.g. 03-25"
+              placeholderTextColor={t.textTertiary}
+              style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: t.text, marginBottom: 20 }}
+              maxLength={5}
             />
 
             <TouchableOpacity
@@ -8175,12 +10863,10 @@ Be specific and human. Under 120 words total.`
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Add to Circle</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </Modal>
+      </InFrameSheet>
 
-      {/* Find by Code Modal (kept for direct access from circle header button) */}
-      <Modal visible={findModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setFindModal(false)}>
-        <View style={[g.screen, { backgroundColor: t.bg, padding: 28 }]}>
+      {/* Find by Code — in-frame sheet */}
+      <InFrameSheet visible={findModal} onClose={() => setFindModal(false)}>
           <TouchableOpacity onPress={() => setFindModal(false)} style={{ marginBottom: 20 }}>
             <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Close</Text>
           </TouchableOpacity>
@@ -8225,8 +10911,7 @@ Be specific and human. Under 120 words total.`
               </TouchableOpacity>
             </View>
           ))}
-        </View>
-      </Modal>
+      </InFrameSheet>
 
       {/* Widget promo card */}
       <View style={{ marginTop: 24, marginBottom: 8, backgroundColor: t.card, borderRadius: 22, borderWidth: 1, borderColor: t.border, overflow: 'hidden' }}>
@@ -8406,31 +11091,40 @@ function MyProfile({ profile, onBack }: { profile: UserProfile; onBack: () => vo
           </View>
         </TouchableOpacity>
 
-        {/* Photo gallery grid — add up to 6 total */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#6E7191', letterSpacing: 0.5 }}>PHOTOS ({allPhotos.length}/6)</Text>
+        {/* Photo gallery grid — up to 6 photos */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: t.sub, letterSpacing: 0.6 }}>PHOTOS  {allPhotos.length}/6</Text>
             {allPhotos.length < 6 && (
-              <TouchableOpacity onPress={uploadPhoto} style={{ backgroundColor: '#7B6EF615', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#7B6EF640' }}>
-                <Text style={{ color: '#7B6EF6', fontSize: 12, fontWeight: '700' }}>+ Add photo</Text>
+              <TouchableOpacity onPress={uploadPhoto} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#7B6EF618', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#7B6EF640' }}>
+                <Ionicons name="add" size={14} color="#7B6EF6" />
+                <Text style={{ color: '#7B6EF6', fontSize: 12, fontWeight: '700' }}>Add photo</Text>
               </TouchableOpacity>
             )}
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {allPhotos.map((uri, i) => (
               <TouchableOpacity key={i} onPress={() => setGalleryIdx(i)} style={{ position: 'relative' }}>
-                <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 12, borderWidth: i === galleryIdx ? 2.5 : 0, borderColor: '#7B6EF6' }} />
-                {i === 0 && <View style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: '#7B6EF6', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>
-                  <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800' }}>MAIN</Text>
-                </View>}
+                <Image source={{ uri }} style={{ width: 100, height: 100, borderRadius: 14, borderWidth: i === galleryIdx ? 2.5 : 0, borderColor: '#7B6EF6' }} />
+                {i === 0 && (
+                  <View style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: '#7B6EF6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>MAIN</Text>
+                  </View>
+                )}
+                <TouchableOpacity onPress={() => removePhoto(i)}
+                  style={{ position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✕</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             ))}
             {allPhotos.length < 6 && (
-              <TouchableOpacity onPress={uploadPhoto} style={{ width: 80, height: 80, borderRadius: 12, borderWidth: 1.5, borderColor: '#C5BFEC', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F7FF' }}>
-                <Text style={{ fontSize: 24, color: '#C5BFEC' }}>+</Text>
+              <TouchableOpacity onPress={uploadPhoto}
+                style={{ width: 100, height: 100, borderRadius: 14, borderWidth: 1.5, borderColor: '#7B6EF660', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B6EF608', gap: 4 }}>
+                <Ionicons name="camera-outline" size={26} color="#7B6EF6" />
+                <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '600' }}>Add</Text>
               </TouchableOpacity>
             )}
-          </ScrollView>
+          </View>
         </View>
 
         {/* About */}
@@ -8477,12 +11171,37 @@ function MyProfile({ profile, onBack }: { profile: UserProfile; onBack: () => vo
           {d.idealPartner ? <Text style={[g.dAbout, { marginTop: 8 }]}>✨ Ideal partner: {d.idealPartner}</Text> : null}
         </View>
 
+        {/* I'm here for (sector picker) */}
+        <View style={g.dSection}>
+          <Text style={g.dH}>I'm here for</Text>
+          <Text style={[g.dAbout, { marginBottom: 12 }]}>Your profile adapts to what you're looking for.</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {([
+              { key: 'dating', label: '💜 Dating', color: '#F66E8E', bg: '#F66E8E18' },
+              { key: 'friends', label: '😊 Friends', color: '#10B981', bg: '#10B98118' },
+              { key: 'professional', label: '💼 Professional', color: '#378ADD', bg: '#378ADD18' },
+              { key: 'support', label: '🤝 Support', color: '#F59E0B', bg: '#F59E0B18' },
+            ] as const).map(s => {
+              const active = (d.connectionType || 'dating') === s.key
+              return (
+                <TouchableOpacity
+                  key={s.key}
+                  onPress={() => { DB.saveDating({ connectionType: s.key }); force(x => x + 1) }}
+                  style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: active ? s.bg : 'transparent', borderWidth: 1.5, borderColor: active ? s.color : '#E0DDEF' }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: active ? s.color : '#9590a8' }}>{s.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        </View>
+
         {/* Intimacy — private, AI-handled */}
         {d.intimacy ? (
           <View style={g.dSection}>
             <View style={g.intimacyCard}>
               <Text style={g.intimacyLbl}>🔒 INTIMACY · PRIVATE · AURA HANDLES THIS</Text>
-              <Text style={g.intimacyTxt}>{d.intimacy}</Text>
+              <Text style={[g.intimacyTxt, { color: t.text }]}>{d.intimacy}</Text>
               <Text style={g.intimacyNote}>Only shared by your Soma with a match's Soma when there's real compatibility — never shown publicly. You never have to bring it up.</Text>
             </View>
           </View>
@@ -8504,7 +11223,7 @@ function MyProfile({ profile, onBack }: { profile: UserProfile; onBack: () => vo
         {/* Auto-update note */}
         <View style={g.dSection}>
           <View style={g.autoCard}>
-            <Text style={g.autoCardTxt}>✦  Your profile updates automatically as you talk to Soma every day. The more you share, the truer it becomes.</Text>
+            <Text style={[g.autoCardTxt, { color: t.text }]}>✦  Your profile updates automatically as you talk to Soma every day. The more you share, the truer it becomes.</Text>
             <Text style={g.autoCardDate}>Last updated {d.lastUpdated}</Text>
           </View>
         </View>
@@ -8770,18 +11489,63 @@ interface Candidate {
   loveLanguage: string; attachment: string; intimacy: string
   work: string; children: string; pets: string
   tags: { icon: string; label: string }[]
+  gender: 'male' | 'female'
 }
 
 const U = (id: string) => `https://images.unsplash.com/photo-${id}?w=900&q=80&auto=format&fit=crop`
 
 // One demo profile — shown only when no real users are available
 const CANDIDATES: Candidate[] = [
-  { name: 'Mai', age: 27, emoji: '🌿', color: '#F6A86E', photo: U('1494790108377-be9c29b29330'), location: 'Demo profile', distance: '—', height: '168 cm', weight: '54 kg',
-    bio: '✨ This is a demo profile. Real people will appear here once more users join SOMA near you.',
+  { name: 'Mai', age: 27, gender: 'female', emoji: '🌿', color: '#F6A86E', photo: U('1494790108377-be9c29b29330'), photos: [U('1494790108377-be9c29b29330'), U('1529626455594-ec16216f6a06'), U('1524504388688-2f4b383172e5')], location: 'Ho Chi Minh City', distance: '2 km', height: '168 cm', weight: '54 kg',
+    bio: 'Illustrator & coffee lover. I believe in slow mornings and honest conversations. Let\'s hike somewhere beautiful.',
     values: ['Depth', 'Growth', 'Freedom'], interests: ['hiking', 'films', 'painting', 'coffee'], agentName: 'Lux',
     loveLanguage: 'Quality Time', attachment: 'Secure', intimacy: 'Values slow, emotionally present closeness over intensity.', work: 'Illustrator', children: 'Wants kids', pets: 'Has a cat',
-    tags: [{icon:'🤖',label:'Demo'},{icon:'🎨',label:'Painter'},{icon:'🐈',label:'Have cat'},{icon:'🥾',label:'Hiking'},{icon:'🎬',label:'Indie films'}] },
+    tags: [{icon:'🎨',label:'Painter'},{icon:'🐈',label:'Cat mom'},{icon:'🥾',label:'Hiking'},{icon:'🎬',label:'Indie films'},{icon:'☕',label:'Coffee'}] },
+
+  { name: 'Linh', age: 25, gender: 'female', emoji: '🌸', color: '#F9A8C9', photo: U('1517841905240-472988babdf9'), photos: [U('1517841905240-472988babdf9'), U('1488426862086-d30bcc43e09d'), U('1508214751196-bcfd4ca60f91')], location: 'Hanoi', distance: '5 km', height: '162 cm', weight: '50 kg',
+    bio: 'Product designer who thinks in systems. Bookworm, plant parent, and occasional runner. Looking for deep conversations and weekend adventures.',
+    values: ['Creativity', 'Authenticity', 'Balance'], interests: ['reading', 'yoga', 'design', 'travel'], agentName: 'Aria',
+    loveLanguage: 'Words of Affirmation', attachment: 'Secure', intimacy: 'Needs emotional safety before physical closeness.', work: 'Product Designer', children: 'Open to kids', pets: 'Has plants',
+    tags: [{icon:'📚',label:'Reader'},{icon:'🧘',label:'Yoga'},{icon:'✈️',label:'Traveler'},{icon:'🌿',label:'Plant parent'},{icon:'🎨',label:'Designer'}] },
+
+  { name: 'Alex', age: 30, gender: 'male', emoji: '🌊', color: '#6EC4F6', photo: U('1507003211169-0a1dd7228f2d'), photos: [U('1507003211169-0a1dd7228f2d'), U('1539571696357-3bde6e536d97'), U('1488161628813-04466f872be2')], location: 'Da Nang', distance: '1.2 km', height: '178 cm', weight: '72 kg',
+    bio: 'Software engineer by day, surfer by sunrise. I value real friendships and good food. Will always show up — that\'s my love language.',
+    values: ['Loyalty', 'Adventure', 'Growth'], interests: ['surfing', 'cooking', 'tech', 'music'], agentName: 'Zion',
+    loveLanguage: 'Acts of Service', attachment: 'Secure', intimacy: 'Shows love through doing, not saying.', work: 'Software Engineer', children: 'Wants kids', pets: 'Has a dog',
+    tags: [{icon:'🏄',label:'Surfer'},{icon:'👨‍💻',label:'Engineer'},{icon:'🎵',label:'Music'},{icon:'🍳',label:'Cook'},{icon:'🐕',label:'Dog dad'}] },
+
+  { name: 'Dr. Sarah', age: 38, gender: 'female', emoji: '🌱', color: '#7ECBA5', photo: U('1573496359142-b8d87734a5a2'), photos: [U('1573496359142-b8d87734a5a2'), U('1551836022-d5d88e9218df'), U('1548142813-c4e8731e9fad')], location: 'Online & Ho Chi Minh City', distance: '3 km', height: '170 cm', weight: '62 kg',
+    bio: 'Clinical psychologist specializing in relationships, anxiety and life transitions. I help people understand themselves so they can build lives that actually fit them.',
+    values: ['Healing', 'Insight', 'Connection'], interests: ['psychology', 'mindfulness', 'writing', 'running'], agentName: 'Sage',
+    loveLanguage: 'Quality Time', attachment: 'Secure', intimacy: 'Believes vulnerability is strength.', work: 'Psychologist', children: 'Has kids', pets: 'Has a dog',
+    tags: [{icon:'🧠',label:'Psychologist'},{icon:'🫂',label:'Therapist'},{icon:'🧘',label:'Mindfulness'},{icon:'📝',label:'Writer'},{icon:'🏃',label:'Runner'}] },
+
+  { name: 'Minh', age: 29, gender: 'male', emoji: '🔥', color: '#F6906E', photo: U('1500648767791-00dcc994a43e'), photos: [U('1500648767791-00dcc994a43e'), U('1519085360753-af0119f7cbe7'), U('1492562080023-ab3db95bfbce')], location: 'Ho Chi Minh City', distance: '0.8 km', height: '175 cm', weight: '68 kg',
+    bio: 'Startup founder. I wake up thinking about problems worth solving. Looking for people who want to build something meaningful together.',
+    values: ['Impact', 'Excellence', 'Vision'], interests: ['entrepreneurship', 'reading', 'basketball', 'coffee'], agentName: 'Volt',
+    loveLanguage: 'Quality Time', attachment: 'Avoidant', intimacy: 'Warms slowly but deeply committed once trust is built.', work: 'Founder & CEO', children: 'Undecided', pets: 'No pets',
+    tags: [{icon:'🚀',label:'Founder'},{icon:'📚',label:'Reader'},{icon:'🏀',label:'Basketball'},{icon:'☕',label:'Coffee'},{icon:'💡',label:'Builder'}] },
+
+  { name: 'Hana', age: 26, gender: 'female', emoji: '🦋', color: '#C4A8F9', photo: U('1534528741775-53994a69daeb'), photos: [U('1534528741775-53994a69daeb'), U('1524638431693-d66c2a4a7bbc'), U('1503185912284-5271ff81b9a8')], location: 'Hoi An', distance: '8 km', height: '160 cm', weight: '48 kg',
+    bio: 'Photographer and traveler. I collect moments, not things. My camera is always with me. Looking for people who see beauty in ordinary days.',
+    values: ['Beauty', 'Freedom', 'Presence'], interests: ['photography', 'travel', 'art', 'meditation'], agentName: 'Luna',
+    loveLanguage: 'Physical Touch', attachment: 'Anxious', intimacy: 'Deeply caring, needs reassurance to feel safe.', work: 'Photographer', children: 'Not sure', pets: 'Has a cat',
+    tags: [{icon:'📷',label:'Photographer'},{icon:'✈️',label:'Nomad'},{icon:'🎨',label:'Artist'},{icon:'🧘',label:'Meditator'},{icon:'🌍',label:'Explorer'}] },
+
+  { name: 'James', age: 33, gender: 'male', emoji: '💼', color: '#8BC4E8', photo: U('1472099645785-5658abf4ff4e'), photos: [U('1472099645785-5658abf4ff4e'), U('1463453091185-61582044d556'), U('1506794778202-cad84cf45f1d')], location: 'Ho Chi Minh City', distance: '1.5 km', height: '182 cm', weight: '78 kg',
+    bio: 'Marketing director at a fintech scale-up. Outside work I\'m a weekend cyclist and amateur chef. Looking to expand my circle here.',
+    values: ['Ambition', 'Balance', 'Community'], interests: ['cycling', 'cooking', 'finance', 'travel'], agentName: 'Marco',
+    loveLanguage: 'Acts of Service', attachment: 'Secure', intimacy: 'Balanced and direct communicator.', work: 'Marketing Director', children: 'Has kids', pets: 'No pets',
+    tags: [{icon:'🚴',label:'Cyclist'},{icon:'👨‍🍳',label:'Chef'},{icon:'📊',label:'Marketing'},{icon:'✈️',label:'Traveler'},{icon:'💰',label:'Fintech'}] },
+
+  { name: 'Zara', age: 31, gender: 'female', emoji: '⚡', color: '#F6D46E', photo: U('1531746020798-e6953c6e8e04'), photos: [U('1531746020798-e6953c6e8e04'), U('1438761681033-6461ffad8d80'), U('1534751516642-a1af1ef26a56')], location: 'Ho Chi Minh City', distance: '2.3 km', height: '165 cm', weight: '57 kg',
+    bio: 'UX researcher + mindset coach. I help teams build things people actually want. In my free time: tennis, good podcasts, and long walks.',
+    values: ['Curiosity', 'Clarity', 'Courage'], interests: ['research', 'coaching', 'tennis', 'podcasts'], agentName: 'Vera',
+    loveLanguage: 'Words of Affirmation', attachment: 'Secure', intimacy: 'Values clarity and open communication in all relationships.', work: 'UX Researcher & Coach', children: 'Open to kids', pets: 'Has a cat',
+    tags: [{icon:'🎾',label:'Tennis'},{icon:'🔬',label:'Researcher'},{icon:'🎙️',label:'Podcast fan'},{icon:'🧠',label:'Coach'},{icon:'🚶',label:'Walker'}] },
 ]
+
+const DEMO_CONNECTIONS: Connection[] = []
 
 // Love languages + attachment reference
 const LOVE_LANGUAGES = ['Words of Affirmation', 'Quality Time', 'Acts of Service', 'Physical Touch', 'Receiving Gifts']
@@ -8853,22 +11617,114 @@ const MEET_CATEGORIES = [
   { id: 'purpose', icon: 'compass-outline' as const, title: 'Purpose-Driven', subtitle: 'Mission-aligned, impact partners', color: '#7B6EF6', count: '2.4K' }
 ]
 
-function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { profile: UserProfile; onBack: () => void; onMyProfile: () => void; onSynergy: () => void; onRegister?: () => void }) {
+async function runAgentMatching(profile: UserProfile, category: string): Promise<{ name: string; score: number; why: string; category: string; cachedAt: string }[]> {
+  const pool = CANDIDATES.filter(c => {
+    if (category === 'romantic') return true
+    if (category === 'friends') return !['Dr. Sarah'].includes(c.name)
+    return true
+  }).slice(0, 6)
+
+  const myInterests = profile.memories.filter(m => m.domain === 'hobby').map(m => m.content).join(', ') || 'curious and open'
+  const myValues = profile.memories.filter(m => m.domain === 'purpose' || m.domain === 'mind').map(m => m.content).join(', ') || 'depth and authenticity'
+
+  const prompt = `You are an AI agent named ${profile.aiName || 'Soma'} scouting for ${profile.name || 'someone'}.
+Profile: interests — ${myInterests}; values — ${myValues}; category — ${category}.
+
+Candidates:
+${pool.map((c, i) => `${i + 1}. ${c.name}: ${c.bio}; values: ${c.values.join(', ')}; interests: ${c.interests.join(', ')}`).join('\n')}
+
+Pick the TOP 3 matches for a ${category} connection. Return ONLY a JSON array:
+[{"name":"...","score":88,"why":"one sentence on why they fit"}]
+JSON only:`
+
+  const raw = await groq([{ role: 'user', content: prompt }], `You are a thoughtful ${category} matchmaking AI. Return only JSON.`, 400)
+  try {
+    const m = raw.match(/\[[\s\S]*\]/)
+    if (m) {
+      const picks = JSON.parse(m[0])
+      if (Array.isArray(picks)) {
+        const result = picks.slice(0, 3).map((p: any) => ({ name: p.name, score: Number(p.score) || 80, why: p.why || '', category, cachedAt: new Date().toISOString() }))
+        const saved = DB.get()
+        saved.agentPicks = [...(saved.agentPicks || []).filter(p => p.category !== category), ...result]
+        DB.save(saved)
+        return result
+      }
+    }
+  } catch {}
+  return []
+}
+
+function MeetPeople({ profile, category = 'romantic', startAtName, onBack, onMatchSent, onMyProfile, onSynergy, onRegister }: { profile: UserProfile; category?: 'romantic' | 'friends' | 'professional' | 'support'; startAtName?: string; onBack: () => void; onMatchSent?: (name: string, userId?: string, firstMessage?: string) => void; onMyProfile: () => void; onSynergy: () => void; onRegister?: () => void }) {
   const { t } = useT()
   const isInRelationship = !!getRomanticPartner(profile)
-  // Extract dating profile from Soma conversations (automatic from daily chats)
+
+  // ── Category config: each mode pulls different memories and uses a different AI persona ──
+  const CAT_CONFIG = {
+    romantic: {
+      label: 'Dating', matchLabel: 'SOMA MATCHED YOU',
+      agentA: 'Soma', agentB: 'Lux',
+      domains: ['relationship', 'hobby', 'purpose'] as const,
+      contextLine: (p: UserProfile) => `attachment: ${p.dating.attachment || 'secure'}; love language: ${p.dating.loveLanguage || 'Quality Time'}; intimacy: ${p.dating.intimacy || 'values emotional closeness'}`,
+      promptGoal: 'decide if their humans should date and find long-term compatibility',
+      openingContext: (p: UserProfile, c: Candidate) => `You just matched romantically with ${p.name || 'someone'} on SOMA. Open with warmth and light curiosity — no pressure, 1-2 sentences.`,
+      accentColor: '#F6379B',
+    },
+    friends: {
+      label: 'Friends', matchLabel: 'SOMA FOUND A FRIEND',
+      agentA: 'Soma', agentB: 'Pal',
+      domains: ['hobby', 'social', 'health'] as const,
+      contextLine: (p: UserProfile) => `hobbies: ${p.memories.filter(m => m.domain === 'hobby').map(m => m.content).slice(0, 3).join(', ') || 'curious about many things'}`,
+      promptGoal: 'decide if their humans would make great friends based on shared activities and social vibe',
+      openingContext: (p: UserProfile, c: Candidate) => `You just connected as potential friends with ${p.name || 'someone'} on SOMA. Send a casual, fun opening — reference a shared interest, 1-2 sentences.`,
+      accentColor: '#1D9E75',
+    },
+    professional: {
+      label: 'Professional', matchLabel: 'SOMA FOUND A MATCH',
+      agentA: 'Soma', agentB: 'Pro',
+      domains: ['purpose', 'career', 'growth'] as const,
+      contextLine: (p: UserProfile) => `goals: ${p.memories.filter(m => m.domain === 'purpose').map(m => m.content).slice(0, 3).join(', ') || 'building meaningful work'}`,
+      promptGoal: 'decide if their humans could collaborate, mentor each other, or build something together',
+      openingContext: (p: UserProfile, c: Candidate) => `You just connected professionally with ${p.name || 'someone'} on SOMA. Open with curiosity about their work — brief, professional but warm, 1-2 sentences.`,
+      accentColor: '#378ADD',
+    },
+    support: {
+      label: 'Support', matchLabel: 'SOMA CONNECTED YOU',
+      agentA: 'Soma', agentB: 'Ally',
+      domains: ['mind', 'health', 'body'] as const,
+      contextLine: (p: UserProfile) => `what they're working on: ${p.memories.filter(m => m.domain === 'mind' || m.domain === 'health').map(m => m.content).slice(0, 3).join(', ') || 'personal growth and balance'}`,
+      promptGoal: 'decide if their humans could genuinely support each other through shared challenges or complementary strengths',
+      openingContext: (p: UserProfile, c: Candidate) => `You just connected for mutual support with ${p.name || 'someone'} on SOMA. Open with empathy and genuine curiosity about what they're working on — 1-2 sentences, no pressure.`,
+      accentColor: '#D85A30',
+    },
+  }
+  const cfg = CAT_CONFIG[category]
+
+  // Extract memories relevant to this category
   const extractedValues = profile.memories.filter(m => m.domain === 'relationship').map(m => m.content)
   const extractedInterests = profile.memories.filter(m => m.domain === 'hobby').map(m => m.content)
   const extractedPurpose = profile.memories.filter(m => m.domain === 'purpose').map(m => m.content)
 
-  const [step, setStep] = useState<'category' | 'browse' | 'matched' | 'chat' | 'conversation' | 'report' | 'liked'>('category')
+  const [step, setStep] = useState<'category' | 'browse' | 'matched' | 'chat' | 'conversation' | 'report' | 'liked' | 'sent'>('browse')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [browseTab, setBrowseTab] = useState<'for-you' | 'nearby'>('for-you')
+  const [agentPicksData, setAgentPicksData] = useState<{ name: string; score: number; why: string; category: string; cachedAt: string }[]>(
+    (profile.agentPicks || []).filter(p => p.category === category)
+  )
+  const [agentPicksLoading, setAgentPicksLoading] = useState(false)
+  const [genderPref, setGenderPref] = useState<'male' | 'female' | 'both' | null>(() => {
+    if (category !== 'romantic') return 'both'
+    const saved = DB.get().dating?.genderPref as any
+    return saved || null
+  })
   const [userLocation] = useState({ lat: 34.0522, lng: -118.2437 }) // Mock LA location
   // Real users from the backend (live when logged in + backend deployed)
   const [realNearby, setRealNearby] = useState<NearbyUser[]>([])
   const [realStatus, setRealStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
-  const [index, setIndex] = useState(0)
+  const [index, setIndex] = useState(() => {
+    if (!startAtName) return 0
+    const i = CANDIDATES.findIndex(c => c.name === startAtName)
+    return i >= 0 ? i : 0
+  })
   const [liked, setLiked] = useState<Candidate[]>([])
   const [matchedRealUserId, setMatchedRealUserId] = useState<string | null>(null)
   const [likesLeft, setLikesLeft] = useState(DB.likesLeft())
@@ -8887,8 +11743,54 @@ function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { p
   const [report, setReport] = useState<{ score: string; why: string; date: string; activities: string; intimacy?: string } | null>(null)
   const [agentReport, setAgentReport] = useState<any>(null)
   const [agentReportLoading, setAgentReportLoading] = useState(false)
-  const [relationshipType, setRelationshipType] = useState<'romantic' | 'friend'>('romantic')
+  const [relationshipType, setRelationshipType] = useState<'romantic' | 'friend'>('friend')
   const scrollRef = useRef<ScrollView>(null)
+
+  // ── Swipe gesture state ──
+  const cardXY = useRef(new Animated.ValueXY()).current
+  const [swipeDir, setSwipeDir] = useState<'like' | 'nope' | 'super' | null>(null)
+  const [passedStack, setPassedStack] = useState<number[]>([])
+  const likeOpacity  = cardXY.x.interpolate({ inputRange: [0, 60], outputRange: [0, 1], extrapolate: 'clamp' })
+  const nopeOpacity  = cardXY.x.interpolate({ inputRange: [-60, 0], outputRange: [1, 0], extrapolate: 'clamp' })
+  const superOpacity = cardXY.y.interpolate({ inputRange: [-80, -20], outputRange: [1, 0], extrapolate: 'clamp' })
+  const cardRotate   = cardXY.x.interpolate({ inputRange: [-220, 0, 220], outputRange: ['-18deg', '0deg', '18deg'] })
+
+  const swipePanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 6,
+    onPanResponderMove: (_, gs) => {
+      cardXY.setValue({ x: gs.dx, y: gs.dy })
+      if (gs.dx > 40) setSwipeDir('like')
+      else if (gs.dx < -40) setSwipeDir('nope')
+      else if (gs.dy < -60) setSwipeDir('super')
+      else setSwipeDir(null)
+    },
+    onPanResponderRelease: (_, gs) => {
+      if (gs.dx > 100) { flyCard('like') }
+      else if (gs.dx < -100) { flyCard('nope') }
+      else if (gs.dy < -120) { flyCard('super') }
+      else { setSwipeDir(null); Animated.spring(cardXY, { toValue: { x: 0, y: 0 }, useNativeDriver: false, friction: 6 }).start() }
+    },
+  })).current
+
+  const flyCard = (dir: 'like' | 'nope' | 'super') => {
+    const toX = dir === 'like' ? 600 : dir === 'nope' ? -600 : 0
+    const toY = dir === 'super' ? -900 : 60
+    Animated.timing(cardXY, { toValue: { x: toX, y: toY }, duration: 280, useNativeDriver: false }).start(() => {
+      cardXY.setValue({ x: 0, y: 0 })
+      setSwipeDir(null)
+      if (dir === 'nope') { setPassedStack(s => [...s, index]); pass() }
+      else if (dir === 'super') { haptic.success(); like() }
+      else { like() }
+    })
+  }
+
+  const rewind = () => {
+    if (passedStack.length === 0) return
+    const prev = passedStack[passedStack.length - 1]
+    setPassedStack(s => s.slice(0, -1))
+    setIndex(prev); setPhotoIdx(0); haptic.light()
+  }
 
   // Rank candidates by REAL alignment with the user's memories (best first), respecting active age filter
   const ranked = [...CANDIDATES]
@@ -8897,36 +11799,45 @@ function MeetPeople({ profile, onBack, onMyProfile, onSynergy, onRegister }: { p
     .sort((a, b) => b.score - a.score)
   const candidate = liked[liked.length - 1] ?? ranked[0]?.c ?? CANDIDATES[0]
 
-  // My agent name = Soma. Their agent = Lux.
-  const myInterests = profile.memories.filter(m => m.domain === 'hobby').map(m => m.content).join(', ') || 'still discovering their interests'
+  // Pull memories for the active category
+  const myInterests = profile.memories.filter(m => cfg.domains.includes(m.domain as any)).map(m => m.content).join(', ')
+    || profile.memories.filter(m => m.domain === 'hobby').map(m => m.content).join(', ')
+    || 'still discovering their interests'
   const myValues    = profile.memories.filter(m => m.domain === 'purpose' || m.domain === 'mind').map(m => m.content).join(', ') || 'thoughtful and curious'
   const myRel       = profile.memories.filter(m => m.domain === 'relationship').map(m => m.content).join(', ')
+  const myCategoryContext = cfg.contextLine(profile)
 
   const fallbackTurns = (): AgentTurn[] => [
-    { agent: 'A', text: `Hi Lux. I represent ${profile.name || 'my person'}. They're thoughtful, value depth, and love the outdoors. What's Mai like?` },
-    { agent: 'B', text: `Lovely to meet you, Soma. Mai is warm and curious — she hikes most weekends and is learning to paint. Depth matters to her too.` },
-    { agent: 'A', text: `That's a beautiful overlap. ${profile.name || 'My person'} also gravitates toward quiet, meaningful time over big crowds.` },
-    { agent: 'B', text: `Then they'd get along well. Mai prefers a calm café and a good conversation over anything loud. Shall we find them a first date?` },
-    { agent: 'A', text: `Yes. Something outdoors and gentle — a place where conversation can breathe. I think they'd genuinely enjoy each other.` },
+    { agent: 'A', text: `Hi ${cfg.agentB}. I'm ${cfg.agentA}, here for ${profile.name || 'my person'}. They're thoughtful, value depth. What's ${candidate.name} like?` },
+    { agent: 'B', text: `Great to meet you, ${cfg.agentA}. ${candidate.name} is warm and curious — ${candidate.interests[0]} is a big part of their life.` },
+    { agent: 'A', text: `There's real overlap here. ${profile.name || 'My person'} values ${myValues.split(',')[0] || 'meaningful connection'} deeply.` },
+    { agent: 'B', text: `${candidate.name} would appreciate that. They're intentional about who they let in. I think these two would genuinely click.` },
+    { agent: 'A', text: `Agreed. Let's make sure they actually connect.` },
   ]
 
-  const fallbackReport = () => ({ score: '85%', why: 'You both value depth and quiet adventure, and share a love of the outdoors.', date: 'A sunset hike on an easy trail, ending with coffee at a small café to talk.', activities: 'A weekend hike, visiting an art exhibit together', intimacy: 'Your Auras noted you both value emotionally present, unhurried closeness — a gentle, trusting fit.' })
+  const fallbackReport = () => ({
+    score: '85%',
+    why: category === 'romantic' ? 'You both value depth and quiet adventure.' : category === 'friends' ? 'You share energy, interests, and a similar social vibe.' : category === 'professional' ? 'Your goals and working styles align in meaningful ways.' : "You're both on a growth path that the other can support.",
+    date: category === 'romantic' ? 'A sunset hike ending with coffee at a small café.' : category === 'friends' ? 'A casual hangout around your shared interest.' : category === 'professional' ? 'A focused 30-min coffee chat about what you\'re each building.' : 'A low-pressure check-in to share what you\'re working through.',
+    activities: candidate.interests.slice(0, 2).join(' · '),
+    intimacy: category === 'romantic' ? 'Your SOMAs noted you both value emotionally present, unhurried closeness.' : undefined,
+  })
 
   const runMatch = async () => {
     setStep('conversation'); setTurns([]); setVisibleCount(0)
 
-    // 1) Generate the AI-to-AI conversation
+    // 1) Generate the AI-to-AI conversation — persona and goal differ by category
     const convoRaw = await groq([{ role: 'user', content:
-`Write a short conversation between two AI agents who represent two people deciding if their humans should date.
+`Write a short conversation between two AI agents who ${cfg.promptGoal}.
 
-AGENT A is "Soma", representing ${profile.name || 'a thoughtful person'} — interests: ${myInterests}; values: ${myValues}; ${myRel ? `relationships: ${myRel}` : ''}.
-AGENT B is "Lux", representing ${candidate.name} — bio: ${candidate.bio}; values: ${candidate.values.join(', ')}; interests: ${candidate.interests.join(', ')}.
+AGENT A is "${cfg.agentA}", representing ${profile.name || 'a thoughtful person'} — ${myCategoryContext}; interests: ${myInterests}.
+AGENT B is "${cfg.agentB}", representing ${candidate.name} — bio: ${candidate.bio}; values: ${candidate.values.join(', ')}; interests: ${candidate.interests.join(', ')}.
 
-They warmly compare their humans, find common ground, and agree they'd be a good match. 5 to 6 short turns, alternating A then B. Each turn 1-2 sentences, natural and warm.
+They warmly compare their humans, find common ground, and agree on a fit. 5 short turns, alternating A then B. Each turn 1-2 sentences, natural and warm.
 
 Return ONLY a JSON array:
 [{"agent":"A","text":"..."},{"agent":"B","text":"..."}]
-JSON only:` }], 'You write warm, natural dialogue between two matchmaker AI agents. Return only a JSON array.', 600)
+JSON only:` }], `You write warm dialogue between two AI agents acting as ${category} matchmakers. Return only a JSON array.`, 600)
 
     let parsed: AgentTurn[] = fallbackTurns()
     try { const m = convoRaw.match(/\[[\s\S]*\]/); if (m) { const p = JSON.parse(m[0]); if (Array.isArray(p) && p.length) parsed = p } } catch {}
@@ -8947,21 +11858,15 @@ JSON only:` }], 'You write warm, natural dialogue between two matchmaker AI agen
     const myAttach = d.attachment || 'Secure'
     const totalDelay = parsed.length * 1600 + 800
     setTimeout(async () => {
-      const raw = await groq([{ role: 'user', content:
-`Two people matched. Their AI agents privately compared notes including intimacy. Return ONLY JSON.
+      const reportPrompt = category === 'romantic'
+        ? `Two people matched romantically. Return ONLY JSON.\n\nPERSON A: interests ${myInterests}; values ${myValues}; love language ${myLove}; attachment ${myAttach}; intimacy notes (PRIVATE): "${myIntimacy}"\nPERSON B (${candidate.name}): ${candidate.bio}; values ${candidate.values.join(', ')}; love language ${candidate.loveLanguage}; attachment ${candidate.attachment}; intimacy notes (PRIVATE): "${candidate.intimacy}"\n\nReturn: {"score":"87%","why":"2 sentences on emotional fit","date":"one specific ideal first date","activities":"2 activities comma separated","intimacy":"one discreet sentence on intimacy alignment"}\nJSON only:`
+        : category === 'friends'
+        ? `Two people matched as potential friends. Return ONLY JSON.\n\nPERSON A: hobbies ${myInterests}; vibe: ${myValues}\nPERSON B (${candidate.name}): ${candidate.bio}; interests: ${candidate.interests.join(', ')}\n\nReturn: {"score":"84%","why":"2 sentences on friendship fit and shared energy","date":"one fun activity they'd enjoy together","activities":"2 shared things comma separated"}\nJSON only:`
+        : category === 'professional'
+        ? `Two people matched professionally. Return ONLY JSON.\n\nPERSON A: goals ${myInterests}; purpose ${myValues}\nPERSON B (${candidate.name}): ${candidate.bio}; values: ${candidate.values.join(', ')}\n\nReturn: {"score":"82%","why":"2 sentences on professional synergy","date":"a specific collaboration or meeting format","activities":"2 ways they could work together comma separated"}\nJSON only:`
+        : `Two people matched for mutual support. Return ONLY JSON.\n\nPERSON A: what they're working on: ${myInterests}\nPERSON B (${candidate.name}): ${candidate.bio}; values: ${candidate.values.join(', ')}\n\nReturn: {"score":"88%","why":"2 sentences on how they can support each other","date":"a low-key first check-in format","activities":"2 ways they could support each other"}\nJSON only:`
 
-PERSON A: interests ${myInterests}; values ${myValues}; love language ${myLove}; attachment ${myAttach}; intimacy notes (PRIVATE): "${myIntimacy}"
-PERSON B (${candidate.name}): ${candidate.bio}; values ${candidate.values.join(', ')}; love language ${candidate.loveLanguage}; attachment ${candidate.attachment}; intimacy notes (PRIVATE): "${candidate.intimacy}"
-
-Return:
-{
- "score":"compatibility % like 87%",
- "why":"2 sentences on emotional + psychological fit",
- "date":"one specific ideal first date",
- "activities":"2 activities comma separated",
- "intimacy":"one discreet, respectful sentence on how their intimacy needs align — phrased tastefully, the agents handled this so neither human had to bring it up"
-}
-JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.', 400)
+      const raw = await groq([{ role: 'user', content: reportPrompt }], `You are a thoughtful ${category} matchmaker AI. Return only JSON.`, 400)
       try { const m = raw.match(/\{[\s\S]*\}/); setReport(m ? JSON.parse(m[0]) : fallbackReport()) } catch { setReport(fallbackReport()) }
       setStep('report')
     }, totalDelay)
@@ -9033,8 +11938,12 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     }, totalDelay)
   }
 
-  // Reset card index whenever filters change
-  useEffect(() => { setIndex(0); setPhotoIdx(0) }, [maxDistKm, ageMin, ageMax])
+  // Reset card index whenever filters change (skip on first mount to preserve startAtName)
+  const filtersInitialized = useRef(false)
+  useEffect(() => {
+    if (!filtersInitialized.current) { filtersInitialized.current = true; return }
+    setIndex(0); setPhotoIdx(0)
+  }, [maxDistKm, ageMin, ageMax])
 
   // Load all SOMA users for "For You" tab (works for guests too)
   const [allUsers, setAllUsers] = useState<any[]>([])
@@ -9063,6 +11972,22 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     })()
     return () => { stale = true }
   }, [browseTab, maxDistKm])
+
+  // Kick off agent matching when component mounts (cache for 1 hour)
+  useEffect(() => {
+    const cached = (profile.agentPicks || []).filter(p => p.category === category)
+    const lastCache = cached[0]?.cachedAt
+    const oneHourAgo = Date.now() - 60 * 60 * 1000
+    if (cached.length > 0 && lastCache && new Date(lastCache).getTime() > oneHourAgo) {
+      setAgentPicksData(cached)
+      return
+    }
+    setAgentPicksLoading(true)
+    runAgentMatching(profile, category).then(picks => {
+      setAgentPicksData(picks)
+      setAgentPicksLoading(false)
+    }).catch(() => setAgentPicksLoading(false))
+  }, [category])
 
   const allUsersRanked = allUsers
     .filter(u => !u.age || (u.age >= ageMin && u.age <= ageMax))
@@ -9107,10 +12032,12 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     setMatchedRealUserId(realId || null)
 
     if (realId && datingApi.authed()) {
-      // Real user: send like to backend; backend tells us if it's mutual
+      // Real user: start AI agent conversation immediately, send like in background
+      haptic.success()
+      setStep('matched')
+      setTimeout(() => runMatch(), 100)
       datingApi.like(realId).then(res => {
         if (res.matched) {
-          // Mutual match! Save connection
           DB.upsertConnection({
             id: `real_${realId}`,
             name: pick.name, age: pick.age, photo: pick.photo,
@@ -9118,31 +12045,16 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
             loveLanguage: (pick as any).loveLanguage || '',
             attachment: (pick as any).attachment || '',
             messages: [], matchScore: Math.round(currentScore),
+            connectionType: (pick as any).connectionType || 'dating',
           })
-          haptic.success()
           analytics.track('match_created', { with: pick.name })
-          setStep('matched')
-          setTimeout(() => runMatch(), 100)
         }
-        // If not mutual: stay in 'liked' waiting state (already set below for non-premium)
       }).catch(() => {})
-
-      if (profile.premium) {
-        // Premium: immediate AI conversation without waiting for mutual
-        haptic.success()
-        analytics.track('match_created', { with: pick.name })
-        setStep('matched')
-        setTimeout(() => runMatch(), 100)
-      } else {
-        // Non-premium + real user: show "liked" waiting state, auto-advance
-        haptic.light()
-        setStep('liked')
-        setTimeout(() => { setStep('browse'); setPhotoIdx(0); if (index < safeActive.length - 1) setIndex(index + 1); else setIndex(0) }, 2500)
-      }
+    } else if (realId && !datingApi.authed()) {
+      setShowRegisterPrompt(true)
     } else {
-      // Demo profile: always immediate match (no real mutual matching possible)
+      // Demo profile — start AI agent conversation immediately
       haptic.success()
-      analytics.track('match_created', { with: pick.name })
       setStep('matched')
       setTimeout(() => runMatch(), 100)
     }
@@ -9154,24 +12066,21 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
   const startInstantChat = async () => {
     const bio = candidate.interests.slice(0, 2).join(', ')
 
-    // Real SOMA user — add to Circle with their userId and go to Circle for real DM
+    // Real SOMA user — add to Circle and jump to Messages tab with their convo open
     if (matchedRealUserId) {
-      DB.addCircle(candidate.name, relationshipType, bio, matchedRealUserId)
-      onBack() // go back to Circle/home where they can open the real chat
+      DB.addCircle(candidate.name, relationshipType === 'romantic' ? 'Dating' : 'friend', bio, matchedRealUserId)
+      onMatchSent?.(candidate.name, matchedRealUserId)
       return
     }
 
-    // Demo profile — AI-simulated chat
-    const circleId = `circle_${candidate.name}_${Date.now()}`
-    DB.addCircle(candidate.name, relationshipType, bio)
-    setStep('chat'); setChatLoading(true)
-    setChatMsgs([])
-    const persona = `You ARE ${candidate.name}, age ${candidate.age}, ${candidate.bio} You value ${candidate.values.join(', ')} and love ${candidate.interests.join(', ')}. You just matched with ${profile.name || 'someone'} on SOMA. Send a warm, natural opening message to start the conversation — 1-2 sentences, like a real person texting, reference something to spark a chat. Just the message, no quotes.`
+    // Demo profile — generate opener then jump to Messages tab with convo auto-opened
+    DB.addCircle(candidate.name, relationshipType === 'romantic' ? 'Dating' : 'friend', bio)
+    setChatLoading(true)
+    const persona = `You ARE ${candidate.name}, age ${candidate.age}, ${candidate.bio} You value ${candidate.values.join(', ')} and love ${candidate.interests.join(', ')}. ${cfg.openingContext(profile, candidate)} Just the message text, no quotes.`
     const opener = await groq([{ role: 'user', content: 'Send your first message' }], persona, 120)
     const first = opener || `Hey ${profile.name || 'there'}! So glad we matched 😊 What's been the best part of your week?`
-    setChatMsgs([{ role: 'assistant' as const, content: first }])
-    DB.messageCircle(circleId, first, false)
     setChatLoading(false)
+    onMatchSent?.(candidate.name, undefined, first)
   }
 
   const sendChat = async (text: string) => {
@@ -9197,19 +12106,19 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           <TouchableOpacity onPress={onBack} style={{ marginBottom: 16 }}>
             <Text style={g.backLink}>← Back</Text>
           </TouchableOpacity>
-          <Text style={[g.greeting, { marginBottom: 4 }]}>Meet people</Text>
+          <Text style={[g.greeting, { marginBottom: 4, color: t.text }]}>Meet people</Text>
           <Text style={{ fontSize: 15, color: t.textSub, lineHeight: 22 }}>Find people aligned with your goals and values</Text>
         </View>
 
         {/* Relationship status banner or Dating featured card */}
         {isInRelationship ? (
-          <View style={{ borderRadius: 20, padding: 16, backgroundColor: '#FFF0F6', borderWidth: 1, borderColor: '#F6379B30', marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <View style={{ borderRadius: 20, padding: 16, backgroundColor: t.card, borderWidth: 1, borderColor: '#F6379B30', marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#F6379B20', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="heart" size={22} color="#F6379B" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#C4196B' }}>You're in a relationship</Text>
-              <Text style={{ fontSize: 13, color: '#C4196B80', marginTop: 2 }}>Dating is hidden. Explore friends, career & more below.</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#EC4899' }}>You're in a relationship</Text>
+              <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Dating is hidden. Explore friends, career & more below.</Text>
             </View>
           </View>
         ) : (
@@ -9291,8 +12200,43 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     )
   }
 
+  if (step === 'browse' && category === 'romantic' && genderPref === null) {
+    return (
+      <View style={[g.screen, { backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
+        <TouchableOpacity onPress={onBack} style={{ position: 'absolute', top: 56, left: 20 }}>
+          <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Back</Text>
+        </TouchableOpacity>
+        <Text style={{ fontSize: 32, marginBottom: 16 }}>💜</Text>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 8 }}>Who are you interested in?</Text>
+        <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>We'll show you people that match your preference.</Text>
+        {([
+          { label: 'Women', value: 'female' as const, emoji: '👩' },
+          { label: 'Men', value: 'male' as const, emoji: '👨' },
+          { label: 'Everyone', value: 'both' as const, emoji: '🫂' },
+        ]).map(opt => (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => {
+              const p = DB.get()
+              if (!p.dating) p.dating = {} as any
+              ;(p.dating as any).genderPref = opt.value
+              DB.save(p)
+              setGenderPref(opt.value)
+            }}
+            style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: t.card, borderRadius: 18, padding: 20, marginBottom: 12, borderWidth: 1.5, borderColor: t.border }}>
+            <Text style={{ fontSize: 28 }}>{opt.emoji}</Text>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: t.text }}>{opt.label}</Text>
+            <Text style={{ marginLeft: 'auto', color: t.textSub, fontSize: 18 }}>›</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    )
+  }
+
   if (step === 'browse') {
-    const demoFallback = CANDIDATES.map(c => ({ c, ...alignmentScore(profile, c) }))
+    const demoFallback = CANDIDATES
+      .filter(c => !genderPref || genderPref === 'both' || c.gender === genderPref)
+      .map(c => ({ c, ...alignmentScore(profile, c) }))
     const filteredRanked = browseTab === 'nearby'
       ? (realRanked.length > 0 ? realRanked : demoFallback)
       : (allUsersRanked.length > 0 ? allUsersRanked : demoFallback)
@@ -9302,40 +12246,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
     const currentScore = filteredRanked[browseIndex]?.score
 
     return (
-      <View style={[g.screen, { backgroundColor: t.bg }]}>
-        {/* Top toggle bar */}
-        <View style={g.dTop}>
-          <TouchableOpacity style={g.dBack} onPress={onBack}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
-          <View style={g.dToggle}>
-            <PressButton
-              onPress={() => setBrowseTab('for-you')}
-              style={browseTab === 'for-you' ? g.dTogActive : { flex: 1 }}
-            >
-              <Text style={browseTab === 'for-you' ? g.dTogActiveTxt : g.dTogTxt}>FOR YOU</Text>
-            </PressButton>
-            <PressButton
-              onPress={() => setBrowseTab('nearby')}
-              style={browseTab === 'nearby' ? g.dTogActive : { flex: 1 }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="location-outline" size={13} color={browseTab === 'nearby' ? '#fff' : '#9A9DB2'} />
-                <Text style={browseTab === 'nearby' ? g.dTogActiveTxt : g.dTogTxt}>NEARBY</Text>
-              </View>
-            </PressButton>
-          </View>
-          <TouchableOpacity
-            style={[g.dMe, { position: 'relative' }]}
-            onPress={() => setShowFilters(true)}
-          >
-            <Ionicons name="options-outline" size={18} color="#fff" />
-            {(maxDistKm !== 50 || ageMin !== 18 || ageMax !== 60) && (
-              <View style={{ position: 'absolute', top: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#F6379B' }} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={g.dMe} onPress={() => setStep('profile')}><Text style={g.dMeTxt}>Me</Text></TouchableOpacity>
-        </View>
-
-        {/* Live status — compact, inside the top bar area */}
+      <View style={[g.screen, { backgroundColor: t.bg, paddingTop: 12 }]}>
 
         {/* No results state */}
         {filteredRanked.length === 0 && (
@@ -9354,32 +12265,51 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           </View>
         )}
 
-        {currentBrowse && (<ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
-          {/* Card stack + photo */}
+        {currentBrowse && (<ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
+          {/* ── PHOTO CARD ── full-bleed, swipeable */}
           {(() => {
             const allPhotos = (currentBrowse.photos && currentBrowse.photos.length > 0) ? currentBrowse.photos : (currentBrowse.photo ? [currentBrowse.photo] : [])
             const safeIdx = Math.min(photoIdx, Math.max(0, allPhotos.length - 1))
             const displayPhoto = allPhotos[safeIdx] || currentBrowse.photo
+            const ct = (currentBrowse as any).connectionType || 'dating'
+            const categoryEmoji: Record<string, string> = { dating: '💜', friends: '😊', professional: '💼', support: '🤝' }
             return (
-              <View style={{ paddingHorizontal: 20, paddingTop: 106, paddingBottom: 8, alignItems: 'center' }}>
-                {/* User count pill */}
-                <View style={{ position: 'absolute', top: 110, left: 36, zIndex: 20, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: useReal ? '#34C759' : '#C5BFEC' }} />
-                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } }}>
-                    {allUsersRanked.length > 0 ? `${allUsersRanked.length} on SOMA` : 'Demo mode'}
-                  </Text>
-                </View>
-                {/* Card stack — 2 rotated cards behind */}
-                <View style={{ position: 'absolute', top: 125, left: 30, right: 30, height: 540, borderRadius: 28, backgroundColor: '#C4B5F4', transform: [{ rotate: '5deg' }], opacity: 0.5 }} />
-                <View style={{ position: 'absolute', top: 120, left: 24, right: 24, height: 540, borderRadius: 28, backgroundColor: '#9580E8', transform: [{ rotate: '2.5deg' }], opacity: 0.7 }} />
-
-                {/* Main photo card */}
-                <TouchableOpacity activeOpacity={0.97}
+              <Animated.View
+                {...swipePanResponder.panHandlers}
+                style={{
+                  marginHorizontal: 14, marginTop: 8, marginBottom: 8,
+                  height: 540, borderRadius: 24, overflow: 'hidden',
+                  transform: [{ translateX: cardXY.x }, { translateY: cardXY.y }, { rotate: cardRotate }],
+                  shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 },
+                }}
+              >
+                <TouchableOpacity activeOpacity={1}
                   onPress={() => { if (allPhotos.length > 1) setPhotoIdx((safeIdx + 1) % allPhotos.length) }}
-                  style={{ width: '100%', height: 560, borderRadius: 28, overflow: 'hidden', ...shadowMd }}>
-                  <Image source={{ uri: displayPhoto }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} resizeMode="cover" />
+                  style={{ width: '100%', height: '100%' }}>
+                  <Image source={{ uri: displayPhoto }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' } as any} resizeMode="cover" />
 
-                  {/* Photo progress bars */}
+                  {/* LIKE overlay */}
+                  <Animated.View style={{ position: 'absolute', top: 44, left: 20, zIndex: 20, opacity: likeOpacity, transform: [{ rotate: '-15deg' }] }}>
+                    <View style={{ borderWidth: 3, borderColor: '#2DCA73', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#2DCA73', fontSize: 32, fontWeight: '900', letterSpacing: 2 }}>LIKE</Text>
+                    </View>
+                  </Animated.View>
+
+                  {/* NOPE overlay */}
+                  <Animated.View style={{ position: 'absolute', top: 44, right: 20, zIndex: 20, opacity: nopeOpacity, transform: [{ rotate: '15deg' }] }}>
+                    <View style={{ borderWidth: 3, borderColor: '#FF4458', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#FF4458', fontSize: 32, fontWeight: '900', letterSpacing: 2 }}>NOPE</Text>
+                    </View>
+                  </Animated.View>
+
+                  {/* SUPER LIKE overlay */}
+                  <Animated.View style={{ position: 'absolute', bottom: 160, left: 0, right: 0, zIndex: 20, alignItems: 'center', opacity: superOpacity }}>
+                    <View style={{ borderWidth: 3, borderColor: '#1AA3FF', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 5 }}>
+                      <Text style={{ color: '#1AA3FF', fontSize: 28, fontWeight: '900', letterSpacing: 2 }}>SUPER LIKE</Text>
+                    </View>
+                  </Animated.View>
+
+                  {/* Photo progress dots */}
                   {allPhotos.length > 1 && (
                     <View style={{ position: 'absolute', top: 14, left: 14, right: 14, flexDirection: 'row', gap: 4, zIndex: 10 }}>
                       {allPhotos.map((_, i) => (
@@ -9388,51 +12318,50 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
                     </View>
                   )}
 
-                  {/* Compatibility badge top-right */}
-                  <View style={{ position: 'absolute', top: 14, right: 14, zIndex: 5, alignItems: 'center' }}>
-                    <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name="sparkles" size={11} color="#F6D66E" />
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{currentScore}%</Text>
+                  {/* Compatibility badge */}
+                  <View style={{ position: 'absolute', top: allPhotos.length > 1 ? 34 : 14, right: 14, zIndex: 5 }}>
+                    <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)', flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)' }}>
+                      <Text style={{ color: '#FFD60A', fontSize: 10 }}>✦</Text>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{currentScore}%</Text>
                     </View>
                   </View>
 
-                  {/* Deep bottom gradient */}
-                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 280, backgroundColor: 'rgba(0,0,0,0.0)' }}>
-                    <View style={{ flex: 1, background: 'linear-gradient(transparent, rgba(0,0,0,0.85))' }} />
-                  </View>
-                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 200, backgroundColor: 'rgba(0,0,0,0.5)' }} />
-                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 100, backgroundColor: 'rgba(0,0,0,0.2)' }} />
-
-                  {/* Interest chips */}
-                  <View style={{ position: 'absolute', left: 16, right: 16, bottom: 90, flexDirection: 'row', flexWrap: 'wrap', gap: 6, zIndex: 5 }}>
-                    {currentBrowse.interests.slice(0, 3).map(interest => (
-                      <View key={interest} style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' }}>
-                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{interest}</Text>
-                      </View>
-                    ))}
+                  {/* Bottom gradient overlay */}
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 200,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)' as any,
+                    backgroundColor: 'transparent' as any,
+                  }}>
+                    <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 200,
+                      backgroundColor: 'rgba(0,0,0,0.001)' }}>
+                      {[0.85,0.7,0.55,0.38,0.22,0.1,0].map((o, i) => (
+                        <View key={i} style={{ position: 'absolute', left: 0, right: 0, bottom: i * 28, height: 30,
+                          backgroundColor: `rgba(0,0,0,${o})` }} />
+                      ))}
+                    </View>
                   </View>
 
-                  {/* Name / location */}
-                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingBottom: 20 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                          <Text style={{ color: '#fff', fontSize: 34, fontWeight: '800', letterSpacing: -0.5 }}>{currentBrowse.name}</Text>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 26, fontWeight: '300' }}>{currentBrowse.age}</Text>
+                  {/* Name / info overlay */}
+                  <View style={{ position: 'absolute', left: 18, right: 18, bottom: 16, zIndex: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+                      <Text style={{ color: '#fff', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>{currentBrowse.name}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 22, fontWeight: '300' }}>{currentBrowse.age}</Text>
+                    </View>
+                    {/* Interest chips ON card */}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {currentBrowse.interests.slice(0, 3).map(interest => (
+                        <View key={interest} style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.3)' }}>
+                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{interest}</Text>
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                          <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.7)" />
-                          <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '500' }}>{currentBrowse.distance || currentBrowse.location}</Text>
-                        </View>
+                      ))}
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="location-outline" size={11} color="rgba(255,255,255,0.8)" />
+                        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500' }}>{currentBrowse.distance || currentBrowse.location}</Text>
                       </View>
-                      <TouchableOpacity onPress={like}
-                        style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', shadowColor: '#F6379B', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }}>
-                        <Ionicons name="heart" size={24} color="#fff" />
-                      </TouchableOpacity>
                     </View>
                   </View>
                 </TouchableOpacity>
-              </View>
+              </Animated.View>
+
             )
           })()}
 
@@ -9490,9 +12419,9 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           {/* Why Soma matched */}
           <View style={g.dSection}>
             <View style={{ borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#7B6EF630' }}>
-              <View style={{ backgroundColor: '#7B6EF6', paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ backgroundColor: cfg.accentColor, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="sparkles" size={14} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>SOMA MATCHED YOU · {currentScore}%</Text>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>{cfg.matchLabel} · {currentScore}%</Text>
               </View>
               <View style={{ backgroundColor: '#F8F6FF', padding: 16 }}>
                 <Text style={{ color: '#3D3A56', fontSize: 15, lineHeight: 23, fontWeight: '500' }}>
@@ -9514,25 +12443,96 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
             </View>
           </View>
 
-          {/* Connection style — love language + attachment */}
+          {/* Connection style — sector-specific highlights */}
           <View style={g.dSection}>
-            <Text style={g.dH}>Connection style</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={g.styleCard}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                  <Ionicons name="heart-outline" size={13} color="#7B6EF6" />
-                  <Text style={g.styleLbl}>LOVE LANGUAGE</Text>
-                </View>
-                <Text style={g.styleVal}>{currentBrowse.loveLanguage}</Text>
-              </View>
-              <View style={g.styleCard}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                  <Ionicons name="link-outline" size={13} color="#7B6EF6" />
-                  <Text style={g.styleLbl}>ATTACHMENT</Text>
-                </View>
-                <Text style={g.styleVal}>{currentBrowse.attachment}</Text>
-              </View>
-            </View>
+            {(() => {
+              const ct = (currentBrowse as any).connectionType || 'dating'
+              if (ct === 'friends') return (
+                <>
+                  <Text style={g.dH}>As a friend</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="happy-outline" size={13} color="#10B981" />
+                        <Text style={[g.styleLbl, { color: '#10B981' }]}>VIBE</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.loveLanguage || 'Open & warm'}</Text>
+                    </View>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="people-outline" size={13} color="#10B981" />
+                        <Text style={[g.styleLbl, { color: '#10B981' }]}>INTERESTS</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.interests.slice(0, 2).join(', ') || 'Exploring life'}</Text>
+                    </View>
+                  </View>
+                </>
+              )
+              if (ct === 'professional') return (
+                <>
+                  <Text style={g.dH}>Professionally</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="briefcase-outline" size={13} color="#378ADD" />
+                        <Text style={[g.styleLbl, { color: '#378ADD' }]}>WORK</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.work || 'Building something'}</Text>
+                    </View>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="bulb-outline" size={13} color="#378ADD" />
+                        <Text style={[g.styleLbl, { color: '#378ADD' }]}>VALUES</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.values.slice(0, 1).join(', ') || 'Growth & impact'}</Text>
+                    </View>
+                  </View>
+                </>
+              )
+              if (ct === 'support') return (
+                <>
+                  <Text style={g.dH}>Here to support</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="hand-left-outline" size={13} color="#F59E0B" />
+                        <Text style={[g.styleLbl, { color: '#F59E0B' }]}>STYLE</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.attachment || 'Empathetic listener'}</Text>
+                    </View>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="heart-circle-outline" size={13} color="#F59E0B" />
+                        <Text style={[g.styleLbl, { color: '#F59E0B' }]}>STRENGTH</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.loveLanguage || 'Words of affirmation'}</Text>
+                    </View>
+                  </View>
+                </>
+              )
+              // Default: dating
+              return (
+                <>
+                  <Text style={g.dH}>Connection style</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="heart-outline" size={13} color="#7B6EF6" />
+                        <Text style={g.styleLbl}>LOVE LANGUAGE</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.loveLanguage}</Text>
+                    </View>
+                    <View style={g.styleCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                        <Ionicons name="link-outline" size={13} color="#7B6EF6" />
+                        <Text style={g.styleLbl}>ATTACHMENT</Text>
+                      </View>
+                      <Text style={g.styleVal}>{currentBrowse.attachment}</Text>
+                    </View>
+                  </View>
+                </>
+              )
+            })()}
           </View>
 
           {/* More info tags */}
@@ -9549,36 +12549,62 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           </View>
         </ScrollView>)}
 
-        {/* Likes-left bar */}
-        {currentBrowse && <View style={g.likesBar}>
-          <Text style={g.likesTxt}>
-            {profile.premium ? '⚡ Premium · ' : ''}♥ {likesLeft} like{likesLeft !== 1 ? 's' : ''} left today
-            {profile.premium ? '' : ' · mutual match required'}
-          </Text>
-          {!profile.premium && <TouchableOpacity onPress={() => setShowPaywall(true)}><Text style={g.likesUpgrade}>Go instant →</Text></TouchableOpacity>}
-        </View>}
+        {/* Action buttons — always visible below card */}
+        {currentBrowse && (
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            paddingHorizontal: 20, paddingVertical: 16, gap: 16,
+            backgroundColor: t.bg,
+            borderTopWidth: 0.5, borderTopColor: t.border,
+          }}>
+            <PressButton onPress={rewind} style={{
+              width: 46, height: 46, borderRadius: 23,
+              backgroundColor: passedStack.length > 0 ? '#FFF8E7' : t.card2,
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1, borderColor: passedStack.length > 0 ? '#F5C54230' : t.border,
+            }}>
+              <Ionicons name="arrow-undo" size={18} color={passedStack.length > 0 ? '#F5A623' : t.textSub} />
+            </PressButton>
 
-        {/* Bottom action bar */}
-        {currentBrowse && <View style={[g.dActions, { paddingHorizontal: 32, justifyContent: 'center', gap: 20 }]}>
-          <PressButton
-            onPress={pass}
-            style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E3F0', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}
-          >
-            <Ionicons name="close" size={28} color="#9A9DB2" />
-          </PressButton>
-          <PressButton
-            onPress={like}
-            style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#F6379B', alignItems: 'center', justifyContent: 'center', shadowColor: '#F6379B', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }}
-          >
-            <Ionicons name="heart" size={34} color="#fff" />
-          </PressButton>
-          <PressButton
-            onPress={() => { haptic.medium(); like() }}
-            style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#F3F0FF', borderWidth: 1.5, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}
-          >
-            <Ionicons name="star" size={26} color="#7B6EF6" />
-          </PressButton>
-        </View>}
+            <PressButton onPress={() => flyCard('nope')} style={{
+              width: 62, height: 62, borderRadius: 31,
+              backgroundColor: '#fff',
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1.5, borderColor: '#FF445830',
+              shadowColor: '#FF4458', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+            }}>
+              <Ionicons name="close" size={26} color="#FF4458" />
+            </PressButton>
+
+            <PressButton onPress={() => flyCard('like')} style={{
+              width: 76, height: 76, borderRadius: 38,
+              backgroundColor: cfg.accentColor,
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: cfg.accentColor, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
+            }}>
+              <Ionicons name={category === 'romantic' ? 'heart' : category === 'friends' ? 'people' : category === 'professional' ? 'briefcase' : 'hand-left'} size={30} color="#fff" />
+            </PressButton>
+
+            <PressButton onPress={() => flyCard('super')} style={{
+              width: 62, height: 62, borderRadius: 31,
+              backgroundColor: '#fff',
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1.5, borderColor: '#1AA3FF30',
+              shadowColor: '#1AA3FF', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+            }}>
+              <Ionicons name="star" size={22} color="#1AA3FF" />
+            </PressButton>
+
+            <PressButton onPress={() => setShowFilters(true)} style={{
+              width: 46, height: 46, borderRadius: 23,
+              backgroundColor: t.card2,
+              alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1, borderColor: t.border,
+            }}>
+              <Ionicons name="options-outline" size={18} color={t.textSub} />
+            </PressButton>
+          </View>
+        )}
 
         {/* Paywall */}
         {showPaywall && (
@@ -9738,11 +12764,11 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           <TouchableOpacity style={g.dBack} onPress={() => setStep('browse')}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
           <Image source={{ uri: candidate.photo }} style={g.chatAvatar} />
           <View style={{ flex: 1 }}>
-            <Text style={g.chatName}>{candidate.name}, {candidate.age}</Text>
+            <Text style={[g.chatName, { color: t.text }]}>{candidate.name}, {candidate.age}</Text>
             <Text style={g.chatStatus}>{chatLoading ? 'typing…' : '🟢 Matched just now'}</Text>
           </View>
           <TouchableOpacity onPress={() => { setStep('conversation'); setTurns([]); setVisibleCount(0); runMatch() }}>
-            <Text style={g.chatAura}>✦</Text>
+            <Text style={g.chatSoma}>✦</Text>
           </TouchableOpacity>
         </View>
         <View style={g.matchStrip}><Text style={g.matchStripTxt}>💜 You matched — say hi! The conversation started for you.</Text></View>
@@ -9798,11 +12824,11 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           <View style={[g.matchCard, { backgroundColor: t.card, borderColor: t.border }]}>
             <Text style={g.cardTag}>✦  WHAT KIND OF CONNECTION?</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-              <TouchableOpacity style={[g.typePill, relationshipType === 'romantic' && g.typePillActive]} onPress={() => setRelationshipType('romantic')}>
-                <Text style={g.typePillTxt}>💕 Romantic</Text>
+              <TouchableOpacity style={[g.typePill, { backgroundColor: t.card, borderColor: t.border }, relationshipType === 'friend' && g.typePillActive]} onPress={() => setRelationshipType('friend')}>
+                <Text style={[g.typePillTxt, { color: t.text }]}>🤝 Friendship</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[g.typePill, relationshipType === 'friend' && g.typePillActive]} onPress={() => setRelationshipType('friend')}>
-                <Text style={g.typePillTxt}>🤝 Friend</Text>
+              <TouchableOpacity style={[g.typePill, { backgroundColor: t.card, borderColor: t.border }, relationshipType === 'romantic' && g.typePillActive]} onPress={() => setRelationshipType('romantic')}>
+                <Text style={[g.typePillTxt, { color: t.text }]}>💕 Exploring</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -9826,7 +12852,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
           <View style={{ height: 16 }} />
           <View style={[g.matchCard, { backgroundColor: t.card, borderColor: t.border }]}>
             <Image source={{ uri: candidate.photo }} style={g.matchPhoto} />
-            <Text style={g.matchName}>{candidate.name}, {candidate.age}</Text>
+            <Text style={[g.matchName, { color: t.text }]}>{candidate.name}, {candidate.age}</Text>
             <Text style={g.matchBio}>{candidate.bio}</Text>
             <View style={g.valuesRow}>{candidate.values.map(v => <View key={v} style={g.valueChip}><Text style={g.valueChipTxt}>{v}</Text></View>)}</View>
           </View>
@@ -9837,16 +12863,16 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
       {(step === 'conversation' || step === 'report') && (
         <>
           {/* Two-agent header */}
-          <View style={g.agentsHeader}>
+          <View style={[g.agentsHeader, { backgroundColor: t.card, borderColor: t.border }]}>
             <View style={{ alignItems: 'center', gap: 4 }}>
               <View style={[g.agentAv, { backgroundColor: '#7B6EF6' }]}><Text style={g.agentAvTxt}>✦</Text></View>
-              <Text style={g.agentName}>Soma</Text>
+              <Text style={[g.agentName, { color: t.text }]}>Soma</Text>
               <Text style={g.agentFor}>for {profile.name || 'you'}</Text>
             </View>
             <Text style={g.agentVs}>↔</Text>
             <View style={{ alignItems: 'center', gap: 4 }}>
               <View style={[g.agentAv, { backgroundColor: '#F6A86E' }]}><Text style={g.agentAvTxt}>✦</Text></View>
-              <Text style={g.agentName}>{candidate.agentName}</Text>
+              <Text style={[g.agentName, { color: t.text }]}>{candidate.agentName}</Text>
               <Text style={g.agentFor}>for {candidate.name}</Text>
             </View>
           </View>
@@ -9869,23 +12895,23 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
 
       {step === 'report' && report && (
         <>
-          <View style={g.scoreCard}>
+          <View style={[g.scoreCard, { backgroundColor: t.card, borderColor: t.border }]}>
             <Text style={g.scoreLabel}>{matchedRealUserId ? 'YOUR AIs MET' : 'OUR AURAS AGREE'}</Text>
             <Text style={g.scoreNum}>{report.score}</Text>
-            <Text style={g.scoreWhy}>{report.why}</Text>
+            <Text style={[g.scoreWhy, { color: t.text }]}>{report.why}</Text>
           </View>
-          <View style={g.reportCard}><Text style={g.cardTag}>{matchedRealUserId ? '✦  SUGGESTED FIRST MESSAGE' : '✦  YOUR IDEAL FIRST DATE'}</Text><Text style={g.reportDate}>{report.date}</Text></View>
-          <View style={g.reportCard}><Text style={g.cardTag}>{matchedRealUserId ? '✦  WHAT YOU HAVE IN COMMON' : '✦  THINGS TO DO TOGETHER'}</Text><Text style={g.reportAct}>{report.activities}</Text></View>
+          <View style={[g.reportCard, { backgroundColor: t.card, borderColor: t.border }]}><Text style={g.cardTag}>{matchedRealUserId ? '✦  SUGGESTED FIRST MESSAGE' : '✦  YOUR IDEAL FIRST DATE'}</Text><Text style={[g.reportDate, { color: t.text }]}>{report.date}</Text></View>
+          <View style={[g.reportCard, { backgroundColor: t.card, borderColor: t.border }]}><Text style={g.cardTag}>{matchedRealUserId ? '✦  WHAT YOU HAVE IN COMMON' : '✦  THINGS TO DO TOGETHER'}</Text><Text style={[g.reportAct, { color: t.text }]}>{report.activities}</Text></View>
           {report.intimacy && !matchedRealUserId ? (
             <View style={g.intimacyReport}>
               <Text style={g.intimacyRLbl}>🔒  INTIMACY COMPATIBILITY · handled privately by your AIs</Text>
-              <Text style={g.intimacyRTxt}>{report.intimacy}</Text>
+              <Text style={[g.intimacyRTxt, { color: t.text }]}>{report.intimacy}</Text>
               <Text style={g.intimacyRNote}>Neither of you had to bring this up. Your agents compared notes so the conversation could stay easy.</Text>
             </View>
           ) : report.intimacy && matchedRealUserId ? (
-            <View style={[g.reportCard, { borderLeftWidth: 3, borderLeftColor: '#7B6EF6' }]}>
+            <View style={[g.reportCard, { backgroundColor: t.card, borderColor: t.border, borderLeftWidth: 3, borderLeftColor: '#7B6EF6' }]}>
               <Text style={g.cardTag}>✦  GROWTH POTENTIAL</Text>
-              <Text style={g.reportAct}>{report.intimacy}</Text>
+              <Text style={[g.reportAct, { color: t.text }]}>{report.intimacy}</Text>
             </View>
           ) : null}
           <TouchableOpacity style={g.primaryBtn} onPress={() => { startInstantChat(); setReport(null); setTurns([]); setVisibleCount(0) }}><Text style={g.primaryBtnTxt}>💜  Send {candidate.name} a hello</Text></TouchableOpacity>
@@ -9898,6 +12924,7 @@ JSON only:` }], 'You are a thoughtful, discreet matchmaker AI. Return only JSON.
 }
 
 function AgentBubble({ turn, self }: { turn: AgentTurn; self: boolean }) {
+  const { t } = useT()
   const fade = useRef(new Animated.Value(0)).current
   const rise = useRef(new Animated.Value(10)).current
   useEffect(() => {
@@ -9908,9 +12935,9 @@ function AgentBubble({ turn, self }: { turn: AgentTurn; self: boolean }) {
   }, [])
   return (
     <Animated.View style={[g.agentRow, self ? g.bLeft : g.bRight, { opacity: fade, transform: [{ translateY: rise }] }]}>
-      <View style={[g.agentBubble, self ? g.agentBubbleA : g.agentBubbleB]}>
+      <View style={[g.agentBubble, self ? [g.agentBubbleA, { backgroundColor: t.card }] : g.agentBubbleB]}>
         <Text style={[g.agentLabel, { color: self ? '#7B6EF6' : '#F6A86E' }]}>{self ? '✦ Soma' : '✦ Lux'}</Text>
-        <Text style={[g.agentText, !self && { color: '#EDE8E0' }]}>{turn.text}</Text>
+        <Text style={[g.agentText, { color: t.text }, !self && { color: '#EDE8E0' }]}>{turn.text}</Text>
       </View>
     </Animated.View>
   )
@@ -9918,7 +12945,7 @@ function AgentBubble({ turn, self }: { turn: AgentTurn; self: boolean }) {
 
 // ── BUBBLES ────────────────────────────────────────────────
 function Bubble({ msg }: { msg: Msg }) {
-  const isAura = msg.role === 'assistant'
+  const isSoma = msg.role === 'assistant'
   const fade = useRef(new Animated.Value(0)).current
   const rise = useRef(new Animated.Value(8)).current
   useEffect(() => {
@@ -9928,9 +12955,9 @@ function Bubble({ msg }: { msg: Msg }) {
     ]).start()
   }, [])
   return (
-    <Animated.View style={[g.bRow, isAura ? g.bLeft : g.bRight, { opacity: fade, transform: [{ translateY: rise }] }]}>
-      {isAura && <View style={g.miniOrb}><Text style={{ fontSize: 9, color: '#fff' }}>✦</Text></View>}
-      <View style={[g.bubble, isAura ? g.aBubble : g.uBubble]}>
+    <Animated.View style={[g.bRow, isSoma ? g.bLeft : g.bRight, { opacity: fade, transform: [{ translateY: rise }] }]}>
+      {isSoma && <View style={g.miniOrb}><Text style={{ fontSize: 9, color: '#fff' }}>✦</Text></View>}
+      <View style={[g.bubble, isSoma ? g.aBubble : g.uBubble]}>
         <Text style={g.bTxt}>{msg.content}</Text>
       </View>
     </Animated.View>
@@ -10191,19 +13218,19 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
       <View style={[g.header, { paddingTop: 52 }]}>
         <TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Back</Text></TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[g.auraTitle, { fontSize: 22 }]}>⚡ Synergy Scan</Text>
-          <Text style={g.auraSub}>Your AIs talk privately. You see only what matters.</Text>
+          <Text style={[g.auraTitle, { fontSize: 22, color: t.text }]}>⚡ Synergy Scan</Text>
+          <Text style={[g.auraSub, { color: t.textSub }]}>Your AIs talk privately. You see only what matters.</Text>
         </View>
       </View>
       <View style={g.divider} />
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48, gap: 16 }}>
-        <TouchableOpacity onPress={() => setStep('mycode')} style={{ borderRadius: 20, padding: 20, backgroundColor: '#1A1A2E', flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+        <TouchableOpacity onPress={() => setStep('mycode')} style={{ borderRadius: 20, padding: 20, backgroundColor: t.card2, flexDirection: 'row', alignItems: 'center', gap: 16, borderWidth: 1, borderColor: t.border2 }}>
           <View style={{ width: 60, height: 60, borderRadius: 16, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#7B6EF6', borderStyle: 'dashed' }}>
             <Text style={{ fontSize: 28 }}>🪪</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 17, fontWeight: '800', color: '#fff' }}>Show My Code</Text>
-            <Text style={{ fontSize: 13, color: '#888', marginTop: 3 }}>Let others scan you. Your private data stays private.</Text>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>Show My Code</Text>
+            <Text style={{ fontSize: 13, color: t.textSub, marginTop: 3 }}>Let others scan you. Your private data stays private.</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setStep('scan')} style={{ borderRadius: 20, padding: 20, backgroundColor: '#7B6EF6', flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -10240,7 +13267,7 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
     <View style={[g.screen, { backgroundColor: t.bg }]}>
       <View style={[g.header, { paddingTop: 52 }]}>
         <TouchableOpacity onPress={() => setStep('home')}><Text style={g.backLink}>← Back</Text></TouchableOpacity>
-        <Text style={[g.auraTitle, { marginLeft: 12 }]}>My Synergy Code</Text>
+        <Text style={[g.auraTitle, { marginLeft: 12, color: t.text }]}>My Synergy Code</Text>
       </View>
       <View style={g.divider} />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
@@ -10272,15 +13299,15 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
       <View style={[g.header, { paddingTop: 52 }]}>
         <TouchableOpacity onPress={() => setStep('home')}><Text style={g.backLink}>← Back</Text></TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={g.auraTitle}>Scan Someone</Text>
-          <Text style={g.auraSub}>Tap a person to run an AI synergy check</Text>
+          <Text style={[g.auraTitle, { color: t.text }]}>Scan Someone</Text>
+          <Text style={[g.auraSub, { color: t.textSub }]}>Tap a person to run an AI synergy check</Text>
         </View>
       </View>
       <View style={g.divider} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
-        <View style={{ borderRadius: 14, padding: 14, backgroundColor: '#1A1A2E', marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ borderRadius: 14, padding: 14, backgroundColor: t.card, marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: t.border }}>
           <Text style={{ fontSize: 18 }}>📡</Text>
-          <Text style={{ fontSize: 13, color: '#888', flex: 1 }}>In the app, this uses your camera to scan their code. Try a demo scan below.</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, flex: 1 }}>In the app, this uses your camera to scan their code. Try a demo scan below.</Text>
         </View>
         {SYNERGY_PERSONAS.map(p => (
           <TouchableOpacity key={p.id} onPress={() => { setSelected(p); runSynergy(p) }}
@@ -10309,6 +13336,7 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
   if (step === 'connecting') return (
     <View style={[g.screen, { backgroundColor: '#0D0D1A' }]}>
       <View style={{ paddingTop: 52, paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <TouchableOpacity onPress={() => setStep('scan')} style={{ marginRight: 4 }}><Text style={[g.backLink, { color: '#9B8EFF' }]}>← Back</Text></TouchableOpacity>
         <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 18 }}>⚡</Text>
         </View>
@@ -10350,8 +13378,8 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
         <View style={[g.header, { paddingTop: 52 }]}>
           <TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Done</Text></TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={g.auraTitle}>Synergy Report</Text>
-            <Text style={g.auraSub}>AI-generated · {selected.name} · {new Date().toLocaleDateString()}</Text>
+            <Text style={[g.auraTitle, { color: t.text }]}>Synergy Report</Text>
+            <Text style={[g.auraSub, { color: t.textSub }]}>AI-generated · {selected.name} · {new Date().toLocaleDateString()}</Text>
           </View>
           <TouchableOpacity onPress={() => setStep('scan')} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: t.card, borderWidth: 1, borderColor: t.border }}>
             <Text style={{ fontSize: 12, color: t.textSub, fontWeight: '600' }}>Scan again</Text>
@@ -10553,7 +13581,7 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
           <TouchableOpacity style={g.dBack} onPress={() => { setOpenId(null); onRefresh() }}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
           <Image source={{ uri: conn.photo }} style={g.chatAvatar} />
           <View style={{ flex: 1 }}>
-            <Text style={g.chatName}>{conn.name}, {conn.age}</Text>
+            <Text style={[g.chatName, { color: t.text }]}>{conn.name}, {conn.age}</Text>
             <Text style={g.chatStatus}>{loading ? 'typing…' : isReal ? `🟢 ${conn.matchScore}% match` : `${conn.matchScore}% match`}</Text>
           </View>
           <TouchableOpacity
@@ -10631,15 +13659,27 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
         const realId = c.id.startsWith('real_') ? c.id.replace('real_', '') : null
         const unreadCount = realId ? (unread[realId] || 0) : 0
         const isLive = c.id.startsWith('real_')
+        const sectorMeta: Record<string, { label: string; color: string; bg: string }> = {
+          dating: { label: '💜 Dating', color: '#F66E8E', bg: '#F66E8E18' },
+          friends: { label: '😊 Friends', color: '#10B981', bg: '#10B98118' },
+          professional: { label: '💼 Professional', color: '#378ADD', bg: '#378ADD18' },
+          support: { label: '🤝 Support', color: '#F59E0B', bg: '#F59E0B18' },
+        }
+        const sector = sectorMeta[c.connectionType || 'dating']
         return (
-          <TouchableOpacity key={c.id} style={g.connRow} onPress={() => open(c)}>
+          <TouchableOpacity key={c.id} style={[g.connRow, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => open(c)}>
             <View style={{ position: 'relative' }}>
               <Image source={{ uri: c.photo }} style={g.connAvatar} />
               {isLive && <View style={{ position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#6EE6C0', borderWidth: 2, borderColor: '#fff' }} />}
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={g.connName}>{c.name}, {c.age}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[g.connName, { color: t.text }]}>{c.name}{c.age ? `, ${c.age}` : ''}</Text>
+                  <View style={{ backgroundColor: sector.bg, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: sector.color }}>{sector.label}</Text>
+                  </View>
+                </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   {unreadCount > 0 && (
                     <View style={{ backgroundColor: '#F66E8E', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
@@ -10662,6 +13702,148 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
 }
 
 // ════════════════════════════════════════════════════════════
+//  WHO LIKES ME — inline section in Explore, 4 sectors
+// ════════════════════════════════════════════════════════════
+const WHO_LIKES_SECTORS = [
+  { key: 'dating',       label: 'Daters',     emoji: '💜', color: '#F66E8E' },
+  { key: 'friends',      label: 'Friends',    emoji: '😊', color: '#10B981' },
+  { key: 'professional', label: 'Pro',        emoji: '💼', color: '#378ADD' },
+  { key: 'support',      label: 'Support',    emoji: '🤝', color: '#F59E0B' },
+] as const
+
+function WhoLikesMe({ profile, onMeetPeople }: { profile: UserProfile; onMeetPeople: (cat: 'romantic' | 'friends' | 'professional' | 'support', startAt?: string) => void }) {
+  const { t } = useT()
+  const [activeTab, setActiveTab] = useState<'dating' | 'friends' | 'professional' | 'support'>('dating')
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [isPremium, setIsPremium] = useState(profile.premium)
+
+  const likerNames = profile.likedYou ?? []
+  const allLikers = CANDIDATES.filter(c => likerNames.includes(c.name))
+  const demoLikers = CANDIDATES.slice(0, 6)
+
+  // Distribute candidates across sectors deterministically
+  const sectorLikers = (sectorKey: string) => {
+    const base = allLikers.length > 0 ? allLikers : demoLikers
+    return base.filter((_, i) => {
+      const keys = ['dating', 'friends', 'professional', 'support']
+      return keys[i % 4] === sectorKey
+    })
+  }
+
+  const current = WHO_LIKES_SECTORS.find(s => s.key === activeTab)!
+  const likers = sectorLikers(activeTab)
+  const totalCount = (allLikers.length > 0 ? allLikers : demoLikers).length
+
+  return (
+    <View style={{ marginTop: 28 }}>
+      {/* Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <View>
+          <Text style={{ fontSize: 20, fontWeight: '900', color: t.text, letterSpacing: -0.5 }}>{tr('who_likes_me')}</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>
+            {isPremium ? `${totalCount} ${tr('likes_you_count')}` : tr('unlock_likes')}
+          </Text>
+        </View>
+        {!isPremium && (
+          <View style={{ backgroundColor: '#F6379B18', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#F6379B40' }}>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: '#F6379B' }}>★ SOMA+</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Sector tabs */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+        {WHO_LIKES_SECTORS.map(s => {
+          const active = s.key === activeTab
+          return (
+            <TouchableOpacity
+              key={s.key}
+              onPress={() => setActiveTab(s.key)}
+              style={{
+                flex: 1, paddingVertical: 9, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: active ? s.color + '20' : t.card,
+                borderWidth: 1.5,
+                borderColor: active ? s.color : t.border,
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>{s.emoji}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: active ? s.color : t.textSub, marginTop: 2 }}>{s.label}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+
+      {/* Liker cards */}
+      {likers.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {likers.map((c, i) => (
+            <TouchableOpacity
+              key={c.name + i}
+              activeOpacity={isPremium ? 0.75 : 1}
+              onPress={() => isPremium ? onMeetPeople(activeTab as any, c.name) : setShowPaywall(true)}
+              style={{ width: '47%', borderRadius: 16, overflow: 'hidden', backgroundColor: t.card, borderWidth: 1, borderColor: t.border }}
+            >
+              <View style={{ position: 'relative' }}>
+                <Image
+                  source={{ uri: c.photo }}
+                  style={{ width: '100%', height: 120 }}
+                  resizeMode="cover"
+                  blurRadius={isPremium ? 0 : 20}
+                />
+                {!isPremium && (
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
+                    <Text style={{ fontSize: 28 }}>🔒</Text>
+                  </View>
+                )}
+                <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: current.color, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{current.emoji}</Text>
+                </View>
+              </View>
+              <View style={{ padding: 10 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>
+                  {isPremium ? `${c.name}, ${c.age}` : '••••, ••'}
+                </Text>
+                <Text style={{ fontSize: 12, color: t.textSub, marginTop: 2 }} numberOfLines={1}>
+                  {isPremium ? c.location : '••••••'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (
+        <View style={{ alignItems: 'center', paddingVertical: 32, backgroundColor: t.card, borderRadius: 16, borderWidth: 1, borderColor: t.border }}>
+          <Text style={{ fontSize: 36, marginBottom: 8 }}>{current.emoji}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>No {current.label} likes yet</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 4 }}>{tr('keep_exploring')}</Text>
+        </View>
+      )}
+
+      {/* Premium upsell */}
+      {!isPremium && (
+        <TouchableOpacity
+          onPress={() => setShowPaywall(true)}
+          style={{ marginTop: 14, borderRadius: 16, padding: 16, backgroundColor: '#F6379B', alignItems: 'center', flexDirection: 'row', gap: 12 }}
+        >
+          <Text style={{ fontSize: 22 }}>★</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>{tr('see_who_likes')}</Text>
+            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>{tr('unlock_all').replace('{n}', String(totalCount))}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {showPaywall && (
+        <SomaPlusPaywall
+          onClose={() => setShowPaywall(false)}
+          onSuccess={() => { setShowPaywall(false); setIsPremium(true) }}
+        />
+      )}
+    </View>
+  )
+}
+
+// ════════════════════════════════════════════════════════════
 //  WHO LIKED YOU — premium
 // ════════════════════════════════════════════════════════════
 function LikedYou({ profile, onBack, onUpgrade }: { profile: UserProfile; onBack: () => void; onUpgrade: () => void }) {
@@ -10673,12 +13855,12 @@ function LikedYou({ profile, onBack, onUpgrade }: { profile: UserProfile; onBack
     <View style={[g.screen, { backgroundColor: t.bg }]}>
       <ScrollView contentContainerStyle={g.homePad}>
         <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Back</Text></TouchableOpacity></View>
-        <Text style={g.logo}>Who Liked You</Text>
+        <Text style={g.logo}>{tr('who_likes_me')}</Text>
         <Text style={g.logoSub}>{list.length} people liked you first.</Text>
         <View style={{ height: 16 }} />
         <View style={g.likedGrid}>
           {list.map((c, i) => (
-            <View key={c.name} style={g.likedCard}>
+            <View key={c.name} style={[g.likedCard, { backgroundColor: t.card }]}>
               <Image source={{ uri: c.photo }} style={[g.likedPhoto, !profile.premium && g.blurred]} blurRadius={profile.premium ? 0 : 18} />
               <View style={g.likedInfo}>
                 <Text style={g.likedName}>{profile.premium ? `${c.name}, ${c.age}` : '••••, ••'}</Text>
@@ -10688,7 +13870,7 @@ function LikedYou({ profile, onBack, onUpgrade }: { profile: UserProfile; onBack
           ))}
         </View>
         {!profile.premium && (
-          <View style={g.likedUpsell}>
+          <View style={[g.likedUpsell, { backgroundColor: t.card }]}>
             <Text style={g.likedUpsellTitle}>★ See who likes you</Text>
             <Text style={g.likedUpsellSub}>Premium reveals everyone who liked you, plus {PREMIUM_DAILY_LIKES} likes a day and unlimited chats.</Text>
             <TouchableOpacity style={g.paywallBtn} onPress={() => setShowPaywall(true)}>
@@ -10731,7 +13913,7 @@ function DiaryHistory({ profile, onBack }: { profile: UserProfile; onBack: () =>
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={g.homePad} keyboardShouldPersistTaps="handled">
       <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Back</Text></TouchableOpacity></View>
-      <Text style={g.logo}>Your Diary</Text>
+      <Text style={g.logo}>{tr('your_diary')}</Text>
       <Text style={g.logoSub}>{profile.diary.length} {profile.diary.length === 1 ? 'entry' : 'entries'} · your story over time.</Text>
       <View style={{ height: 14 }} />
 
@@ -10772,7 +13954,7 @@ function DiaryHistory({ profile, onBack }: { profile: UserProfile; onBack: () =>
       {profile.diary.length === 0 ? (
         <View style={[g.centerWrap, { paddingTop: 60 }]}>
           <Text style={g.bigOrbIcon}>📖</Text>
-          <Text style={[g.startSub, { marginTop: 20 }]}>No diary entries yet.{'\n'}Reflect with Soma on the home screen.</Text>
+          <Text style={[g.startSub, { marginTop: 20 }]}>{tr('no_diary')}</Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={[g.centerWrap, { paddingTop: 40 }]}>
@@ -11103,12 +14285,13 @@ Return this JSON (no extra text):
 function SettingRow({ icon, title, subtitle, onPress, right, danger, last }: {
   icon: string; title: string; subtitle?: string; onPress?: () => void; right?: any; danger?: boolean; last?: boolean
 }) {
+  const { t } = useT()
   const Wrap: any = onPress ? TouchableOpacity : View
   return (
     <Wrap onPress={onPress} activeOpacity={0.7} style={[g.setRow2, last && { borderBottomWidth: 0 }]}>
       <View style={[g.setIconWrap, danger && { backgroundColor: '#FCEAEA' }]}><Text style={{ fontSize: 18 }}>{icon}</Text></View>
       <View style={{ flex: 1 }}>
-        <Text style={[g.setTitle, danger && { color: '#E8636F' }]}>{title}</Text>
+        <Text style={[g.setTitle, { color: t.text }, danger && { color: '#E8636F' }]}>{title}</Text>
         {!!subtitle && <Text style={g.setSub}>{subtitle}</Text>}
       </View>
       {right !== undefined ? right : (onPress ? <Text style={g.setChevron}>›</Text> : null)}
@@ -11117,19 +14300,22 @@ function SettingRow({ icon, title, subtitle, onPress, right, danger, last }: {
 }
 
 // ── Twinby-style settings row ──────────────────────────────
-function StgRow({ icon, label, value, onPress, danger, last }: {
-  icon: string; label: string; value?: string; onPress?: () => void; danger?: boolean; last?: boolean
+function StgRow({ icon, label, value, onPress, danger, last, iconBg }: {
+  icon: string; label: string; value?: string; onPress?: () => void; danger?: boolean; last?: boolean; iconBg?: string
 }) {
+  const { t } = useT()
   const Wrap: any = onPress ? TouchableOpacity : View
   return (
-    <Wrap onPress={onPress} activeOpacity={0.6}
-      style={[g.stgRow, last && { borderBottomWidth: 0 }]}>
-      <View style={g.stgIconCircle}><Text style={g.stgIconTxt}>{icon}</Text></View>
-      <View style={{ flex: 1 }}>
-        <Text style={[g.stgLabel, danger && { color: '#E8636F' }]}>{label}</Text>
-        {!!value && <Text style={g.stgValue}>{value}</Text>}
+    <Wrap onPress={onPress} activeOpacity={0.65}
+      style={[g.stgRow, { backgroundColor: t.card, borderBottomColor: t.border }, last && { borderBottomWidth: 0 }]}>
+      <View style={[g.stgIconCircle, iconBg ? { backgroundColor: iconBg } : {}]}>
+        <Text style={g.stgIconTxt}>{icon}</Text>
       </View>
-      {onPress && <Text style={[g.stgChevron, danger && { color: '#E8636F' }]}>›</Text>}
+      <View style={{ flex: 1 }}>
+        <Text style={[g.stgLabel, { color: danger ? '#E8636F' : t.text }]}>{label}</Text>
+        {!!value && <Text style={[g.stgValue, { color: t.textSub }]} numberOfLines={1}>{value}</Text>}
+      </View>
+      {onPress && <Ionicons name="chevron-forward" size={15} color={danger ? '#E8636F' : t.textTertiary || t.textSub} />}
     </Wrap>
   )
 }
@@ -11179,9 +14365,9 @@ function ThankfulDiary({ profile, onBack, onRefresh }: { profile: UserProfile; o
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 80 }}>
       {/* Header */}
-      <View style={g.stgHeader}>
-        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={g.stgHeaderTitle}>Thankful Diary</Text>
+      <View style={[g.stgHeader, { backgroundColor: t.card }]}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={[g.stgBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: t.text }]}>{tr('thankful_diary')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -11195,35 +14381,35 @@ function ThankfulDiary({ profile, onBack, onRefresh }: { profile: UserProfile; o
         )}
 
         {/* Today's card */}
-        <View style={g.gratCard2}>
+        <View style={[g.gratCard2, { backgroundColor: t.card, borderColor: t.border }]}>
           <Text style={g.gratDate}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
-          <Text style={g.gratHeading}>Today I am grateful for…</Text>
+          <Text style={[g.gratHeading, { color: t.text }]}>{tr('grateful_for')}</Text>
 
           {saved ? (
             <>
               {items.filter(x => x.trim()).map((item, i) => (
                 <View key={i} style={g.gratSavedItem}>
                   <Text style={g.gratNum}>{i + 1}</Text>
-                  <Text style={g.gratItemTxt}>{item}</Text>
+                  <Text style={[g.gratItemTxt, { color: t.text }]}>{item}</Text>
                 </View>
               ))}
               {!!somaNote && (
-                <View style={g.gratSomaNote}>
+                <View style={[g.gratSomaNote, { backgroundColor: t.card2 }]}>
                   <Text style={g.gratSomaName}>{aiName}</Text>
-                  <Text style={g.gratSomaTxt}>{somaNote}</Text>
+                  <Text style={[g.gratSomaTxt, { color: t.textSub }]}>{somaNote}</Text>
                 </View>
               )}
               <TouchableOpacity style={g.gratEditBtn} onPress={() => setSaved(false)}>
-                <Text style={g.gratEditTxt}>Edit today's entry</Text>
+                <Text style={g.gratEditTxt}>{tr('edit_entry')}</Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
               {GRATITUDE_PROMPTS.map((prompt, i) => (
                 <View key={i} style={{ marginBottom: 12 }}>
-                  <Text style={g.gratLabel}>{i + 1}. {prompt}</Text>
+                  <Text style={[g.gratLabel, { color: t.textSub }]}>{i + 1}. {prompt}</Text>
                   <TextInput
-                    style={g.gratInput}
+                    style={[g.gratInput, { backgroundColor: t.card2, color: t.text, borderColor: t.border }]}
                     value={items[i]}
                     onChangeText={v => setItems(prev => { const n = [...prev]; n[i] = v; return n })}
                     placeholder="Write anything…"
@@ -11248,10 +14434,10 @@ function ThankfulDiary({ profile, onBack, onRefresh }: { profile: UserProfile; o
           <>
             <Text style={[g.secLabel, { marginTop: 28, marginBottom: 12 }]}>PAST ENTRIES</Text>
             {past.map(entry => (
-              <View key={entry.id} style={g.gratPastCard}>
+              <View key={entry.id} style={[g.gratPastCard, { backgroundColor: t.card, borderColor: t.border }]}>
                 <Text style={g.gratPastDate}>{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
                 {entry.items.filter(x => x.trim()).map((item, i) => (
-                  <Text key={i} style={g.gratPastItem}>· {item}</Text>
+                  <Text key={i} style={[g.gratPastItem, { color: t.textSub }]}>· {item}</Text>
                 ))}
               </View>
             ))}
@@ -11336,9 +14522,9 @@ function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; on
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 80 }}>
       {/* Header */}
-      <View style={g.stgHeader}>
-        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={g.stgHeaderTitle}>Love Yourself</Text>
+      <View style={[g.stgHeader, { backgroundColor: t.card }]}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={[g.stgBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: t.text }]}>Love Yourself</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -11351,21 +14537,21 @@ function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; on
         )}
 
         {/* Affirmation of the day */}
-        <View style={g.affirmCard}>
+        <View style={[g.affirmCard, { backgroundColor: t.card2, borderColor: t.border }]}>
           <Text style={g.affirmLabel}>TODAY'S AFFIRMATION</Text>
-          <Text style={g.affirmTxt}>"{affirmation}"</Text>
+          <Text style={[g.affirmTxt, { color: t.text }]}>"{affirmation}"</Text>
           <Text style={g.affirmHint}>Read it slowly. Breathe. Let it land.</Text>
         </View>
 
         {/* Self-care checklist */}
         <Text style={[g.secLabel, { marginTop: 24, marginBottom: 12 }]}>HOW DID YOU CARE FOR YOURSELF?</Text>
-        <View style={g.loveChecklist}>
+        <View style={[g.loveChecklist, { backgroundColor: t.card, borderColor: t.border }]}>
           {SELF_CARE_CHECKS.map(item => {
             const checked = !!checks[item.key]
             return (
               <TouchableOpacity key={item.key} style={[g.loveCheck, checked && g.loveCheckDone]} onPress={() => toggle(item.key)} activeOpacity={0.7}>
                 <Text style={g.loveCheckEmoji}>{item.emoji}</Text>
-                <Text style={[g.loveCheckTxt, checked && { color: t.accent }]}>{item.label}</Text>
+                <Text style={[g.loveCheckTxt, { color: t.text }, checked && { color: t.accent }]}>{item.label}</Text>
                 <View style={[g.loveCheckBox, checked && g.loveCheckBoxDone]}>
                   {checked && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
                 </View>
@@ -11380,7 +14566,7 @@ function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; on
         {/* Note to self */}
         <Text style={[g.secLabel, { marginTop: 24, marginBottom: 10 }]}>A NOTE TO YOURSELF</Text>
         <TextInput
-          style={g.loveNoteInput}
+          style={[g.loveNoteInput, { backgroundColor: t.card2, color: t.text, borderColor: t.border }]}
           value={note}
           onChangeText={saved ? undefined : setNote}
           editable={!saved}
@@ -11408,9 +14594,9 @@ function LoveYourself({ profile, onBack, onRefresh }: { profile: UserProfile; on
             {past.map(entry => {
               const done = Object.values(entry.checks).filter(Boolean).length
               return (
-                <View key={entry.id} style={g.lovePastCard}>
+                <View key={entry.id} style={[g.lovePastCard, { backgroundColor: t.card, borderColor: t.border }]}>
                   <Text style={g.gratPastDate}>{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                  <Text style={g.lovePastAffirm} numberOfLines={2}>"{entry.affirmation}"</Text>
+                  <Text style={[g.lovePastAffirm, { color: t.textSub }]} numberOfLines={2}>"{entry.affirmation}"</Text>
                   <Text style={g.lovePastChecks}>{done}/{SELF_CARE_CHECKS.length} self-care · {entry.note ? '📝 note' : ''}</Text>
                 </View>
               )
@@ -11601,14 +14787,14 @@ function HealthHub({ profile, onBack, onRefresh, onMedication, onBreathing }: { 
 
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 48 }}>
-      <View style={g.stgHeader}>
-        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={g.stgHeaderTitle}>❤️‍🩹 Health Hub</Text>
+      <View style={[g.stgHeader, { backgroundColor: t.card }]}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={[g.stgBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: t.text }]}>❤️‍🩹 Health Hub</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {/* Quick stats strip */}
-      <View style={g.healthStatsStrip}>
+      <View style={[g.healthStatsStrip, { backgroundColor: t.card, borderColor: t.border }]}>
         {[
           { emoji: '🚶', val: todayLog?.steps?.toLocaleString() ?? '—', lbl: 'Steps', color: '#6E8BF6' },
           { emoji: '😴', val: todayLog?.sleepHours ? `${todayLog.sleepHours}h` : '—', lbl: 'Sleep', color: '#A89BFA' },
@@ -11624,10 +14810,10 @@ function HealthHub({ profile, onBack, onRefresh, onMedication, onBreathing }: { 
       </View>
 
       {/* Tab bar */}
-      <View style={g.tabRow}>
-        {([['dashboard','Today'],['log','Log Data'],['connect','Devices']] as [string,string][]).map(([t, label]) => (
-          <TouchableOpacity key={t} style={[g.tabBtn, tab === t && g.tabBtnActive]} onPress={() => setTab(t as any)}>
-            <Text style={[g.tabBtnTxt, tab === t && g.tabBtnTxtActive]}>{label}</Text>
+      <View style={[g.tabRow, { backgroundColor: t.card2 }]}>
+        {([['dashboard','Today'],['log','Log Data'],['connect','Devices']] as [string,string][]).map(([k, label]) => (
+          <TouchableOpacity key={k} style={[g.tabBtn, tab === k && [g.tabBtnActive, { backgroundColor: t.card }]]} onPress={() => setTab(k as any)}>
+            <Text style={[g.tabBtnTxt, tab === k && [g.tabBtnTxtActive, { color: t.text }]]}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -11643,28 +14829,28 @@ function HealthHub({ profile, onBack, onRefresh, onMedication, onBreathing }: { 
           <MetricBar label="Resting HR" emoji="❤️" value={todayLog?.heartRate} goal={METRIC_GOALS.heartRate} unit="bpm" color="#F66E8E" />
           {todayLog?.calories !== undefined && <MetricBar label="Calories burned" emoji="🔥" value={todayLog?.calories} goal={500} unit="kcal" color="#F6A86E" />}
           {todayLog?.weight !== undefined && (
-            <View style={g.metricBar}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#222540' }}>⚖️ Weight</Text>
+            <View style={[g.metricBar, { backgroundColor: t.card, borderColor: t.border }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.text }}>⚖️ Weight</Text>
               <Text style={{ fontSize: 18, fontWeight: '800', color: '#7B6EF6', textAlign: 'right' }}>{todayLog.weight} kg</Text>
             </View>
           )}
 
           {/* Medication adherence */}
           {activeMeds.length > 0 && (
-            <View style={[g.healthDataPanel, { marginTop: 16 }]}>
+            <View style={[g.healthDataPanel, { marginTop: 16, backgroundColor: t.card, borderColor: t.border }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text style={g.lbSectionLabel}>MEDICATIONS TODAY</Text>
                 <TouchableOpacity onPress={onMedication}><Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '700' }}>Manage →</Text></TouchableOpacity>
               </View>
               {activeMeds.map(med => {
-                const takenCount = med.times.filter(t => todayMedLog?.taken[`${med.id}_${t}`]).length
+                const takenCount = med.times.filter(ti => todayMedLog?.taken[`${med.id}_${ti}`]).length
                 const pct = med.times.length > 0 ? Math.round((takenCount / med.times.length) * 100) : 0
                 return (
                   <View key={med.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <View style={[g.medDot, { backgroundColor: med.color, width: 10, height: 10 }]} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#222540' }}>{med.name} <Text style={{ color: '#9A9DB2', fontWeight: '400' }}>{med.dosage}</Text></Text>
-                      <View style={{ height: 4, backgroundColor: '#F0EFF8', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: t.text }}>{med.name} <Text style={{ color: t.textTertiary, fontWeight: '400' }}>{med.dosage}</Text></Text>
+                      <View style={{ height: 4, backgroundColor: t.border, borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
                         <View style={{ width: `${pct}%`, height: 4, backgroundColor: pct === 100 ? '#6EE6C0' : med.color, borderRadius: 2 }} />
                       </View>
                     </View>
@@ -11677,13 +14863,13 @@ function HealthHub({ profile, onBack, onRefresh, onMedication, onBreathing }: { 
 
           {/* 7-day mini chart */}
           <Text style={[g.lbSectionLabel, { marginTop: 20, marginBottom: 12 }]}>THIS WEEK</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E9E6F2' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: t.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: t.border }}>
             {week7.map((w, i) => {
               const stepH = w.log?.steps ? Math.min(60, Math.round((w.log.steps / METRIC_GOALS.steps) * 60)) : 0
               const isToday = w.date === today
               return (
                 <View key={i} style={{ alignItems: 'center', gap: 4 }}>
-                  <View style={{ height: 60, width: 16, justifyContent: 'flex-end', borderRadius: 4, backgroundColor: '#F0EFF8', overflow: 'hidden' }}>
+                  <View style={{ height: 60, width: 16, justifyContent: 'flex-end', borderRadius: 4, backgroundColor: t.border, overflow: 'hidden' }}>
                     {stepH > 0 && <View style={{ height: stepH, backgroundColor: isToday ? '#7B6EF6' : '#A89BFA', borderRadius: 4 }} />}
                   </View>
                   {w.medPct !== null && (
@@ -11703,10 +14889,10 @@ function HealthHub({ profile, onBack, onRefresh, onMedication, onBreathing }: { 
           )}
 
           {/* Breathing exercise entry point */}
-          <TouchableOpacity onPress={onBreathing} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF7FF', borderRadius: 16, padding: 16, marginTop: 16, gap: 14 }}>
+          <TouchableOpacity onPress={onBreathing} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card2, borderRadius: 16, padding: 16, marginTop: 16, gap: 14 }}>
             <Text style={{ fontSize: 28 }}>🫁</Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540' }}>Breathing Exercise</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>Breathing Exercise</Text>
               <Text style={{ fontSize: 12, color: '#6E7191', marginTop: 2 }}>4-7-8 calm breathing · 2 min</Text>
             </View>
             <Text style={{ fontSize: 16, color: '#3B82F6' }}>→</Text>
@@ -11741,9 +14927,9 @@ function HealthHub({ profile, onBack, onRefresh, onMedication, onBreathing }: { 
             <Text style={g.saveBtnTxt}>Save health data ✓</Text>
           </TouchableOpacity>
 
-          <View style={{ backgroundColor: '#F3F0FF', borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1, borderColor: '#7B6EF620' }}>
+          <View style={{ backgroundColor: t.card2, borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1, borderColor: '#7B6EF620' }}>
             <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '700', marginBottom: 4 }}>💡 Tip: Connect a device for automatic sync</Text>
-            <Text style={{ fontSize: 12, color: '#666' }}>Apple Watch, Fitbit and Google Fit can sync your data automatically without manual entry.</Text>
+            <Text style={{ fontSize: 12, color: t.textSub }}>Apple Watch, Fitbit and Google Fit can sync your data automatically without manual entry.</Text>
             <TouchableOpacity onPress={() => setTab('connect')} style={{ marginTop: 8 }}>
               <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '700' }}>Connect devices →</Text>
             </TouchableOpacity>
@@ -11760,11 +14946,11 @@ function HealthHub({ profile, onBack, onRefresh, onMedication, onBreathing }: { 
           {HEALTH_APPS.map(app => {
             const connected = connectedApps.includes(app.id)
             return (
-              <View key={app.id} style={[g.deviceRow, connected && { borderColor: app.color + '60', backgroundColor: app.color + '05' }]}>
+              <View key={app.id} style={[g.deviceRow, { backgroundColor: t.card, borderColor: t.border }, connected && { borderColor: app.color + '60', backgroundColor: app.color + '05' }]}>
                 <HealthAppLogo id={app.id} size={52} />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#222540' }}>{app.name}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: t.text }}>{app.name}</Text>
                     <View style={{ backgroundColor: '#F0EFF8', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
                       <Text style={{ fontSize: 10, color: '#9A9DB2', fontWeight: '700' }}>{app.platform}</Text>
                     </View>
@@ -11810,6 +14996,7 @@ const MED_TIMES = [
 ]
 
 function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const { t } = useT()
   const today = new Date().toISOString().slice(0, 10)
   const [tab, setTab] = useState<'today' | 'add' | 'history'>('today')
   const [newName, setNewName] = useState('')
@@ -11876,9 +15063,9 @@ function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfil
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Header */}
-      <View style={g.stgHeader}>
-        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={g.stgHeaderTitle}>💊 Medications</Text>
+      <View style={[g.stgHeader, { backgroundColor: t.card }]}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={[g.stgBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: t.text }]}>💊 Medications</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -11894,11 +15081,11 @@ function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfil
       )}
 
       {/* Tab bar */}
-      <View style={g.tabRow}>
-        {(['today','add','history'] as const).map(t => (
-          <TouchableOpacity key={t} style={[g.tabBtn, tab === t && g.tabBtnActive]} onPress={() => setTab(t)}>
-            <Text style={[g.tabBtnTxt, tab === t && g.tabBtnTxtActive]}>
-              {t === 'today' ? 'Today' : t === 'add' ? '+ Add Med' : 'History'}
+      <View style={[g.tabRow, { backgroundColor: t.card2 }]}>
+        {(['today','add','history'] as const).map(k => (
+          <TouchableOpacity key={k} style={[g.tabBtn, tab === k && [g.tabBtnActive, { backgroundColor: t.card }]]} onPress={() => setTab(k)}>
+            <Text style={[g.tabBtnTxt, tab === k && [g.tabBtnTxtActive, { color: t.text }]]}>
+              {k === 'today' ? 'Today' : k === 'add' ? '+ Add Med' : 'History'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -11908,12 +15095,12 @@ function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfil
       {tab === 'today' && (
         <View style={{ paddingHorizontal: 20 }}>
           {total > 0 && (
-            <View style={g.medProgressCard}>
+            <View style={[g.medProgressCard, { backgroundColor: t.card, borderColor: t.border }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540' }}>Today's doses</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>Today's doses</Text>
                 <Text style={{ fontSize: 14, fontWeight: '800', color: pct === 100 ? '#6EE6C0' : '#7B6EF6' }}>{done}/{total} taken</Text>
               </View>
-              <View style={{ height: 8, backgroundColor: '#E9E6F2', borderRadius: 4, overflow: 'hidden' }}>
+              <View style={{ height: 8, backgroundColor: t.border, borderRadius: 4, overflow: 'hidden' }}>
                 <View style={{ width: `${pct}%`, height: 8, backgroundColor: pct === 100 ? '#6EE6C0' : '#7B6EF6', borderRadius: 4 }} />
               </View>
               {pct === 100 && <Text style={{ textAlign: 'center', marginTop: 8, fontSize: 13, color: '#6EE6C0', fontWeight: '700' }}>✓ All done for today! Great job 🎉</Text>}
@@ -11921,16 +15108,16 @@ function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfil
           )}
 
           {activeMeds.length === 0 ? (
-            <TouchableOpacity style={g.emptyCircle} onPress={() => setTab('add')}>
-              <Text style={g.emptyCircleTxt}>No medications yet. Tap "+ Add Med" to start tracking.</Text>
+            <TouchableOpacity style={[g.emptyCircle, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => setTab('add')}>
+              <Text style={[g.emptyCircleTxt, { color: t.textSub }]}>No medications yet. Tap "+ Add Med" to start tracking.</Text>
             </TouchableOpacity>
           ) : (
             activeMeds.map(med => (
-              <View key={med.id} style={[g.medCard2, { borderLeftColor: med.color }]}>
+              <View key={med.id} style={[g.medCard2, { backgroundColor: t.card, borderColor: t.border, borderLeftColor: med.color }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                   <View style={[g.medDot, { backgroundColor: med.color }]} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#222540' }}>{med.name}</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: t.text }}>{med.name}</Text>
                     {med.dosage ? <Text style={{ fontSize: 12, color: '#9A9DB2' }}>{med.dosage}</Text> : null}
                   </View>
                   <TouchableOpacity onPress={() => { DB.removeMedication(med.id); onRefresh() }}>
@@ -11972,14 +15159,14 @@ function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfil
           <TextInput style={g.input} placeholder="e.g. 50mg, 1 tablet" value={newDosage} onChangeText={setNewDosage} />
           <Text style={g.fieldLabel}>When to take</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-            {MED_TIMES.map(t => (
+            {MED_TIMES.map(mt => (
               <TouchableOpacity
-                key={t.key}
-                style={[g.timeChip, newTimes.includes(t.key) && g.timeChipActive]}
-                onPress={() => setNewTimes(prev => prev.includes(t.key) ? prev.filter(x => x !== t.key) : [...prev, t.key])}
+                key={mt.key}
+                style={[g.timeChip, newTimes.includes(mt.key) && g.timeChipActive]}
+                onPress={() => setNewTimes(prev => prev.includes(mt.key) ? prev.filter(x => x !== mt.key) : [...prev, mt.key])}
               >
-                <Text style={{ fontSize: 16 }}>{t.emoji}</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: newTimes.includes(t.key) ? '#fff' : '#222540' }}>{t.label}</Text>
+                <Text style={{ fontSize: 16 }}>{mt.emoji}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: newTimes.includes(mt.key) ? '#fff' : t.text }}>{mt.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -12003,7 +15190,7 @@ function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfil
       {tab === 'history' && (
         <View style={{ paddingHorizontal: 20 }}>
           {logs.length === 0 ? (
-            <View style={g.emptyCircle}><Text style={g.emptyCircleTxt}>No history yet. Start tracking today!</Text></View>
+            <View style={[g.emptyCircle, { backgroundColor: t.card, borderColor: t.border }]}><Text style={[g.emptyCircleTxt, { color: t.textSub }]}>No history yet. Start tracking today!</Text></View>
           ) : (
             logs.slice(0, 30).map(log => {
               const meds = profile.medications || []
@@ -12012,12 +15199,12 @@ function MedicationTracker({ profile, onBack, onRefresh }: { profile: UserProfil
               const totalCount = allDoses.length
               const pctDay = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0
               return (
-                <View key={log.date} style={[g.histRow, { marginBottom: 10 }]}>
+                <View key={log.date} style={[g.histRow, { marginBottom: 10, backgroundColor: t.card, borderColor: t.border }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#222540' }}>{log.date}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>{log.date}</Text>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: pctDay === 100 ? '#6EE6C0' : pctDay >= 50 ? '#F6C26E' : '#F66E8E' }}>{pctDay}%</Text>
                   </View>
-                  <View style={{ height: 6, backgroundColor: '#E9E6F2', borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ height: 6, backgroundColor: t.border, borderRadius: 3, overflow: 'hidden' }}>
                     <View style={{ width: `${pctDay}%`, height: 6, backgroundColor: pctDay === 100 ? '#6EE6C0' : pctDay >= 50 ? '#F6C26E' : '#F66E8E', borderRadius: 3 }} />
                   </View>
                   <Text style={{ fontSize: 11, color: '#9A9DB2', marginTop: 3 }}>{takenCount}/{totalCount} doses taken</Text>
@@ -12098,9 +15285,9 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Header */}
-      <View style={g.stgHeader}>
-        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={g.stgHeaderTitle}>🧠 Therapy & Support</Text>
+      <View style={[g.stgHeader, { backgroundColor: t.card }]}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={[g.stgBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: t.text }]}>🧠 Therapy & Support</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -12117,10 +15304,10 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
       </View>
 
       {/* Tab bar */}
-      <View style={g.tabRow}>
-        {([['support','Resources'],['soma',`Talk to ${aiName}`],['sessions','My Sessions']] as [string,string][]).map(([t, label]) => (
-          <TouchableOpacity key={t} style={[g.tabBtn, tab === t && g.tabBtnActive]} onPress={() => setTab(t as any)}>
-            <Text style={[g.tabBtnTxt, tab === t && g.tabBtnTxtActive]}>{label}</Text>
+      <View style={[g.tabRow, { backgroundColor: t.card2 }]}>
+        {([['support','Resources'],['soma',`Talk to ${aiName}`],['sessions','My Sessions']] as [string,string][]).map(([k, label]) => (
+          <TouchableOpacity key={k} style={[g.tabBtn, tab === k && [g.tabBtnActive, { backgroundColor: t.card }]]} onPress={() => setTab(k as any)}>
+            <Text style={[g.tabBtnTxt, tab === k && [g.tabBtnTxtActive, { color: t.text }]]}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -12156,9 +15343,9 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
           {/* Crisis lines */}
           <Text style={[g.secLabel, { marginBottom: 12 }]}>CRISIS HOTLINES</Text>
           {CRISIS_LINES.map(line => (
-            <View key={line.name} style={g.crisisRow}>
-              <Text style={{ fontSize: 12, color: '#9A9DB2', marginBottom: 2 }}>{line.country}</Text>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: '#222540' }}>{line.name}</Text>
+            <View key={line.name} style={[g.crisisRow, { backgroundColor: t.card }]}>
+              <Text style={{ fontSize: 12, color: t.textTertiary, marginBottom: 2 }}>{line.country}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: t.text }}>{line.name}</Text>
               <Text style={{ fontSize: 13, color: '#E8636F', fontWeight: '700', marginTop: 2 }}>{line.contact}</Text>
             </View>
           ))}
@@ -12166,10 +15353,10 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
           {/* Online therapy platforms */}
           <Text style={[g.secLabel, { marginTop: 20, marginBottom: 12 }]}>FIND A THERAPIST</Text>
           {THERAPY_PLATFORMS.map(p => (
-            <View key={p.name} style={g.therapyPlatformRow}>
+            <View key={p.name} style={[g.therapyPlatformRow, { backgroundColor: t.card, borderColor: t.border }]}>
               <Text style={{ fontSize: 24, marginRight: 12 }}>{p.emoji}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#222540' }}>{p.name}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: t.text }}>{p.name}</Text>
                 <Text style={{ fontSize: 12, color: '#9A9DB2' }}>{p.desc}</Text>
               </View>
               <Text style={{ fontSize: 18, color: '#7B6EF6' }}>→</Text>
@@ -12186,7 +15373,7 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
             <Text style={{ fontSize: 14, fontWeight: '700', color: '#7B6EF6', marginBottom: 4 }}>Talk to {aiName} about how you feel</Text>
             <Text style={{ fontSize: 13, color: '#666' }}>{aiName} uses evidence-based techniques — CBT, ACT, mindfulness — to support your recovery. Always confidential, always caring.</Text>
           </View>
-          <Text style={g.fieldLabel}>How are you feeling right now?</Text>
+          <Text style={g.fieldLabel}>{tr('feeling_now')}</Text>
           <TextInput
             style={[g.input, { height: 120, textAlignVertical: 'top' }]}
             placeholder={`Write freely — ${aiName} is listening. How are you really doing? What's weighing on you?`}
@@ -12209,13 +15396,13 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
                 style={[g.saveBtn, { backgroundColor: '#6EE6C0', marginTop: 12, opacity: savingSession ? 0.5 : 1 }]}
                 onPress={saveSession} disabled={savingSession}
               >
-                <Text style={[g.saveBtnTxt, { color: '#222540' }]}>Save this session ✓</Text>
+                <Text style={[g.saveBtnTxt, { color: '#1a3a2a' }]}>Save this session ✓</Text>
               </TouchableOpacity>
             </View>
           ) : null}
 
-          <View style={{ backgroundColor: '#F5F4FA', borderRadius: 12, padding: 12, marginTop: 8 }}>
-            <Text style={{ fontSize: 12, color: '#9A9DB2', textAlign: 'center' }}>
+          <View style={{ backgroundColor: t.card2, borderRadius: 12, padding: 12, marginTop: 8 }}>
+            <Text style={{ fontSize: 12, color: t.textTertiary, textAlign: 'center' }}>
               {aiName} is an AI companion, not a licensed therapist. In a crisis, please call a crisis line. 💙
             </Text>
           </View>
@@ -12226,18 +15413,18 @@ function TherapyConnect({ profile, onBack, onRefresh }: { profile: UserProfile; 
       {tab === 'sessions' && (
         <View style={{ paddingHorizontal: 20 }}>
           {sessions.length === 0 ? (
-            <TouchableOpacity style={g.emptyCircle} onPress={() => setTab('soma')}>
-              <Text style={g.emptyCircleTxt}>No sessions yet. Talk to {aiName} to record your first session.</Text>
+            <TouchableOpacity style={[g.emptyCircle, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => setTab('soma')}>
+              <Text style={[g.emptyCircleTxt, { color: t.textSub }]}>No sessions yet. Talk to {aiName} to record your first session.</Text>
             </TouchableOpacity>
           ) : (
             sessions.slice(0, 20).map(s => (
-              <View key={s.id} style={[g.histRow, { marginBottom: 14 }]}>
-                <Text style={{ fontSize: 12, color: '#9A9DB2', marginBottom: 4 }}>{s.date}</Text>
-                <Text style={{ fontSize: 14, color: '#222540', marginBottom: 8 }} numberOfLines={3}>{s.notes}</Text>
+              <View key={s.id} style={[g.histRow, { marginBottom: 14, backgroundColor: t.card, borderColor: t.border }]}>
+                <Text style={{ fontSize: 12, color: t.textTertiary, marginBottom: 4 }}>{s.date}</Text>
+                <Text style={{ fontSize: 14, color: t.text, marginBottom: 8 }} numberOfLines={3}>{s.notes}</Text>
                 {s.somaReflection && (
-                  <View style={{ backgroundColor: '#7B6EF608', borderRadius: 10, padding: 10, borderLeftWidth: 3, borderLeftColor: '#7B6EF6' }}>
+                  <View style={{ backgroundColor: t.card2, borderRadius: 10, padding: 10, borderLeftWidth: 3, borderLeftColor: '#7B6EF6' }}>
                     <Text style={{ fontSize: 11, color: '#7B6EF6', fontWeight: '700', marginBottom: 2 }}>🧠 {aiName}</Text>
-                    <Text style={{ fontSize: 12, color: '#555', fontStyle: 'italic' }} numberOfLines={4}>{s.somaReflection}</Text>
+                    <Text style={{ fontSize: 12, color: t.textSub, fontStyle: 'italic' }} numberOfLines={4}>{s.somaReflection}</Text>
                   </View>
                 )}
               </View>
@@ -12266,6 +15453,7 @@ const GRATITUDE_TIME_OPTIONS = [
 ]
 
 function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: UserProfile; onBack: () => void; onRefresh: () => void }) {
+  const { t } = useT()
   const ns = profile.notifSettings ?? { enabled: false, medReminders: true, morningEnabled: false, morningHour: 8, morningMinute: 0, diaryEnabled: false, diaryHour: 21, diaryMinute: 0, moodEnabled: false, moodHour: 12, moodMinute: 0, gratitudeEnabled: true, gratitudeHour: 21, gratitudeMinute: 0, streakEnabled: false, streakHour: 19, streakMinute: 0, matchAlertsEnabled: true }
   const [enabled, setEnabled] = useState(ns.enabled)
   const [medReminders, setMedReminders] = useState(ns.medReminders)
@@ -12365,10 +15553,10 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
   const streak = calcGratitudeStreak(profile)
 
   return (
-    <ScrollView style={g.screen} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={g.stgHeader}>
-        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={g.stgHeaderTitle}>Notifications</Text>
+    <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 60 }}>
+      <View style={[g.stgHeader, { backgroundColor: t.card }]}>
+        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={[g.stgBackTxt, { color: t.text }]}>‹</Text></TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: t.text }]}>Notifications</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -12381,10 +15569,10 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       )}
 
       {/* Master toggle */}
-      <View style={[g.stgGroup, { marginTop: 20 }]}>
+      <View style={[g.stgGroup, { marginTop: 20, backgroundColor: t.card, borderColor: t.border }]}>
         <View style={[g.notifRow, { borderBottomWidth: 0 }]}>
           <View style={{ flex: 1 }}>
-            <Text style={g.notifRowTitle}>Enable notifications</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }]}>Enable notifications</Text>
             <Text style={g.notifRowSub}>Allow SOMA to send you reminders</Text>
           </View>
           <Switch
@@ -12397,11 +15585,11 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       </View>
 
       {/* Medication reminders */}
-      <Text style={g.stgSec}>Medication</Text>
-      <View style={g.stgGroup}>
+      <Text style={[g.stgSec, { color: t.text }]}>Medication</Text>
+      <View style={[g.stgGroup, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={[g.notifRow, { borderBottomWidth: 0 }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Medication reminders</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }, !enabled && { color: '#B0B3C8' }]}>Medication reminders</Text>
             <Text style={g.notifRowSub}>
               {activeMedCount > 0
                 ? `${activeMedCount} active medication${activeMedCount > 1 ? 's' : ''} — notified at each dose time`
@@ -12431,11 +15619,11 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       )}
 
       {/* Morning check-in */}
-      <Text style={g.stgSec}>Morning</Text>
-      <View style={g.stgGroup}>
+      <Text style={[g.stgSec, { color: t.text }]}>Morning</Text>
+      <View style={[g.stgGroup, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={g.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Morning check-in</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }, !enabled && { color: '#B0B3C8' }]}>Morning check-in</Text>
             <Text style={g.notifRowSub}>A warm nudge to log your mood and start the day intentionally</Text>
           </View>
           <Switch
@@ -12467,11 +15655,11 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       </View>
 
       {/* Diary reminder */}
-      <Text style={g.stgSec}>Diary</Text>
-      <View style={g.stgGroup}>
+      <Text style={[g.stgSec, { color: t.text }]}>Diary</Text>
+      <View style={[g.stgGroup, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={g.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Evening diary reminder</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }, !enabled && { color: '#B0B3C8' }]}>Evening diary reminder</Text>
             <Text style={g.notifRowSub}>A gentle prompt to write your daily entry before bed</Text>
           </View>
           <Switch
@@ -12503,11 +15691,11 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       </View>
 
       {/* Mood check-in */}
-      <Text style={g.stgSec}>Mood check-in</Text>
-      <View style={g.stgGroup}>
+      <Text style={[g.stgSec, { color: t.text }]}>Mood check-in</Text>
+      <View style={[g.stgGroup, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={g.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>💭 Daily mood reminder</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }, !enabled && { color: '#B0B3C8' }]}>💭 Daily mood reminder</Text>
             <Text style={g.notifRowSub}>A nudge to log how you're feeling each day</Text>
           </View>
           <Switch value={moodEnabled && enabled} onValueChange={toggleMood} disabled={!enabled} trackColor={{ false: '#E0DCED', true: '#7B6EF6' }} thumbColor="#fff" />
@@ -12528,11 +15716,11 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       </View>
 
       {/* Daily check-in */}
-      <Text style={g.stgSec}>Daily check-in</Text>
-      <View style={g.stgGroup}>
+      <Text style={[g.stgSec, { color: t.text }]}>Daily check-in</Text>
+      <View style={[g.stgGroup, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={g.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>Personalised reminder</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }, !enabled && { color: '#B0B3C8' }]}>Personalised reminder</Text>
             <Text style={g.notifRowSub}>
               {aiName} writes your reminders from what you've shared — gratitude, memories, loved ones
             </Text>
@@ -12567,8 +15755,8 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       </View>
 
       {/* AI-generated message preview */}
-      <Text style={g.stgSec}>This week's messages</Text>
-      <View style={[g.stgGroup, { padding: 16 }]}>
+      <Text style={[g.stgSec, { color: t.text }]}>This week's messages</Text>
+      <View style={[g.stgGroup, { padding: 16, backgroundColor: t.card, borderColor: t.border }]}>
         {/* Data source info */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dataPoints > 0 ? '#6EE6C0' : '#E0DCED' }} />
@@ -12618,11 +15806,11 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       </View>
 
       {/* Streak nudge */}
-      <Text style={g.stgSec}>Streak protection</Text>
-      <View style={g.stgGroup}>
+      <Text style={[g.stgSec, { color: t.text }]}>Streak protection</Text>
+      <View style={[g.stgGroup, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={g.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>🔥 Daily streak nudge</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }, !enabled && { color: '#B0B3C8' }]}>🔥 Daily streak nudge</Text>
             <Text style={g.notifRowSub}>Reminds you to log before your streak breaks — fires every evening</Text>
           </View>
           <Switch value={streakEnabled && enabled} onValueChange={toggleStreak} disabled={!enabled} trackColor={{ false: '#E0DCED', true: '#7B6EF6' }} thumbColor="#fff" />
@@ -12643,11 +15831,11 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       </View>
 
       {/* Match alerts */}
-      <Text style={g.stgSec}>Dating</Text>
-      <View style={g.stgGroup}>
+      <Text style={[g.stgSec, { color: t.text }]}>Dating</Text>
+      <View style={[g.stgGroup, { backgroundColor: t.card, borderColor: t.border }]}>
         <View style={[g.notifRow, { borderBottomWidth: 0 }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.notifRowTitle, !enabled && { color: '#B0B3C8' }]}>💜 Match alerts</Text>
+            <Text style={[g.notifRowTitle, { color: t.text }, !enabled && { color: '#B0B3C8' }]}>💜 Match alerts</Text>
             <Text style={g.notifRowSub}>Get notified when someone likes you or a match sends a message</Text>
           </View>
           <Switch value={matchAlertsEnabled && enabled} onValueChange={toggleMatchAlerts} disabled={!enabled} trackColor={{ false: '#E0DCED', true: '#7B6EF6' }} thumbColor="#fff" />
@@ -12664,8 +15852,8 @@ function NotificationSettingsPanel({ profile, onBack, onRefresh }: { profile: Us
       {/* Test notification */}
       {enabled && (
         <>
-          <Text style={g.stgSec}>Test</Text>
-          <View style={[g.stgGroup, { padding: 16 }]}>
+          <Text style={[g.stgSec, { color: t.text }]}>Test</Text>
+          <View style={[g.stgGroup, { padding: 16, backgroundColor: t.card, borderColor: t.border }]}>
             <Text style={{ fontSize: 13, color: '#6E7191', marginBottom: 12, lineHeight: 19 }}>
               Send yourself a test notification right now to confirm everything is working.
             </Text>
@@ -12803,7 +15991,7 @@ function VoiceSettingsPanel({ profile, onBack, onRefresh }: { profile: UserProfi
 
       {/* Voice list */}
       <Text style={[g.stgSec, { color: t.textTertiary }]}>Voice</Text>
-      <View style={[g.stgGroup, { marginHorizontal: 20, borderRadius: 16, overflow: 'hidden' }]}>
+      <View style={[g.stgGroup, { marginHorizontal: 20, borderRadius: 16, overflow: 'hidden', backgroundColor: t.card, borderColor: t.border }]}>
         {/* Best available option */}
         <TouchableOpacity
           onPress={() => pickVoice(undefined)}
@@ -12886,7 +16074,7 @@ function LifeTimeline({ profile, onBack }: { profile: UserProfile; onBack: () =>
     love:      { emoji: '🌸', color: '#EC4899', label: 'Self-love' },
   }
   const MOOD_EMOJI: Record<number, string> = { 1: '😔', 2: '😟', 3: '😐', 4: '🙂', 5: '😊' }
-  const MOOD_LABEL: Record<number, string> = { 1: 'Rough', 2: 'Low', 3: 'Okay', 4: 'Good', 5: 'Great' }
+  const MOOD_LABEL: Record<number, string> = { 1: 'Rough', 2: 'Low', 3: 'Okay', 4: 'Good', 5: 'Great', 6: 'Amazing', 7: 'Euphoric' }
   const MOOD_COLOR: Record<number, string> = { 1: '#EF4444', 2: '#F97316', 3: '#F59E0B', 4: '#84CC16', 5: '#10B981' }
 
   const allItems: TLItem[] = [
@@ -13374,6 +16562,8 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   const [tcName, setTcName] = useState(profile.trustedContact?.name || '')
   const [tcPhone, setTcPhone] = useState(profile.trustedContact?.phone || '')
   const [showDanger, setShowDanger] = useState(false)
+  const [logoTaps, setLogoTaps] = useState(0)
+  const [demoMsg, setDemoMsg] = useState('')
   // Profile editing state
   const [editName, setEditName] = useState(profile.name || '')
   const [editBio, setEditBio] = useState(profile.profileBio || '')
@@ -13419,8 +16609,8 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   // ── Sub-screen: Language ──────────────────────────────────
   if (panel === 'language') return (
     <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={[g.stgHeader, { backgroundColor: theme.card }]}>
-        <TouchableOpacity onPress={back} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+      <View style={[g.stgHeader, { backgroundColor: theme.bg }]}>
+        <TouchableOpacity onPress={back} style={[g.stgBackBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}><Ionicons name="chevron-back" size={18} color="#7B6EF6" /></TouchableOpacity>
         <Text style={[g.stgHeaderTitle, { color: theme.text }]}>{t('language')}</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -13443,8 +16633,8 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   // ── Sub-screen: Companion ─────────────────────────────────
   if (panel === 'companion') return (
     <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={[g.stgHeader, { backgroundColor: theme.card }]}>
-        <TouchableOpacity onPress={back} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+      <View style={[g.stgHeader, { backgroundColor: theme.bg }]}>
+        <TouchableOpacity onPress={back} style={[g.stgBackBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}><Ionicons name="chevron-back" size={18} color="#7B6EF6" /></TouchableOpacity>
         <Text style={[g.stgHeaderTitle, { color: theme.text }]}>Your companion</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -13473,8 +16663,8 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   // ── Sub-screen: Safety ────────────────────────────────────
   if (panel === 'safety') return (
     <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={[g.stgHeader, { backgroundColor: theme.card }]}>
-        <TouchableOpacity onPress={back} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
+      <View style={[g.stgHeader, { backgroundColor: theme.bg }]}>
+        <TouchableOpacity onPress={back} style={[g.stgBackBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}><Ionicons name="chevron-back" size={18} color="#7B6EF6" /></TouchableOpacity>
         <Text style={[g.stgHeaderTitle, { color: theme.text }]}>Trusted contact</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -13498,9 +16688,9 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   // ── Sub-screen: Profile ───────────────────────────────────
   if (panel === 'profile') return (
     <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={[g.stgHeader, { backgroundColor: theme.card }]}>
-        <TouchableOpacity onPress={back} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={[g.stgHeaderTitle, { color: theme.text }]}>Edit profile</Text>
+      <View style={[g.stgHeader, { backgroundColor: theme.bg }]}>
+        <TouchableOpacity onPress={back} style={[g.stgBackBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}><Ionicons name="chevron-back" size={18} color="#7B6EF6" /></TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: theme.text }]}>{t('edit_profile')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -13626,10 +16816,12 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   return (
     <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 80 }}>
       {/* Header */}
-      <View style={[g.stgHeader, { backgroundColor: theme.card }]}>
-        <TouchableOpacity onPress={onBack} style={g.stgBackBtn}><Text style={g.stgBackTxt}>‹</Text></TouchableOpacity>
-        <Text style={[g.stgHeaderTitle, { color: theme.text }]}>Settings</Text>
-        <View style={{ width: 40 }} />
+      <View style={[g.stgHeader, { backgroundColor: theme.bg }]}>
+        <TouchableOpacity onPress={onBack} style={[g.stgBackBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}>
+          <Ionicons name="chevron-back" size={18} color="#7B6EF6" />
+        </TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: theme.text }]}>{t('settings')}</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       {/* Profile card */}
@@ -13669,9 +16861,9 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
         <View style={{ flexDirection: 'row', marginTop: 16, gap: 0, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 14 }}>
           {[
             { label: 'Streak', value: streak > 0 ? `${streak}d 🔥` : '—' },
-            { label: 'Diary', value: `${profile.diary?.length || 0}` },
-            { label: 'Bonds', value: `${profile.circle?.length || 0}` },
-            { label: 'Memories', value: `${profile.memories?.length || 0}` },
+            { label: t('diary'), value: `${profile.diary?.length || 0}` },
+            { label: t('bonds_label'), value: `${profile.circle?.length || 0}` },
+            { label: t('memories_label'), value: `${profile.memories?.length || 0}` },
           ].map((s, i) => (
             <View key={s.label} style={{ flex: 1, alignItems: 'center', borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: theme.border }}>
               <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }}>{s.value}</Text>
@@ -13684,7 +16876,7 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
         {profileScore < 100 && (
           <View style={{ marginTop: 14 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Profile complete</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('profile_complete')}</Text>
               <Text style={{ fontSize: 11, fontWeight: '700', color: theme.accent }}>{profileScore}%</Text>
             </View>
             <View style={{ height: 5, borderRadius: 3, backgroundColor: theme.border, overflow: 'hidden' }}>
@@ -13694,23 +16886,49 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
         )}
         {profileScore === 100 && (
           <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 13, color: '#10B981', fontWeight: '700' }}>✓ Profile complete</Text>
+            <Text style={{ fontSize: 13, color: '#10B981', fontWeight: '700' }}>✓ {t('profile_complete')}</Text>
           </View>
         )}
       </TouchableOpacity>
 
+      {/* My SOMA Code */}
+      {(() => {
+        const myCode = (profile.name || 'User').slice(0, 2).toUpperCase() + Math.abs((profile.name || 'SOMA').split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) % 9000 + 1000)
+        return (
+          <TouchableOpacity
+            onPress={() => {
+              const msg = `Add me on SOMA! My code is ${myCode}`
+              if (typeof navigator !== 'undefined' && navigator.share) {
+                navigator.share({ title: 'My SOMA Code', text: msg }).catch(() => {})
+              } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                navigator.clipboard.writeText(myCode).then(() => alert('Code copied: ' + myCode))
+              }
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#7B6EF608', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 14, marginBottom: 8, borderWidth: 1, borderColor: '#7B6EF625' }}>
+            <View>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{t('my_soma_code') || 'My SOMA Code'}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: theme.accent, letterSpacing: 3 }}>{myCode}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <Text style={{ fontSize: 12, color: theme.textSub }}>{t('share_friends') || 'Share with friends'}</Text>
+              <Text style={{ fontSize: 18 }}>📋</Text>
+            </View>
+          </TouchableOpacity>
+        )
+      })()}
+
       {/* Premium */}
-      <Text style={g.stgSec}>Premium</Text>
+      <Text style={[g.stgSec, { color: theme.textSub }]}>Premium</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {profile.premium
-          ? <StgRow icon="★" label="SOMA+" value="Active ✓" />
-          : <StgRow icon="★" label="SOMA+" value="Upgrade →" onPress={() => setShowPaywall(true)} />}
-        {!profile.premium && <StgRow icon="↩️" label="Restore purchases" value="" onPress={async () => {
+          ? <StgRow icon="★" label="SOMA+" value={DB.trialDaysLeft() != null ? `Trial · ${DB.trialDaysLeft()} days left` : 'Active ✓'} iconBg="rgba(245,158,11,0.15)" />
+          : <StgRow icon="★" label="SOMA+" value="Upgrade →" iconBg="rgba(245,158,11,0.15)" onPress={() => setShowPaywall(true)} />}
+        {!profile.premium && <StgRow icon="↩️" label="Restore purchases" value="" iconBg="rgba(123,110,246,0.12)" onPress={async () => {
           const ok = await purchaseApi.restore()
           if (ok) { DB.goPremium(); onRefresh() }
           else alert('No active subscription found.')
         }} />}
-        <StgRow icon="📦" label="Export data" value="Download as JSON" onPress={exportData} last />
+        <StgRow icon="📦" label="Export data" value="Download as JSON" iconBg="rgba(16,185,129,0.12)" onPress={exportData} last />
       </View>
       {showPaywall && (
         <SomaPlusPaywall
@@ -13720,43 +16938,41 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
       )}
 
       {/* Companion */}
-      <Text style={g.stgSec}>Your companion</Text>
+      <Text style={[g.stgSec, { color: theme.textSub }]}>Your companion</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <StgRow icon="🌟" label="Name" value={profile.aiName || 'Soma'} onPress={() => setPanel('companion')} />
-        <StgRow icon="🔊" label="Voice" value={profile.voiceSettings?.voiceName?.replace(/\s*\(.*\)\s*/g, '') || 'Best available'} onPress={() => setPanel('voice')} />
-        <StgRow icon="🖼" label="Photo" value={profile.aiPhoto ? 'Set' : 'Not set'} onPress={changePipPhoto} last />
+        <StgRow icon="🌟" label="Name" value={profile.aiName || 'Soma'} iconBg="rgba(123,110,246,0.12)" onPress={() => setPanel('companion')} />
+        <StgRow icon="🔊" label="Voice" value={profile.voiceSettings?.voiceName?.replace(/\s*\(.*\)\s*/g, '') || 'Best available'} iconBg="rgba(59,130,246,0.12)" onPress={() => setPanel('voice')} />
+        <StgRow icon="🖼" label="Photo" value={profile.aiPhoto ? 'Set' : 'Not set'} iconBg="rgba(236,72,153,0.12)" onPress={changePipPhoto} last />
       </View>
 
       {/* Application */}
-      <Text style={g.stgSec}>Application</Text>
+      <Text style={[g.stgSec, { color: theme.textSub }]}>Application</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <StgRow icon="🌍" label={t('language')} value={`${curLang?.flag} ${curLang?.label}`} onPress={() => setPanel('language')} />
-        <TouchableOpacity
-          onPress={onToggleDark}
-          style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border }}
-        >
-          <Text style={{ fontSize: 18, marginRight: 14 }}>🌙</Text>
-          <Text style={[g.stgLabel, { flex: 1 }]}>{t('darkMode')}</Text>
-          <View style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: dark ? '#7B6EF6' : '#D1D5DB', justifyContent: 'center', paddingHorizontal: 3 }}>
+        <StgRow icon="🌍" label={t('language')} value={`${curLang?.flag} ${curLang?.label}`} iconBg="rgba(59,130,246,0.12)" onPress={() => setPanel('language')} />
+        <TouchableOpacity onPress={onToggleDark}
+          style={[g.stgRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <View style={[g.stgIconCircle, { backgroundColor: 'rgba(99,102,241,0.12)' }]}><Text style={g.stgIconTxt}>🌙</Text></View>
+          <Text style={[g.stgLabel, { flex: 1, color: theme.text }]}>{t('darkMode')}</Text>
+          <View style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: dark ? '#7B6EF6' : theme.border, justifyContent: 'center', paddingHorizontal: 3 }}>
             <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', transform: [{ translateX: dark ? 20 : 0 }] }} />
           </View>
         </TouchableOpacity>
-        <StgRow icon="💜" label="Trusted contact"
+        <StgRow icon="💜" label="Trusted contact" iconBg="rgba(168,85,247,0.12)"
           value={profile.trustedContact?.name || 'Not set'} onPress={() => setPanel('safety')} />
-        <StgRow icon="🔔" label={t('notifications')}
+        <StgRow icon="🔔" label={t('notifications')} iconBg="rgba(245,158,11,0.12)"
           value={profile.notifSettings?.enabled ? 'On' : 'Off'} onPress={() => setPanel('notifications')} />
-        <StgRow icon="🧠" label="Soma's memories" value={`${profile.memories.length} remembered`} onPress={onMemories} />
-        <StgRow icon="🔒" label={t('privacyPolicy')} value="Data stays on your device" last />
+        <StgRow icon="🧠" label={t('soma_memories')} iconBg="rgba(16,185,129,0.12)" value={`${profile.memories.length} ${t('remembered')}`} onPress={onMemories} />
+        <StgRow icon="🔒" label={t('privacyPolicy')} iconBg="rgba(107,114,128,0.12)" value="Data stays on your device" last />
       </View>
 
       {/* Invite */}
-      <Text style={g.stgSec}>Invite</Text>
+      <Text style={[g.stgSec, { color: theme.textSub }]}>Invite</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {auth.getToken() && (() => {
           const myCode = (() => { try { const t = auth.getToken(); if (!t) return null; return JSON.parse(atob(t.split('.')[1])).userId?.replace(/-/g,'').slice(0,6).toUpperCase() } catch { return null } })()
           if (!myCode) return null
           const addLink = `https://mysoma.site/?add=${myCode}`
-          return <StgRow icon="🔗" label="Share your connect link" value={addLink} onPress={() => {
+          return <StgRow icon="🔗" label="Share your connect link" value={addLink} iconBg="rgba(59,130,246,0.12)" onPress={() => {
             const msg = `Add me on SOMA! Just tap this link and we can chat directly: ${addLink}`
             if (typeof navigator !== 'undefined' && (navigator as any).share) {
               ;(navigator as any).share({ title: 'Connect with me on SOMA', text: msg, url: addLink }).catch(() => {})
@@ -13765,7 +16981,7 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
             } else { alert(`Your connect link:\n\n${addLink}`) }
           }} />
         })()}
-        <StgRow icon="📣" label="Share Soma with a friend" value="mysoma.site" last onPress={() => {
+        <StgRow icon="📣" label="Share Soma with a friend" value="mysoma.site" iconBg="rgba(236,72,153,0.12)" last onPress={() => {
           const url = 'https://mysoma.site'
           const msg = `Hey! I've been using Soma — an AI that helps you understand yourself better. Try it here: ${url}`
           if (typeof navigator !== 'undefined' && (navigator as any).share) {
@@ -13779,14 +16995,14 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
       </View>
 
       {/* Account */}
-      <Text style={g.stgSec}>{t('account')}</Text>
+      <Text style={[g.stgSec, { color: theme.textSub }]}>{t('account')}</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {auth.getToken() ? (
-          <StgRow icon="🚪" label={t('signOut')} value="Signed in" onPress={() => { auth.clearTokens(); onSignIn?.() }} />
+          <StgRow icon="🚪" label={t('signOut')} value="Signed in" iconBg="rgba(107,114,128,0.12)" onPress={() => { auth.clearTokens(); onSignIn?.() }} />
         ) : (
-          <StgRow icon="🔑" label={t('signIn')} value="Save your data & meet people" onPress={onSignIn} />
+          <StgRow icon="🔑" label={t('signIn')} value="Save your data & meet people" iconBg="rgba(123,110,246,0.12)" onPress={onSignIn} />
         )}
-        <StgRow icon="🗑" label="Delete account" value="Erase all data" onPress={() => setShowDanger(true)} last />
+        <StgRow icon="🗑" label="Delete account" value="Erase all data" iconBg="rgba(239,68,68,0.12)" onPress={() => setShowDanger(true)} danger last />
       </View>
 
       {/* Delete confirm */}
@@ -13809,10 +17025,28 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
         </View>
       )}
 
-      {/* Footer */}
+      {/* Footer — tap logo 5× to load demo data */}
       <View style={g.settingsFooter}>
-        <SomaMark size={28} />
-        <Text style={g.settingsFooterTxt}>SOMA  ·  v0.1</Text>
+        <TouchableOpacity onPress={() => {
+          const next = logoTaps + 1
+          setLogoTaps(next)
+          if (next >= 5) {
+            loadDemoData()
+            onRefresh()
+            setLogoTaps(0)
+            setDemoMsg('✅ Demo data loaded!')
+            setTimeout(() => setDemoMsg(''), 3000)
+          } else if (next >= 3) {
+            setDemoMsg(`${5 - next} more tap${5 - next === 1 ? '' : 's'} for demo mode`)
+          }
+        }}>
+          <SomaMark size={28} />
+        </TouchableOpacity>
+        {demoMsg ? (
+          <Text style={[g.settingsFooterTxt, { color: '#7B6EF6' }]}>{demoMsg}</Text>
+        ) : (
+          <Text style={g.settingsFooterTxt}>SOMA  ·  v0.1</Text>
+        )}
       </View>
     </ScrollView>
   )
@@ -14033,7 +17267,7 @@ function MoodAnalytics({ profile, onBack }: { profile: UserProfile; onBack: () =
 
   const logs = profile.moodLogs || []
   const moodEmojis: Record<number, string> = { 1: '😔', 2: '😕', 3: '😐', 4: '🙂', 5: '😊' }
-  const moodLabels: Record<number, string> = { 1: 'Rough', 2: 'Meh', 3: 'Okay', 4: 'Good', 5: 'Great' }
+  const moodLabels: Record<number, string> = { 1: 'Rough', 2: 'Meh', 3: 'Okay', 4: 'Good', 5: 'Great', 6: 'Amazing', 7: 'Euphoric' }
   const lineColor = (v: number) => v >= 4 ? '#4CAF7D' : v >= 3 ? '#7B6EF6' : '#F5A623'
 
   // Build N-day data for selected range
@@ -14080,7 +17314,7 @@ function MoodAnalytics({ profile, onBack }: { profile: UserProfile; onBack: () =
       <View style={g.homeHeader}>
         <TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Back</Text></TouchableOpacity>
       </View>
-      <Text style={g.logo}>Mood Trends</Text>
+      <Text style={g.logo}>{tr('mood_trends_title')}</Text>
       <Text style={g.logoSub}>{logs.length} check-ins recorded</Text>
       <View style={{ height: 16 }} />
 
@@ -14770,7 +18004,7 @@ const g = StyleSheet.create({
   chatAvatar: { width: 42, height: 42, borderRadius: 21 },
   chatName: { color: '#222540', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
   chatStatus: { color: '#6EF6A8', fontSize: 12, marginTop: 1 },
-  chatAura: { color: '#7B6EF6', fontSize: 22 },
+  chatSoma: { color: '#7B6EF6', fontSize: 22 },
   matchStrip: { backgroundColor: '#F3F0FB', paddingVertical: 10, paddingHorizontal: 16 },
   matchStripTxt: { color: '#A89BFA', fontSize: 12, textAlign: 'center', fontWeight: '600' },
   // Connections
@@ -14817,19 +18051,19 @@ const g = StyleSheet.create({
   privacyCard: { backgroundColor: '#EFF6EF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#6EF6A830' },
   privacyTxt: { color: '#9CA0B5', fontSize: 13, lineHeight: 21 },
   aboutTxt: { color: '#9A9DB2', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 30 },
-  // ── Settings (Twinby-style) ──
-  stgHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 8, paddingTop: 20, paddingBottom: 8, backgroundColor: '#F5F4FA' },
-  stgBackBtn: { width: 40, height: 44, alignItems: 'center' as const, justifyContent: 'center' as const },
-  stgBackTxt: { fontSize: 34, lineHeight: 38, color: '#222540', fontWeight: '300' },
-  stgHeaderTitle: { fontSize: 18, fontWeight: '700', color: '#222540', textAlign: 'center' as const },
-  stgSec: { fontSize: 22, fontWeight: '800', color: '#222540', marginTop: 24, marginBottom: 10, paddingHorizontal: 20 },
-  stgGroup: { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#EDEAF4' },
-  stgRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EDEAF4', backgroundColor: '#FFFFFF' },
-  stgIconCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: '#DDDAF0', alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: '#FAFAFA' },
-  stgIconTxt: { fontSize: 15 },
-  stgLabel: { fontSize: 16, fontWeight: '600', color: '#222540' },
-  stgValue: { fontSize: 13, color: '#9A9DB2', marginTop: 1 },
-  stgChevron: { fontSize: 22, color: '#C9CCDD' },
+  // ── Settings (home-card style) ──
+  stgHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16 },
+  stgBackBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center' as const, justifyContent: 'center' as const },
+  stgBackTxt: { fontSize: 22, color: '#7B6EF6', fontWeight: '600' },
+  stgHeaderTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' as const },
+  stgSec: { fontSize: 13, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' as const, marginTop: 20, marginBottom: 8, paddingHorizontal: 20 },
+  stgGroup: { marginHorizontal: 20, borderRadius: 18, borderWidth: 1, overflow: 'hidden' as const },
+  stgRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 0.5 },
+  stgIconCircle: { width: 36, height: 36, borderRadius: 11, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: 'rgba(123,110,246,0.12)' },
+  stgIconTxt: { fontSize: 16 },
+  stgLabel: { fontSize: 15, fontWeight: '600' },
+  stgValue: { fontSize: 13, marginTop: 1 },
+  stgChevron: { fontSize: 18 },
   stgLinks: { paddingHorizontal: 20, paddingTop: 28, gap: 20, alignItems: 'flex-start' as const },
   stgLinkDanger: { fontSize: 15, color: '#E8636F', fontWeight: '500' },
   // shared settings inputs / cards

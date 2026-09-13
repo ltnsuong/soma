@@ -197,7 +197,7 @@ app.post('/auth/verify-email', async (req, res) => {
 })
 
 // DELETE ACCOUNT — required for App Store (Apple mandates account deletion)
-app.delete('/auth/account', requireAuth, async (req, res) => {
+app.delete('/auth/account', auth, async (req, res) => {
   try {
     const userId = req.user.userId
     // Delete from all tables in order (likes → messages → users)
@@ -317,12 +317,28 @@ app.post('/auth/social', async (req, res) => {
   if (provider === 'google') {
     try {
       // Verify the ID token with Google
-      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`)
+      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`)
       if (!googleRes.ok) return res.status(401).json({ error: 'Invalid Google token' })
       const payload = await googleRes.json()
 
-      // Must have a valid audience (your Google client ID) and a sub (user ID)
       if (!payload.sub || payload.error) return res.status(401).json({ error: 'Invalid Google token payload' })
+
+      // The token must have been minted for OUR client. Without this, an id_token issued
+      // to any other Google OAuth app is accepted — so anyone who can get a user to sign
+      // into an app they control can replay that token here and take over the account.
+      const allowedAudiences = (process.env.GOOGLE_CLIENT_IDS || '')
+        .split(',').map(s => s.trim()).filter(Boolean)
+      if (!allowedAudiences.length) {
+        console.error('[Google OAuth] GOOGLE_CLIENT_IDS is not set — refusing to verify tokens')
+        return res.status(500).json({ error: 'Google sign-in is not configured on the server' })
+      }
+      if (!allowedAudiences.includes(payload.aud)) {
+        console.warn('[Google OAuth] rejected token with aud=', payload.aud)
+        return res.status(401).json({ error: 'Invalid Google token audience' })
+      }
+      if (payload.email && payload.email_verified === 'false') {
+        return res.status(401).json({ error: 'Google email not verified' })
+      }
 
       const email = payload.email
       const name  = payload.name || payload.email.split('@')[0]

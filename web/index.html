@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
     <title>Soma — Your AI Life Companion</title>
     <meta name="description" content="Your personal AI companion for growth, reflection and building the life you want." />
     <meta name="theme-color" content="#0F0A2E" />
@@ -39,6 +39,8 @@
       html, body { height: 100%; margin: 0; }
       body { overflow: hidden; background-color: #0F0A2E; }
       #root { display: flex; height: 100%; flex: 1; }
+      /* Ensure no white flash on safe-area / notch area */
+      html { background-color: #0F0A2E; }
 
       * {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -89,5 +91,53 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+
+    <!--
+      Boot watchdog. A JS parse/throw before React mounts leaves #root empty and the
+      screen blank, which is unreportable from inside the Telegram WebView. This shows
+      the failure on screen instead. Self-removes once React renders anything.
+    -->
+    <script>
+    (function () {
+      var errs = [];
+      window.addEventListener('error', function (e) {
+        errs.push((e.message || 'error') + (e.filename ? ' @ ' + String(e.filename).split('/').pop() + ':' + e.lineno : ''));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason; errs.push('promise: ' + ((r && (r.message || r.code)) || r));
+      });
+      setTimeout(function () {
+        var root = document.getElementById('root');
+        if (!root || root.children.length) return; // React mounted — nothing to do
+        var tg = window.Telegram && window.Telegram.WebApp;
+        var rows = [
+          ['bundle', window.__SOMA_BUNDLE_OK__ ? 'executed' : 'DID NOT EXECUTE'],
+          ['telegram sdk', tg ? 'loaded' : 'missing'],
+          ['initData', tg && tg.initData ? 'present' : 'none'],
+          ['platform', (tg && tg.platform) || 'n/a'],
+          ['ua', navigator.userAgent]
+        ];
+        var html = '<div style="font:13px/1.5 -apple-system,system-ui,sans-serif;color:#EDEAFF;padding:22px;height:100%;overflow:auto;-webkit-overflow-scrolling:touch">'
+          + '<div style="font-size:17px;font-weight:700;margin-bottom:4px">SOMA failed to start</div>'
+          + '<div style="opacity:.65;margin-bottom:16px">Screenshot this and send it to support.</div>';
+        if (errs.length) {
+          html += '<div style="background:rgba(255,90,90,.13);border:1px solid rgba(255,90,90,.4);border-radius:10px;padding:12px;margin-bottom:14px">'
+            + '<div style="font-weight:700;color:#FF9B9B;margin-bottom:6px">Error</div>'
+            + errs.map(function (x) {
+                return '<div style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-word;margin-bottom:4px">' + String(x).replace(/</g, '&lt;') + '</div>';
+              }).join('')
+            + '</div>';
+        }
+        html += rows.map(function (r) {
+          return '<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08)">'
+            + '<span style="opacity:.6;min-width:92px;flex-shrink:0">' + r[0] + '</span>'
+            + '<span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all">' + String(r[1]).replace(/</g, '&lt;') + '</span></div>';
+        }).join('');
+        html += '<a href="https://mysoma.site" style="display:block;margin-top:20px;background:#7B6EF6;color:#fff;text-align:center;padding:13px;border-radius:11px;font-weight:700;text-decoration:none">Reload</a></div>';
+        root.innerHTML = html;
+      }, 8000);
+    })();
+    </script>
+    <!-- Expo JS bundle is injected here by `expo export -p web` -->
   </body>
 </html>

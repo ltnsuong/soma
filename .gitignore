@@ -44,3 +44,7 @@ yarn-error.*
 .env
 backend/.env
 .vercel
+.env*
+
+# packaged web build for manual hosting upload
+soma-site.zip

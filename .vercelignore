@@ -1,0 +1,11 @@
+node_modules
+android
+ios
+.expo
+expo-web
+backend
+scripts
+logo-exports
+*.zip
+*.png
+*.svg

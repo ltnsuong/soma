@@ -50,56 +50,38 @@ const backAndHomeKeyboard = {
 // BOT START & SETUP
 // ============================================================================
 
+const START_MSG = {
+  en: (name) => `🌱 *Hi ${name}!*\n\nI'm Soma — your AI life companion.\n\nI help you understand yourself deeply, track your growth, and connect with people who share your values.\n\nTap below to open the app and begin. ✨`,
+  ru: (name) => `🌱 *Привет, ${name}!*\n\nЯ Soma — твой ИИ-компаньон по жизни.\n\nПомогаю глубже понять себя, отслеживать рост и находить людей, разделяющих твои ценности.\n\nНажми ниже, чтобы открыть приложение. ✨`,
+  vi: (name) => `🌱 *Xin chào ${name}!*\n\nMình là Soma — người bạn AI đồng hành trong cuộc sống của bạn.\n\nMình giúp bạn hiểu sâu bản thân, theo dõi sự trưởng thành và kết nối với những người cùng giá trị.\n\nNhấn bên dưới để mở ứng dụng. ✨`,
+  es: (name) => `🌱 *¡Hola ${name}!*\n\nSoy Soma — tu compañero de vida con IA.\n\nTe ayudo a entenderte profundamente, seguir tu crecimiento y conectar con personas que comparten tus valores.\n\nToca abajo para abrir la app. ✨`,
+  fr: (name) => `🌱 *Bonjour ${name} !*\n\nJe suis Soma — ton compagnon de vie IA.\n\nJe t'aide à mieux te comprendre, à suivre ta croissance et à rencontrer des personnes qui partagent tes valeurs.\n\nAppuie ci-dessous pour ouvrir l'app. ✨`,
+  de: (name) => `🌱 *Hallo ${name}!*\n\nIch bin Soma — dein KI-Lebensbegleiter.\n\nIch helfe dir, dich besser zu verstehen, dein Wachstum zu verfolgen und Menschen mit deinen Werten zu finden.\n\nTippe unten, um die App zu öffnen. ✨`,
+  it: (name) => `🌱 *Ciao ${name}!*\n\nSono Soma — il tuo compagno di vita IA.\n\nTi aiuto a capirti in profondità, seguire la tua crescita e connetterti con persone che condividono i tuoi valori.\n\nTocca qui sotto per aprire l'app. ✨`,
+  pt: (name) => `🌱 *Olá ${name}!*\n\nSou Soma — seu companheiro de vida com IA.\n\nAjudo você a se entender profundamente, acompanhar seu crescimento e conectar com pessoas que compartilham seus valores.\n\nToque abaixo para abrir o app. ✨`,
+  zh: (name) => `🌱 *你好，${name}！*\n\n我是 Soma — 你的 AI 人生伴侣。\n\n我帮助你深入了解自己、追踪成长，并与志同道合的人建立连接。\n\n点击下方打开应用。 ✨`,
+  ja: (name) => `🌱 *こんにちは、${name}！*\n\n私はSoma — あなたのAIライフコンパニオンです。\n\n自分自身を深く理解し、成長を追跡し、価値観を共有する人と出会うお手伝いをします。\n\n下のボタンでアプリを開いてください。 ✨`,
+  ar: (name) => `🌱 *مرحباً ${name}!*\n\nأنا سوما — رفيقك الذكي في الحياة.\n\nأساعدك على فهم نفسك بعمق، وتتبع نموك، والتواصل مع أشخاص يشاركونك قيمك.\n\nاضغط أدناه لفتح التطبيق. ✨`,
+};
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const firstName = msg.from.first_name || 'Friend';
+  const lang = (msg.from.language_code || 'en').slice(0, 2).toLowerCase();
 
   userState.set(chatId, { screen: 'home', userId });
 
-  const welcomeMessage = `🧠 *Welcome to SOMA*
-
-Hi ${firstName}! 👋
-
-You're in contact with SOMA - your AI companion for mental health support.
-
-💙 *What SOMA offers:*
-• 💬 Chat with Soma anytime - Express yourself safely
-• 📊 Track your mood - Understand your patterns
-• 👨‍⚨️ Connect with doctors - Share your journey securely
-• 🌍 Multilingual support - In your preferred language
-
-✨ *Your mental health matters.*
-Whether you're dealing with depression, anxiety, or just need someone to talk to, SOMA is here for you.
-
-🚀 *Get Started:*
-Tap the button below to open SOMA and begin your journey.
-
-_Built by someone who survived depression. Here to help you reach out._`;
-
-  const welcomeKeyboard = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: '🚀 Open SOMA App',
-            web_app: { url: 'https://mysoma.site' }
-          }
-        ],
-        [
-          { text: '💬 Quick Mood Check', callback_data: 'quick_mood' }
-        ],
-        [
-          { text: '📚 Learn More', callback_data: 'learn_more' },
-          { text: '⚙️ Settings', callback_data: 'settings' }
-        ],
-      ],
-    },
-  };
+  const getText = START_MSG[lang] || START_MSG['en'];
+  const welcomeMessage = getText(firstName);
 
   bot.sendMessage(chatId, welcomeMessage, {
     parse_mode: 'Markdown',
-    reply_markup: welcomeKeyboard.reply_markup,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🚀 Open SOMA', web_app: { url: 'https://mysoma.site' } }],
+      ],
+    },
   });
 });
 
