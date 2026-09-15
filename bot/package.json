@@ -18,6 +18,7 @@
   "author": "SOMA",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
     "@supabase/supabase-js": "^2.38.0",
     "axios": "^1.6.0",
     "dotenv": "^16.3.1",

@@ -1,8 +1,12 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { createClient } = require('@supabase/supabase-js');
-const axios = require('axios');
+const Anthropic = require('@anthropic-ai/sdk');
 const WebSocket = require('ws');
 require('dotenv').config();
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
@@ -154,17 +158,13 @@ Return this exact JSON structure (no markdown, no extra text):
 }`;
 
   try {
-    const response = await axios.post(
-      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1/v1/messages',
-      {
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 500,
-        temperature: 0.7
-      },
-      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
-    );
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }]
+    });
 
-    const content = response.data.choices[0].message.content;
+    const content = response.content[0].text;
     const extracted = JSON.parse(content);
 
     // Save to database
@@ -304,17 +304,13 @@ Provide compatibility analysis and return ONLY valid JSON:
   "red_flags": []
 }`;
 
-    const response = await axios.post(
-      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1/v1/messages',
-      {
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 800,
-        temperature: 0.7
-      },
-      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
-    );
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 800,
+      messages: [{ role: 'user', content: prompt }]
+    });
 
-    const content = response.data.choices[0].message.content;
+    const content = response.content[0].text;
     const analysis = JSON.parse(content);
 
     // Save analysis
@@ -565,7 +561,7 @@ bot.on('polling_error', (error) => {
 console.log('🚀 SOMA Relationship Bot is running! 💙');
 console.log('Environment:', {
   botToken: !!process.env.TELEGRAM_BOT_TOKEN,
-  hfKey: !!process.env.HF_API_KEY,
+  anthropicKey: !!process.env.ANTHROPIC_API_KEY,
   supabaseUrl: !!process.env.SUPABASE_URL,
   supabaseKey: !!process.env.SUPABASE_KEY
 });
