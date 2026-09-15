@@ -159,7 +159,7 @@ Return this exact JSON structure (no markdown, no extra text):
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-5',
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -305,7 +305,7 @@ Provide compatibility analysis and return ONLY valid JSON:
 }`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-5',
       max_tokens: 800,
       messages: [{ role: 'user', content: prompt }]
     });
