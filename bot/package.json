@@ -1,0 +1,30 @@
+{
+  "name": "soma-relationship-bot",
+  "version": "1.0.0",
+  "description": "SOMA AI Relationship Coach Bot for Telegram",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node bot.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "relationship",
+    "coaching",
+    "ai"
+  ],
+  "author": "SOMA",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "node-telegram-bot-api": "^0.61.0",
+    "ws": "^8.21.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
