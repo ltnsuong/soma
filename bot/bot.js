@@ -157,7 +157,7 @@ Return this exact JSON structure (no markdown, no extra text):
     const response = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: 'llama-3.1-8b-instant',
+        model: 'mixtral-8x7b-32768',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 500
@@ -308,7 +308,7 @@ Provide compatibility analysis and return ONLY valid JSON:
     const response = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: 'llama-3.1-8b-instant',
+        model: 'mixtral-8x7b-32768',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 800
