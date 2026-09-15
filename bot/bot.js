@@ -206,7 +206,8 @@ Return this exact JSON structure (no markdown, no extra text):
     userState.delete(telegramId);
 
   } catch (err) {
-    console.error('Profile extraction error:', err);
+    console.error('Profile extraction error:', err.message);
+    console.error('Error details:', err.response?.data || err.data || 'No response data');
     bot.sendMessage(chatId, '❌ Error analyzing profile. Please try again with /start');
     userState.delete(telegramId);
   }
