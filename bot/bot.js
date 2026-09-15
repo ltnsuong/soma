@@ -155,14 +155,13 @@ Return this exact JSON structure (no markdown, no extra text):
 
   try {
     const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
+      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1/v1/messages',
       {
-        model: 'gemma-7b-it',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 500
+        max_tokens: 500,
+        temperature: 0.7
       },
-      { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } }
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
 
     const content = response.data.choices[0].message.content;
@@ -207,7 +206,7 @@ Return this exact JSON structure (no markdown, no extra text):
 
   } catch (err) {
     console.error('Profile extraction error:', err.message);
-    console.error('Error details:', err.response?.data || err.data || 'No response data');
+    console.error('HF Error:', err.response?.status, err.response?.data?.error || err.message);
     bot.sendMessage(chatId, '❌ Error analyzing profile. Please try again with /start');
     userState.delete(telegramId);
   }
@@ -306,14 +305,13 @@ Provide compatibility analysis and return ONLY valid JSON:
 }`;
 
     const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
+      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1/v1/messages',
       {
-        model: 'gemma-7b-it',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 800
+        max_tokens: 800,
+        temperature: 0.7
       },
-      { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } }
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
 
     const content = response.data.choices[0].message.content;
@@ -567,7 +565,7 @@ bot.on('polling_error', (error) => {
 console.log('🚀 SOMA Relationship Bot is running! 💙');
 console.log('Environment:', {
   botToken: !!process.env.TELEGRAM_BOT_TOKEN,
-  groqKey: !!process.env.GROQ_API_KEY,
+  hfKey: !!process.env.HF_API_KEY,
   supabaseUrl: !!process.env.SUPABASE_URL,
   supabaseKey: !!process.env.SUPABASE_KEY
 });
