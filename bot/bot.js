@@ -462,14 +462,17 @@ Return ONLY valid JSON:
     });
 
     let content = response.content[0].text;
+    console.log('Raw LLM response:', content.substring(0, 300));
 
     // Extract JSON if wrapped in markdown
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       content = jsonMatch[0];
+      console.log('Extracted JSON:', content.substring(0, 200));
     }
 
     const analysis = JSON.parse(content);
+    console.log('Parsed analysis:', analysis);
 
     // Send formatted report
     const report = `🎯 COMPATIBILITY ANALYSIS WITH @${targetUser}
@@ -498,7 +501,11 @@ ${analysis.suggested_activities.map(a => `• ${a}`).join('\n')}`;
     await bot.sendMessage(chatId, report);
 
   } catch (err) {
-    console.error('Error analyzing connection:', err);
+    console.error('=== ERROR ANALYZING CONNECTION ===');
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    console.error('Full error:', JSON.stringify(err, null, 2));
+    console.error('==================================');
     bot.sendMessage(chatId, '❌ Error analyzing. Please try again.');
   }
 }
