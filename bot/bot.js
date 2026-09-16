@@ -213,8 +213,13 @@ Return this exact JSON structure (no markdown, no extra text):
     userState.delete(telegramId);
 
   } catch (err) {
-    console.error('Profile extraction error:', err.message);
-    console.error('HF Error:', err.response?.status, err.response?.data?.error || err.message);
+    console.error('=== PROFILE EXTRACTION ERROR ===');
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    console.error('Full error:', JSON.stringify(err, null, 2));
+    console.error('Response status:', err.response?.status);
+    console.error('Response data:', err.response?.data);
+    console.error('===============================');
     bot.sendMessage(chatId, '❌ Error analyzing profile. Please try again with /start');
     userState.delete(telegramId);
   }
