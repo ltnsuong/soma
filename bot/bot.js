@@ -387,15 +387,15 @@ Available commands:
 // ANALYZE Command - Analyze conversation with a specific user
 // ============================================================================
 
-bot.onText(/\/analyze\s+(.*)/, async (msg) => {
+bot.onText(/\/analyze(.*)/, async (msg) => {
   const chatId = msg.chat.id;
   const telegramId = msg.from.id;
 
-  if (!msg.match || !msg.match[1]) {
+  const args = msg.text.replace('/analyze', '').trim();
+
+  if (!args) {
     return bot.sendMessage(chatId, '📱 Usage: `/analyze @username`');
   }
-
-  const args = msg.match[1].trim();
 
   try {
     // Get user's profile
