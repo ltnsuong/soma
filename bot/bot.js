@@ -462,7 +462,10 @@ Return ONLY valid JSON:
       messages: [{ role: 'user', content: prompt }]
     });
 
+    console.log('Full Anthropic response:', JSON.stringify(response, null, 2));
+
     if (!response.content || !response.content[0] || !response.content[0].text) {
+      console.error('Response content issue:', { content: response.content });
       throw new Error('Invalid API response: no content');
     }
 
