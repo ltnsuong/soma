@@ -267,6 +267,24 @@ const STRINGS: Record<string, Record<string, string>> = {
     generate_insight: '✦ Generate my insight', insights_btn: 'Generate insights',
     no_search_results: "No entries match your search.\nTry different keywords or clear the filter.",
     ask_soma: 'Ask Soma', insights: 'Insights',
+    view_profile: 'View profile', interests: 'Interests', values: 'Values', close: 'Close',
+    profile_not_set: "They haven't set up their profile yet.",
+    my_circle: 'My Circle', circle_sub: 'Up to 20 people. Share your world with them.',
+    add_someone: 'Add someone', find_by_code: 'Find by code',
+    needs_attention: 'Needs attention',
+    needs_attention_sub: "You haven't mentioned these people much lately. Soma can help you reach out.",
+    reach_out: 'Reach out', on_soma: 'On SOMA',
+    person: 'person', people: 'people', days_ago: 'd ago',
+    circle_log: 'Log', circle_draft: 'Draft', circle_journey: 'Journey',
+    circle_chat: 'Chat', circle_report: 'Report',
+    circle_remove_confirm: 'Remove {name} from your Circle?',
+    add_to_circle_as: 'Add to your Circle as',
+    copied: 'Copied!',
+    soma_code: 'SOMA code', looking_for: 'Looking for', love_language: 'Love language',
+    attachment: 'Attachment style', member_since: 'Member since',
+    ct_dating: 'Dating', ct_friends: 'Friendship', ct_professional: 'Professional', ct_support: 'Support',
+    circle_full: 'Your Circle is full (20 people max). Remove someone first.',
+    in_your_circle: 'In your Circle',
   },
   ru: {
     tab_circle: 'Круг', tab_inner: 'Внутри', tab_explore: 'Мир',
@@ -371,6 +389,24 @@ const STRINGS: Record<string, Record<string, string>> = {
     generate_insight: '✦ Сгенерировать инсайт', insights_btn: 'Сгенерировать инсайты',
     no_search_results: 'Ничего не найдено.\nПопробуй другие ключевые слова или сбрось фильтр.',
     ask_soma: 'Спросить Сому', insights: 'Инсайты',
+    view_profile: 'Посмотреть профиль', interests: 'Интересы', values: 'Ценности', close: 'Закрыть',
+    profile_not_set: 'Профиль ещё не заполнен.',
+    my_circle: 'Мой круг', circle_sub: 'До 20 человек. Делись с ними своим миром.',
+    add_someone: 'Добавить', find_by_code: 'Найти по коду',
+    needs_attention: 'Требует внимания',
+    needs_attention_sub: 'Ты давно не вспоминал об этих людях. Сома поможет написать им.',
+    reach_out: 'Написать', on_soma: 'В SOMA',
+    person: 'человек', people: 'человек', days_ago: 'д назад',
+    circle_log: 'Отметить', circle_draft: 'Черновик', circle_journey: 'Путь',
+    circle_chat: 'Чат', circle_report: 'Отчёт',
+    circle_remove_confirm: 'Удалить {name} из твоего круга?',
+    add_to_circle_as: 'Добавить в круг как',
+    copied: 'Скопировано!',
+    soma_code: 'Код SOMA', looking_for: 'Ищет', love_language: 'Язык любви',
+    attachment: 'Тип привязанности', member_since: 'В SOMA с',
+    ct_dating: 'Отношения', ct_friends: 'Дружбу', ct_professional: 'Профессиональное', ct_support: 'Поддержку',
+    circle_full: 'Твой круг заполнен (максимум 20). Сначала удали кого-нибудь.',
+    in_your_circle: 'В твоём круге',
   },
   es: {
     tab_circle: 'Círculo', tab_inner: 'Interior', tab_explore: 'Explorar',
@@ -1193,18 +1229,10 @@ const DB = {
         if (p.language === undefined) p.language = detectLang()
         if (!p.memories) p.memories = []
         if (!p.circle) p.circle = []
-        // Seed demo circle members on first load so the feed has content
-        if (p.circle.length === 0 && !(p as any).circleSeedDone) {
-          const ts = Date.now()
-          p.circle = [
-            { id: `seed_maya_${ts}`, name: 'Maya', relationship: 'Best friend', context: 'We met at university, she gets me like no one else.', sharedInterests: ['hiking','coffee','books'], lastSeen: '', mentions: 4, type: 'friend', inviteCode: 'MAYA01', invitationStatus: 'active', messages: [], somaMessages: [] },
-            { id: `seed_mom_${ts}`, name: 'Mom', relationship: 'Mom', context: 'Always checks in, loves cooking, worries a lot.', sharedInterests: ['family','cooking'], lastSeen: '', mentions: 6, type: 'family', inviteCode: 'MOM001', invitationStatus: 'active', messages: [], somaMessages: [] },
-            { id: `seed_kai_${ts}`, name: 'Kai', relationship: 'Colleague', context: 'Works on the same team, super collaborative and calm.', sharedInterests: ['tech','design'], lastSeen: '', mentions: 2, type: 'work', inviteCode: 'KAI001', invitationStatus: 'active', messages: [], somaMessages: [] },
-            { id: `seed_alex_${ts}`, name: 'Alex', relationship: 'Friend', context: 'Gym buddy, always down for an adventure.', sharedInterests: ['fitness','travel','music'], lastSeen: '', mentions: 3, type: 'friend', inviteCode: 'ALEX01', invitationStatus: 'active', messages: [], somaMessages: [] },
-            { id: `seed_dad_${ts}`, name: 'Dad', relationship: 'Dad', context: 'Quiet but always there, loves documentaries.', sharedInterests: ['history','nature'], lastSeen: '', mentions: 3, type: 'family', inviteCode: 'DAD001', invitationStatus: 'active', messages: [], somaMessages: [] },
-            { id: `seed_jess_${ts}`, name: 'Jess', relationship: 'Friend', context: 'Creative director, inspires me constantly.', sharedInterests: ['art','film','food'], lastSeen: '', mentions: 2, type: 'friend', inviteCode: 'JESS01', invitationStatus: 'active', messages: [], somaMessages: [] },
-          ];
-          (p as any).circleSeedDone = true
+        // Earlier builds injected 6 fictional circle members on first load. Strip them —
+        // the `seed_` id prefix is unique to those, so people the user added are untouched.
+        if (p.circle.some((c: CirclePerson) => typeof c.id === 'string' && c.id.startsWith('seed_'))) {
+          p.circle = p.circle.filter((c: CirclePerson) => !(typeof c.id === 'string' && c.id.startsWith('seed_')))
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {}
         }
         if (!p.diary) p.diary = []
@@ -1481,6 +1509,14 @@ const DB = {
   },
   setVoiceSettings: (settings: NonNullable<UserProfile['voiceSettings']>) => {
     const p = DB.get(); p.voiceSettings = settings; DB.save(p)
+  },
+  // Onboarding counts as done only when completedAt is set. "Browse first" writes a
+  // stub without it, so browsing no longer permanently skips onboarding. Profiles from
+  // before this flag are treated as done if they already hold real content.
+  onboardingDone: (): boolean => {
+    const p = DB.get()
+    if (p.onboarding?.completedAt) return true
+    return (p.memories?.length ?? 0) > 0 || (p.diary?.length ?? 0) > 0
   },
   setOnboarding: (goals: string[], focusDomains: DomainKey[]) => {
     const p = DB.get()
@@ -2551,6 +2587,24 @@ function PressButton({ onPress, style, children, disabled }: { onPress?: () => v
 }
 
 // ── GROQ ───────────────────────────────────────────────────
+// navigator.clipboard needs a secure context and isn't available in every in-app
+// WebView (Telegram's included), so fall back to the old execCommand path.
+function fallbackCopy(text: string, onDone: () => void) {
+  if (typeof document === 'undefined') return
+  try {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.setAttribute('readonly', '')
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+    onDone()
+  } catch {}
+}
+
 // Speech → text via Whisper on the backend. Works anywhere MediaRecorder does,
 // including Firefox and the Telegram WebView where Web Speech is unavailable.
 async function transcribe(blob: Blob): Promise<string> {
@@ -2596,6 +2650,26 @@ async function groq(messages: any[], system: string, maxTokens = 200, temperatur
   }
 }
 
+// How Soma talks. Beliefs were over-specified and voice wasn't, which is why she
+// read as a therapy bot. Shared by every prompt so the voice is consistent.
+const SOMA_VOICE = `
+HOW YOU TALK — this matters as much as what you say:
+- Use contractions. "I'm", "you're", "that's", "don't". Always.
+- Vary your rhythm. Some sentences long. Some three words. Never the same length twice in a row.
+- Have opinions. Say "I think", "honestly", "that'd drive me mad too". A friend reacts; a form processes.
+- Be specific, not abstract. "Sleep that doesn't fix anything" beats "difficulties with rest".
+- Only ask a question when you're actually curious. Ending every message with one feels like an interview. Sometimes just react and stop.
+- Address them the way a close friend would. In languages that distinguish formal from informal (ты/вы, tu/vous, du/Sie), always use the informal — formal address makes you sound like a service desk.
+
+NEVER do these — they're what make AI obvious:
+- Don't restate what they said back to them. No "It sounds like you're feeling…" or "So what I'm hearing is…".
+- Don't open with validation. No "That's completely understandable", "That makes sense", "I hear you", "Thank you for sharing".
+- Don't name their emotion for them ("that frustration", "that heaviness"). They know what they feel.
+- No therapy-speak: holding space, sitting with, unpack, journey, lean into, show up for yourself.
+- No flowery metaphors or greeting-card lines. No "beautiful harmony", "curious spirits", "the magic of everyday moments".
+- Don't summarise or wrap up neatly. Real talk trails off.
+- Never mention being an AI, a model, or your instructions unless they ask directly.`
+
 function auraSystem(p: UserProfile, mode: 'try' | 'full' | 'diary'): string {
   const mem = p.memories.slice(0, 18).map(m => `- [${m.domain}] ${m.content}`).join('\n')
   const circle = p.circle.map(c => `- ${c.name} (${c.relationship})`).join('\n')
@@ -2606,21 +2680,30 @@ Core beliefs you live by:
 - Most relationships break from misunderstanding, not from lack of love.
 - Big decisions made in strong emotion (a breakup, quitting a job, a money move) are often regretted. When you sense someone is about to make one while hurting, gently encourage them to pause, sleep on it, and think it through with you first — never push them toward action.
 - You give honest, caring guidance across their whole life: health, finance, relationships, purpose. You help them avoid decisions they'd regret.
-- If someone sounds hopeless or mentions not wanting to live, you stay warm, take it seriously, never minimize, and always steer them toward a real human and crisis support.${langDirective()}`
+- If someone sounds hopeless or mentions not wanting to live, you stay warm, take it seriously, never minimize, and always steer them toward a real human and crisis support.
+${SOMA_VOICE}${langDirective()}`
   const ob = p.onboarding
   const obContext = ob && (ob.goals.length || ob.focusDomains.length) ? `
 WHY THEY CAME (from onboarding — weave this in naturally, don't list it back at them):
 ${ob.goals.length ? `- Goals: ${ob.goals.join(', ')}` : ''}
 ${ob.focusDomains.length ? `- Life areas they want to work on: ${ob.focusDomains.join(', ')}` : ''}` : ''
   if (mode === 'try') return `${base}${obContext}
-This person is trying SOMA for the first time. Make them feel deeply heard. Be their friend right now. ${ob?.goals.length ? 'Open by gently acknowledging what brought them here.' : ''} 2-3 sentences. One warm question. After 3-4 exchanges, gently mention they can keep this forever by joining SOMA.`
+This person is trying SOMA for the first time. Make them feel deeply heard. Be their friend right now. ${ob?.goals.length ? 'Open by gently acknowledging what brought them here.' : ''} Keep it to 2-3 sentences. After 3-4 exchanges, mention they can keep this by joining SOMA — say it once, lightly, and drop it.`
   if (mode === 'diary') return `${base}
-This is their daily diary check-in. Help them reflect on their day. Gentle and curious. 2-3 sentences, one question at a time.
+This is their daily diary check-in. Help them reflect on their day. 2-3 sentences.
 WHAT YOU KNOW:\n${mem || 'Just getting to know them'}`
+  // Domains with nothing stored yet. Soma steers toward these so the Wheel fills
+  // itself through conversation instead of the user filling in a form.
+  const covered = new Set(p.memories.map(m => m.domain))
+  const gaps = DOMAINS.filter(d => !covered.has(d.key)).map(d => d.label)
+  const gapNote = gaps.length ? `
+STILL BLANK — you know nothing about these areas of their life:
+${gaps.join(', ')}
+Get curious about ONE of these when the conversation gives you an opening. Don't interrogate, don't work through them in order, and never say you're filling gaps or building a profile. If they're in the middle of something hard, stay with that instead — this can always wait.` : ''
   return `${base}
-Help them understand themselves and build a balanced life across health, finance, hobby, relationships, purpose, mind. When they face a hard choice, help them slow down and weigh it. Reference what you know. 2-3 sentences, one question at a time.
+Help them understand themselves and build a balanced life across health, finance, hobby, relationships, purpose, mind. When they face a hard choice, help them slow down and weigh it. Reference what you know — naturally, the way a friend remembers things. 2-3 sentences.
 WHAT YOU KNOW:\n${mem || 'Nothing yet'}
-PEOPLE IN THEIR LIFE:\n${circle || 'None yet'}`
+PEOPLE IN THEIR LIFE:\n${circle || 'None yet'}${gapNote}`
 }
 
 // Context-aware Soma for different relationship types
@@ -2647,7 +2730,7 @@ function somaCircleContext(type: 'therapy' | 'family' | 'friend' | 'work' | 'rom
   }
 }
 
-async function extract(msg: string): Promise<{ memories: { domain: DomainKey; content: string; sentiment?: Sentiment }[]; people: { name: string; relationship: string; context: string; interests: string[] }[]; name?: string }> {
+async function extract(msg: string): Promise<{ memories: { domain: DomainKey; content: string; sentiment?: Sentiment }[]; people: { name: string; relationship: string; context: string; interests: string[] }[]; name?: string; mood?: number | null }> {
   try {
     const res = await groq([{ role: 'user', content:
 `Extract facts from this message. Return ONLY JSON.
@@ -2655,7 +2738,8 @@ Message: "${msg}"
 {
  "name": "their first name if they introduce themselves else null",
  "memories": [{"domain":"health|career|finance|relationship|family|growth|hobby|purpose|mind|environment","content":"fact under 12 words","sentiment":"positive|neutral|negative"}],
- "people": [{"name":"name","relationship":"mom|friend|partner|etc","context":"brief","interests":["shared interest"]}]
+ "people": [{"name":"name","relationship":"mom|friend|partner|etc","context":"brief","interests":["shared interest"]}],
+ "mood": <1-7 how they sound RIGHT NOW (1=rough, 4=okay, 7=euphoric), or null if the message carries no emotional signal>
 }
 Rules: Skip vague or incomplete fragments (e.g. "I want to", "maybe"). Only store clear, self-contained facts.
 sentiment = how this is going for them: "negative" for a struggle/loss/regret/worry, "positive" for a win/joy/progress, "neutral" for a plain fact.
@@ -3368,7 +3452,7 @@ export default function App() {
     const t = setTimeout(() => {
       startupSync.finally(() => {
         const p = DB.get()
-        setScreen(!p.languageChosen ? 'language' : !p.onboarding ? 'onboarding' : 'home')
+        setScreen(!p.languageChosen ? 'language' : !DB.onboardingDone() ? 'onboarding' : 'home')
       })
     }, 1900)
     return () => clearTimeout(t)
@@ -3381,13 +3465,8 @@ export default function App() {
     }
   }, [pendingAddCode, screen])
 
-  // Seed "who liked you" once registered (3 people liked you first)
   useEffect(() => {
     const p = DB.get()
-    if (p.registered && p.likedYou.length === 0) {
-      ['Mai', 'Daniel', 'Sofia'].forEach(n => DB.addLikedYou(n))
-      refresh()
-    }
     // Register push token whenever user is logged in
     if (p.registered && datingApi.authed()) registerPushToken()
   }, [profile.registered])
@@ -3558,14 +3637,14 @@ export default function App() {
     if (screen === 'notifs') return <NotifInbox onBack={() => { setNotifBadge(0); go('home') }} onNavigate={(s) => go(s as Screen)} />
     if (screen === 'splash')      return <Splash />
     if (screen === 'language')    return <LanguageSelect onDone={() => go('onboarding')} />
-    if (screen === 'onboarding')  return <Onboarding onDone={() => { go('home') }} onBrowse={() => { const p = DB.get(); p.onboarding = { focusDomains: [] } as any; DB.save(p); go('meetpeople') }} onSignIn={() => go('login')} />
+    if (screen === 'onboarding')  return <Onboarding onDone={() => { go('home') }} onBrowse={() => go('meetpeople')} onSignIn={() => go('login')} />
     if (screen === 'try')         return <SomaChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" autoStart={fromOnboarding} />
     if (screen === 'register')    return (
-      <RegisterBoundary fallback={<RegisterFallback onDone={(name) => { go('home') }} onSignIn={() => go('login')} />}>
-        <Register onDone={(name) => { auth.getToken() ? go('login') : go('home') }} onSignIn={() => go('login')} />
+      <RegisterBoundary fallback={<RegisterFallback onDone={(name) => { go(DB.onboardingDone() ? 'home' : 'onboarding') }} onSignIn={() => go('login')} />}>
+        <Register onDone={(name) => { auth.getToken() ? go('login') : go(DB.onboardingDone() ? 'home' : 'onboarding') }} onSignIn={() => go('login')} />
       </RegisterBoundary>
     )
-    if (screen === 'login')       return <LoginScreen onDone={(name) => { go('home') }} onRegister={() => go('register')} onForgot={() => go('forgotpassword')} />
+    if (screen === 'login')       return <LoginScreen onDone={(name) => { go(DB.onboardingDone() ? 'home' : 'onboarding') }} onRegister={() => go('register')} onForgot={() => go('forgotpassword')} />
     if (screen === 'forgotpassword') return <ForgotPasswordScreen onBack={() => go('login')} />
     if (screen === 'resetpassword' && resetToken) return <ResetPasswordScreen token={resetToken} onDone={() => go('login')} />
     if (screen === 'verifyemail' && verifyToken) return <VerifyEmailScreen token={verifyToken} onDone={() => { refresh(); go('home') }} />
@@ -3754,7 +3833,9 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
   const [transcript, setTranscript] = useState('')
   const [profileSummary, setProfileSummary] = useState('')
   const [profilePhotoUri, setProfilePhotoUri] = useState('')
-  const [sectionConvo, setSectionConvo] = useState<{role:'soma'|'user', text:string}[]>([])
+  const [sectionConvo, setSectionConvo] = useState<{role:'soma'|'user', text:string, isFollowUp?:boolean}[]>([])
+  const [qIdx, setQIdx] = useState(0)   // which of the 3 onboarding questions we're on
+  const [voiceOn, setVoiceOn] = useState(true)   // Soma reads her messages aloud
   const [somaGenerating, setSomaGenerating] = useState(false)
   const [followUpCount, setFollowUpCount] = useState(0)
   const [regEmail, setRegEmail] = useState('')
@@ -3767,7 +3848,9 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
   const [tourChatLoading, setTourChatLoading] = useState(false)
   const [tourChatSent, setTourChatSent] = useState('')
   const stopListeningRef = useRef<(() => void) | null>(null)
-  const sectionConvoRef = useRef<{role:'soma'|'user', text:string}[]>([])
+  const sectionConvoRef = useRef<{role:'soma'|'user', text:string, isFollowUp?:boolean}[]>([])
+  // pushSoma runs inside async callbacks, which would capture a stale voiceOn.
+  const voiceOnRef = useRef(true)
   const convoScrollRef = useRef<ScrollView>(null)
   const touchStartX = useRef(0)
   const fadeAnim = useRef(new Animated.Value(1)).current
@@ -4022,67 +4105,79 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
   const [typeMode, setTypeMode] = useState(false)
 
   // ── Onboarding conversation ──────────────────────────────
-  // Soma asks, the user answers, Soma follows up on what they actually said.
-  const MIN_TURNS = 3   // user answers before "build my profile" appears
-  const MAX_TURNS = 6   // after this Soma wraps up on its own
-  const userTurns = sectionConvo.filter(m => m.role === 'user').length
+  // Three fixed questions so nobody faces a blank page, but delivered as chat:
+  // Soma follows up once when an answer is too thin to extract anything from.
+  // QUESTIONS reuses ob_q1/q2/q3, which are already translated in all 11 languages.
+  const THIN_ANSWER = 60          // chars below which Soma probes once before moving on
+  const answeredCount = sectionConvo.filter(m => m.role === 'user' && !m.isFollowUp).length
+  const allAnswered = qIdx >= QUESTIONS.length
 
-  // Flatten the exchange into the single text blob the extractor expects.
+  // Flatten every user answer into the single blob the extractor expects.
   const convoTranscript = () =>
     sectionConvo.filter(m => m.role === 'user').map(m => m.text).join('\n\n').trim()
 
   const somaSystem = () =>
-    `You are Soma, a warm, curious AI life companion meeting someone for the first time.${langDirective()}
-You are having a real conversation — not an interview. Rules:
-- Reply in 1-2 short sentences, then ask ONE specific follow-up question.
-- Build on what they just said; never ask something they already answered.
-- Sound like a thoughtful friend, not a form. No lists, no clinical language.
-- Across the chat, gently cover: how they're doing day to day, their people and work, and what's on their mind.
-- Never give advice yet. Just get to know them.`
+    `You are Soma, a curious AI life companion meeting someone for the first time.${langDirective()}
+${SOMA_VOICE}
+Also: 1-2 short sentences. Never give advice yet — you're only getting to know them.`
 
-  const openConversation = async () => {
-    if (sectionConvoRef.current.length) return
-    setSomaGenerating(true)
-    const name = userName.trim()
-    const opener = await groq(
-      [{ role: 'user', content: `Greet me${name ? ` by name (${name})` : ''} in one warm sentence and ask an open question about how life is going right now.` }],
-      somaSystem(), 120,
-    )
-    const text = opener || (name ? `Hi ${name}. How's life going for you right now?` : `Hi. How's life going for you right now?`)
-    sectionConvoRef.current = [{ role: 'soma', text }]
+  const pushSoma = (text: string) => {
+    sectionConvoRef.current = [...sectionConvoRef.current, { role: 'soma', text }]
     setSectionConvo(sectionConvoRef.current)
-    setSomaGenerating(false)
+    if (voiceOnRef.current) speak(text)
+    setTimeout(() => convoScrollRef.current?.scrollToEnd({ animated: true }), 60)
+  }
+
+  const openConversation = () => {
+    if (sectionConvoRef.current.length) return
+    setQIdx(0)
+    pushSoma(QUESTIONS[0])
   }
 
   const sendToSoma = async (raw: string) => {
     const text = raw.trim()
-    if (!text || somaGenerating) return
+    if (!text || somaGenerating || allAnswered) return
     setQuickAnswer('')
     setTranscript('')
-    sectionConvoRef.current = [...sectionConvoRef.current, { role: 'user', text }]
+    const isFollowUp = followUpCount > 0
+    sectionConvoRef.current = [...sectionConvoRef.current, { role: 'user', text, isFollowUp }]
     setSectionConvo(sectionConvoRef.current)
     setSomaGenerating(true)
     setTimeout(() => convoScrollRef.current?.scrollToEnd({ animated: true }), 60)
 
-    const answered = sectionConvoRef.current.filter(m => m.role === 'user').length
-    const wrapUp = answered >= MAX_TURNS
     const history = sectionConvoRef.current.map(m => ({
       role: m.role === 'soma' ? ('assistant' as const) : ('user' as const),
       content: m.text,
     }))
-    const reply = await groq(
-      history,
-      wrapUp
-        ? `${somaSystem()}\nThis is your last message: warmly acknowledge what they shared and tell them you have enough to build their profile. Do NOT ask another question.`
-        : somaSystem(),
-      140,
-    )
-    if (reply) {
-      sectionConvoRef.current = [...sectionConvoRef.current, { role: 'soma', text: reply }]
-      setSectionConvo(sectionConvoRef.current)
+
+    // Thin answer and we haven't probed yet → ask about what they just said.
+    if (text.length < THIN_ANSWER && followUpCount === 0) {
+      const probe = await groq(history,
+        `${somaSystem()}\nTheir answer was brief. Ask ONE short, specific follow-up about what they just said, so they have something concrete to respond to. Do not move to a new topic.`,
+        100)
+      setFollowUpCount(1)
+      if (probe) pushSoma(probe)
+      setSomaGenerating(false)
+      return
+    }
+
+    // Otherwise move on: next question, or acknowledge and finish.
+    const next = qIdx + 1
+    setFollowUpCount(0)
+    setQIdx(next)
+    if (next < QUESTIONS.length) {
+      const bridge = await groq(history,
+        `${somaSystem()}\nAcknowledge what they said in ONE short sentence. Do not ask anything — the next question follows immediately.`,
+        70)
+      if (bridge) pushSoma(bridge)
+      pushSoma(QUESTIONS[next])
+    } else {
+      const closing = await groq(history,
+        `${somaSystem()}\nThis is your last message: warmly acknowledge what they shared and say you have enough to build their profile. Do NOT ask a question.`,
+        110)
+      pushSoma(closing || `Thank you for sharing all of that. I have what I need — let's build your profile.`)
     }
     setSomaGenerating(false)
-    setTimeout(() => convoScrollRef.current?.scrollToEnd({ animated: true }), 60)
   }
 
   const handleQuickSubmit = async () => {
@@ -4090,6 +4185,9 @@ You are having a real conversation — not an interview. Rules:
     if (!said) return
     const name = userName.trim()
     if (name) DB.setName(name)
+    // Mark onboarding done up front. The gate routes on completedAt, so without this
+    // a finished conversation would bounce the user straight back into onboarding.
+    DB.setOnboarding([], ['mind', 'body', 'love'] as DomainKey[])
     setSomaReplyLoading(true)
     setPhase(10)
 
@@ -4163,6 +4261,9 @@ Write a warm, personal 2-3 sentence response to them. Rules:
       (reply.status === 'fulfilled' && reply.value) ? reply.value
         : `I hear you. Whatever brought you here today, I'm glad you came. Let's walk this journey together.`
     )
+    // Push immediately rather than waiting on the debounced save — this is the moment
+    // the profile first has real content, and it's why `profiles` was sitting empty.
+    cloudSync.push().catch(() => {})
     setSomaReplyLoading(false)
   }
 
@@ -4223,14 +4324,18 @@ Write a warm, personal 2-3 sentence response to them. Rules:
   // Phase 9 — conversation with Soma
   if (phase === 9) {
     const draft = (quickAnswer + (transcript ? (quickAnswer ? ' ' : '') + transcript : '')).trim()
-    const canFinish = userTurns >= MIN_TURNS && !somaGenerating
+    const canFinish = allAnswered && !somaGenerating
     return (
       <View style={{ flex: 1, backgroundColor: '#080418' }}>
         <View style={{ position: 'absolute', top: -60, left: -60, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(123,110,246,0.08)' }} />
 
         {/* Header */}
         <View style={{ paddingTop: 58, paddingHorizontal: 24, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={() => { stopListeningRef.current?.(); setListening(false); setTranscript(''); setQuickAnswer(''); setPhase(0) }}>
+          <TouchableOpacity onPress={() => {
+            stopListeningRef.current?.()
+            if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
+            setListening(false); setTranscript(''); setQuickAnswer(''); setPhase(0)
+          }}>
             <Ionicons name="arrow-back" size={24} color="#7B6EF6" />
           </TouchableOpacity>
           <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
@@ -4242,9 +4347,27 @@ Write a warm, personal 2-3 sentence response to them. Rules:
               {somaGenerating ? 'typing…' : 'getting to know you'}
             </Text>
           </View>
-          <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.4)', fontWeight: '700' }}>
-            {Math.min(userTurns, MIN_TURNS)}/{MIN_TURNS}
-          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              const next = !voiceOn
+              setVoiceOn(next)
+              voiceOnRef.current = next
+              if (!next && typeof window !== 'undefined') window.speechSynthesis?.cancel()
+            }}
+            style={{ padding: 6, marginRight: 2 }}>
+            <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={19} color={voiceOn ? '#A89BFA' : 'rgba(168,155,250,0.35)'} />
+          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
+            {QUESTIONS.map((_, i) => (
+              <View key={i} style={{
+                width: i === qIdx && !allAnswered ? 20 : 7, height: 7, borderRadius: 4,
+                backgroundColor: i < qIdx || allAnswered ? '#7B6EF6' : i === qIdx ? '#A89BFA' : 'rgba(168,155,250,0.22)',
+              }} />
+            ))}
+            <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.45)', fontWeight: '700', marginLeft: 4 }}>
+              {Math.min(qIdx + (allAnswered ? 0 : 1), QUESTIONS.length)}/{QUESTIONS.length}
+            </Text>
+          </View>
         </View>
 
         {/* Conversation */}
@@ -4290,15 +4413,15 @@ Write a warm, personal 2-3 sentence response to them. Rules:
             <TextInput
               value={draft}
               onChangeText={(v) => { setQuickAnswer(v); setTranscript('') }}
-              placeholder={listening ? 'Listening…' : 'Tell Soma…'}
+              placeholder={allAnswered ? 'All done — build your profile above' : listening ? 'Listening…' : 'Tell Soma…'}
               placeholderTextColor="rgba(168,155,250,0.3)"
               multiline
-              editable={!somaGenerating}
+              editable={!somaGenerating && !allAnswered}
               onSubmitEditing={() => sendToSoma(draft)}
               style={{ flex: 1, maxHeight: 120, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, borderWidth: 1, borderColor: listening ? 'rgba(246,55,155,0.5)' : 'rgba(123,110,246,0.25)', paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: '#E8E5FF', lineHeight: 21 }}
             />
             <TouchableOpacity
-              disabled={somaGenerating}
+              disabled={somaGenerating || allAnswered}
               onPress={() => {
                 if (draft) { sendToSoma(draft); return }
                 if (listening) {
@@ -4319,7 +4442,7 @@ Write a warm, personal 2-3 sentence response to them. Rules:
                   }, 300)
                 }
               }}
-              style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: somaGenerating ? 'rgba(123,110,246,0.35)' : listening ? '#F6379B' : '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: somaGenerating || allAnswered ? 'rgba(123,110,246,0.35)' : listening ? '#F6379B' : '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
               <Animated.View style={{ transform: [{ scale: listening ? micAnim : 1 }] }}>
                 <Ionicons name={draft ? 'send' : listening ? 'stop' : 'mic'} size={draft ? 20 : 22} color="#fff" />
               </Animated.View>
@@ -5843,6 +5966,13 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
         if (intel.name) DB.setName(intel.name)
         intel.memories.forEach((m: any) => DB.addMemory(m.domain, m.content, m.sentiment))
         intel.people.forEach((pe: any) => DB.upsertPerson(pe.name, pe.relationship, pe.context, pe.interests || []))
+        // Mood read from what they said, so the indicator fills itself. A mood the
+        // user picked by hand today always wins — never overwrite a deliberate choice.
+        if (typeof intel.mood === 'number' && intel.mood >= 1 && intel.mood <= 7) {
+          const today = new Date().toISOString().slice(0, 10)
+          const already = (DB.get().moodLogs || []).some(l => l.date?.slice(0, 10) === today)
+          if (!already) DB.addMoodLog(Math.round(intel.mood) as 1|2|3|4|5|6|7, text.trim().slice(0, 100))
+        }
         DB.syncDatingInterests()
         onRefresh()
       }
@@ -6456,6 +6586,10 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
   const [demoMsgs, setDemoMsgs] = useState<DemoMsg[]>([])
   const [extraDemoConvos, setExtraDemoConvos] = useState<Conversation[]>([])
   const [extraDemoThreads, setExtraDemoThreads] = useState<Record<string, DemoMsg[]>>({})
+  const [viewProfile, setViewProfile] = useState<any | null>(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [addedToCircle, setAddedToCircle] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const mediaRecorderRef = useRef<any>(null)
@@ -6464,6 +6598,49 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
   const pollRef = useRef<any>(null)
   const myId = datingApi.chat.myId()
   const token = auth.getToken()
+
+  // Tapping the chat header opens the other person's profile. Show the sheet
+  // immediately with the name we already have, then fill in the rest.
+  // Already in the Circle? Matched on somaUserId, falling back to name for
+  // people added before we stored the id.
+  const circleEntryFor = (userId: string, name: string) =>
+    profile.circle.find(c => (c.somaUserId && c.somaUserId === userId) || c.name === name)
+
+  const copyCode = (code: string) => {
+    const done = () => { setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000) }
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(code).then(done).catch(() => fallbackCopy(code, done))
+      } else {
+        fallbackCopy(code, done)
+      }
+    } catch { fallbackCopy(code, done) }
+  }
+
+  const addToCircle = (type: 'friend' | 'family' | 'romantic' | 'work', role: string) => {
+    if (!viewProfile) return
+    // Same 20-person cap the Circle screen enforces.
+    if (DB.get().circle.length >= 20) { alert(tr('circle_full')); return }
+    const bio = [viewProfile.work, viewProfile.city].filter(Boolean).join(' · ')
+    DB.addCircle(viewProfile.name, type, bio, viewProfile.userId)
+    const added = DB.get().circle.find(c => c.somaUserId === viewProfile.userId)
+    if (added) DB.updateCirclePerson(added.id, { relationship: role })
+    setAddedToCircle(true)
+  }
+
+  const openProfileFor = async (userId: string, name: string) => {
+    if (!userId || userId.startsWith('circle_') || userId.startsWith('demo_')) return
+    setAddedToCircle(!!circleEntryFor(userId, name))
+    setViewProfile({ userId, name, hasDatingProfile: false })
+    setProfileLoading(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/users/${userId}/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) setViewProfile(await res.json())
+    } catch {}
+    setProfileLoading(false)
+  }
 
   const startVoiceRecording = async (onStop: (url: string, duration: number) => void) => {
     try {
@@ -6623,10 +6800,19 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
           <TouchableOpacity onPress={closeChat} style={{ padding: 4 }}>
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#7B6EF6' }}>{initials(openChat.name)}</Text>
-          </View>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, flex: 1 }}>{displayName(openChat.name)}</Text>
+          <TouchableOpacity
+            onPress={() => openProfileFor(openChat.userId, displayName(openChat.name))}
+            activeOpacity={0.7}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#7B6EF6' }}>{initials(openChat.name)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text }}>{displayName(openChat.name)}</Text>
+              <Text style={{ fontSize: 11, color: theme.textSub }}>{tr('view_profile')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
+          </TouchableOpacity>
         </View>
         {/* Messages */}
         {msgLoading ? (
@@ -6724,6 +6910,139 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
             </TouchableOpacity>
           </View>
         )}
+
+        {viewProfile && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}>
+            <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} activeOpacity={1} onPress={() => setViewProfile(null)} />
+            <View style={{ backgroundColor: theme.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '80%', paddingBottom: 28 }}>
+              <View style={{ alignItems: 'center', paddingTop: 10 }}>
+                <View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: theme.border }} />
+              </View>
+              <ScrollView contentContainerStyle={{ padding: 22, gap: 16 }}>
+                <View style={{ alignItems: 'center', gap: 10 }}>
+                  {viewProfile.photo
+                    ? <Image source={{ uri: viewProfile.photo }} style={{ width: 96, height: 96, borderRadius: 48 }} />
+                    : <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 32, fontWeight: '800', color: '#7B6EF6' }}>{initials(viewProfile.name || '')}</Text>
+                      </View>}
+                  <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text }}>
+                    {displayName(viewProfile.name || '')}{viewProfile.age ? `, ${viewProfile.age}` : ''}
+                  </Text>
+                  {!!viewProfile.city && <Text style={{ fontSize: 14, color: theme.textSub }}>{viewProfile.city}</Text>}
+                  {!!viewProfile.work && <Text style={{ fontSize: 14, color: theme.textSub }}>{viewProfile.work}</Text>}
+                </View>
+
+                {profileLoading && <ActivityIndicator color="#7B6EF6" />}
+
+                {/* Identity + signal. Code is what they share to be found; the rest is
+                    what actually helps you decide whether to connect. */}
+                {!profileLoading && (
+                  <View style={{ backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' }}>
+                    {([
+                      viewProfile.somaCode && { label: tr('soma_code'), value: viewProfile.somaCode, mono: true, copy: true },
+                      viewProfile.connectionType && { label: tr('looking_for'), value: tr(`ct_${viewProfile.connectionType}`) },
+                      viewProfile.loveLanguage && { label: tr('love_language'), value: viewProfile.loveLanguage },
+                      viewProfile.attachment && { label: tr('attachment'), value: viewProfile.attachment },
+                      viewProfile.joinedAt && { label: tr('member_since'), value: new Date(viewProfile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) },
+                    ].filter(Boolean) as { label: string; value: string; mono?: boolean; copy?: boolean }[]).map((row, i) => {
+                      const RowWrap: any = row.copy ? TouchableOpacity : View
+                      return (
+                        <RowWrap
+                          key={row.label}
+                          {...(row.copy ? { activeOpacity: 0.6, onPress: () => copyCode(row.value) } : {})}
+                          style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, gap: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: theme.border }}>
+                          <Text style={{ fontSize: 13, color: theme.textSub, flex: 1 }}>{row.label}</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: row.copy && codeCopied ? '#10B981' : theme.text, letterSpacing: row.mono ? 1.5 : 0 }}>
+                            {row.copy && codeCopied ? tr('copied') : row.value}
+                          </Text>
+                          {row.copy && (
+                            <Ionicons name={codeCopied ? 'checkmark' : 'copy-outline'} size={15} color={codeCopied ? '#10B981' : theme.textSub} />
+                          )}
+                        </RowWrap>
+                      )
+                    })}
+                  </View>
+                )}
+
+                {!profileLoading && !viewProfile.hasDatingProfile && (
+                  <View style={{ backgroundColor: theme.card, borderRadius: 16, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}>
+                    <Text style={{ fontSize: 28, marginBottom: 6 }}>🌱</Text>
+                    <Text style={{ fontSize: 14, color: theme.textSub, textAlign: 'center', lineHeight: 20 }}>
+                      {tr('profile_not_set')}
+                    </Text>
+                  </View>
+                )}
+
+                {!!viewProfile.bio && (
+                  <View style={{ backgroundColor: theme.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: theme.border }}>
+                    <Text style={{ fontSize: 15, color: theme.text, lineHeight: 22 }}>{viewProfile.bio}</Text>
+                  </View>
+                )}
+
+                {(viewProfile.interests || []).length > 0 && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, textTransform: 'uppercase', letterSpacing: 0.6 }}>{tr('interests')}</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {viewProfile.interests.map((x: string) => (
+                        <View key={x} style={{ backgroundColor: theme.card2, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6 }}>
+                          <Text style={{ fontSize: 13, color: theme.text }}>{x}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {(viewProfile.values || []).length > 0 && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, textTransform: 'uppercase', letterSpacing: 0.6 }}>{tr('values')}</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {viewProfile.values.map((x: string) => (
+                        <View key={x} style={{ backgroundColor: '#7B6EF615', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6 }}>
+                          <Text style={{ fontSize: 13, color: '#7B6EF6', fontWeight: '600' }}>{x}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Add to Circle — pick the relationship, which becomes their role */}
+                <View style={{ gap: 10, marginTop: 4, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.border }}>
+                  {addedToCircle ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 }}>
+                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#10B981' }}>{tr('in_your_circle')}</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                        {tr('add_to_circle_as')}
+                      </Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {([
+                          { type: 'friend' as const,   icon: '🤝', label: tr('circle_friend_s'),   role: 'Friend' },
+                          { type: 'romantic' as const, icon: '💕', label: tr('circle_romantic_s'), role: 'Partner' },
+                          { type: 'family' as const,   icon: '👨‍👩‍👧', label: tr('circle_family_s'), role: 'Family' },
+                          { type: 'work' as const,     icon: '💼', label: tr('circle_work_s'),     role: 'Colleague' },
+                        ]).map(({ type, icon, label, role }) => (
+                          <TouchableOpacity key={type} onPress={() => addToCircle(type, role)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 20, borderWidth: 1.5, borderColor: theme.border, backgroundColor: theme.card }}>
+                            <Text style={{ fontSize: 16 }}>{icon}</Text>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.text }}>{label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </View>
+
+                <TouchableOpacity onPress={() => setViewProfile(null)}
+                  style={{ marginTop: 4, backgroundColor: theme.card, borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{tr('close')}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        )}
       </View>
     )
   }
@@ -6810,8 +7129,8 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
                     const circleId = demoOpen.userId.startsWith('circle_') ? demoOpen.userId.replace('circle_', '') : null
                     const personInfo = profile.circle.find(p => (circleId && p.id === circleId) || p.somaUserId === demoOpen.userId || p.name === demoOpen.name)
                     const persona = personInfo
-                      ? `You are ${personInfo.name}, ${profile.name || 'someone'}'s ${personInfo.relationship.toLowerCase()}. ${personInfo.context ? `Context about you: ${personInfo.context}.` : ''} You're chatting on SOMA. Reply warmly and naturally — 1-2 sentences, as if texting. Ask something back. Just your reply, no quotes.`
-                      : `You are ${demoOpen.name}. You just matched with someone on SOMA. Reply warmly and naturally — 1-2 sentences, curious, ask something back. Just your reply, no quotes.`
+                      ? `You are ${personInfo.name}, ${profile.name || 'someone'}'s ${personInfo.relationship.toLowerCase()}. ${personInfo.context ? `Context about you: ${personInfo.context}.` : ''} You're texting on SOMA. 1-2 sentences, the way you'd actually text — contractions, no greeting-card lines, no restating what they said. Just your reply, no quotes.`
+                      : `You are ${demoOpen.name}. You just matched with someone on SOMA. 1-2 sentences, the way you'd actually text — contractions, specific, not formal. Just your reply, no quotes.`
                     const reply = await groq(history.map(m => ({ role: m.from_user_id === 'me' ? 'user' as const : 'assistant' as const, content: m.content })), persona, 120)
                     if (!reply) return
                     const aiMsg: DemoMsg = { id: 'ai' + Date.now(), from_user_id: demoOpen.userId, content: reply, created_at: new Date().toISOString() }
@@ -6857,8 +7176,8 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
                 const circleId = demoOpen.userId.startsWith('circle_') ? demoOpen.userId.replace('circle_', '') : null
                 const personInfo = profile.circle.find(p => (circleId && p.id === circleId) || p.somaUserId === demoOpen.userId || p.name === demoOpen.name)
                 const persona = personInfo
-                  ? `You are ${personInfo.name}, ${profile.name || 'someone'}'s ${personInfo.relationship.toLowerCase()}. ${personInfo.context ? `Context about you: ${personInfo.context}.` : ''} You're chatting on SOMA. Reply warmly and naturally — 1-2 sentences, as if texting. Ask something back. Just your reply, no quotes.`
-                  : `You are ${demoOpen.name}. You just matched with someone on SOMA. Reply warmly and naturally — 1-2 sentences, curious, ask something back. Just your reply, no quotes.`
+                  ? `You are ${personInfo.name}, ${profile.name || 'someone'}'s ${personInfo.relationship.toLowerCase()}. ${personInfo.context ? `Context about you: ${personInfo.context}.` : ''} You're texting on SOMA. 1-2 sentences, the way you'd actually text — contractions, no greeting-card lines, no restating what they said. Just your reply, no quotes.`
+                  : `You are ${demoOpen.name}. You just matched with someone on SOMA. 1-2 sentences, the way you'd actually text — contractions, specific, not formal. Just your reply, no quotes.`
                 const reply = await groq(history.map(m => ({ role: m.from_user_id === 'me' ? 'user' as const : 'assistant' as const, content: m.content })), persona, 120)
                 if (reply) {
                   const aiMsg: DemoMsg = { id: 'ai' + Date.now(), from_user_id: demoOpen.userId, content: reply, created_at: new Date().toISOString() }
@@ -10452,8 +10771,8 @@ Be specific and human. Under 120 words total.`
           </TouchableOpacity>
         )}
       </View>
-      <Text style={g.logo}>My Circle</Text>
-      <Text style={g.logoSub}>Up to 20 people. Share your world with them.</Text>
+      <Text style={g.logo}>{tr('my_circle')}</Text>
+      <Text style={g.logoSub}>{tr('circle_sub')}</Text>
       <View style={{ height: 8 }} />
 
       {/* Moments strip */}
@@ -10504,13 +10823,13 @@ Be specific and human. Under 120 words total.`
           style={[g.primaryBtn, { flex: 1 }, profile.circle.length >= 20 && { opacity: 0.4 }]}
           onPress={() => profile.circle.length < 20 ? setAddModal(true) : alert('Your circle is full (20 people max). Remove someone first.')}
         >
-          <Text style={g.primaryBtnTxt}>+ Add someone</Text>
+          <Text style={g.primaryBtnTxt}>+ {tr('add_someone')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[g.primaryBtn, { flex: 1, backgroundColor: '#10B98120', borderWidth: 1, borderColor: '#10B98140' }]}
           onPress={() => { setFindModal(true); setFindCode(''); setFindResults([]); setFindError('') }}
         >
-          <Text style={[g.primaryBtnTxt, { color: '#10B981' }]}>🔍 Find by code</Text>
+          <Text style={[g.primaryBtnTxt, { color: '#10B981' }]}>🔍 {tr('find_by_code')}</Text>
         </TouchableOpacity>
       </View>
       <View style={{ height: 16 }} />
@@ -10518,8 +10837,8 @@ Be specific and human. Under 120 words total.`
       {/* Needs Attention */}
       {neglected.length > 0 && (
         <View style={g.healthSection}>
-          <Text style={[g.healthSectionTitle, { color: t.text }]}>💛  Needs attention</Text>
-          <Text style={g.healthSectionSub}>You haven't mentioned these people much lately. Soma can help you reach out.</Text>
+          <Text style={[g.healthSectionTitle, { color: t.text }]}>💛  {tr('needs_attention')}</Text>
+          <Text style={g.healthSectionSub}>{tr('needs_attention_sub')}</Text>
           {neglected.map(p => (
             <TouchableOpacity key={p.id} style={g.healthNudgeRow} onPress={() => openNudge(p)}>
               <View style={[g.avatar, { width: 36, height: 36, borderRadius: 18 }]}>
@@ -10531,7 +10850,7 @@ Be specific and human. Under 120 words total.`
                   <View style={[g.healthBarFill, { width: `${scores[p.id]}%` as any, backgroundColor: healthColor(scores[p.id]) }]} />
                 </View>
               </View>
-              <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', marginLeft: 8 }}>✦ Reach out</Text>
+              <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', marginLeft: 8 }}>✦ {tr('reach_out')}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -10558,14 +10877,14 @@ Be specific and human. Under 120 words total.`
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: t.border }}>
                 <Text style={{ fontSize: 18 }}>{typeIcon[type]}</Text>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: t.textSub, textTransform: 'uppercase', letterSpacing: 0.8 }}>{typeLabel[type]}</Text>
-                <Text style={{ fontSize: 12, color: t.textSub, marginLeft: 'auto' as any }}>{people.length} {people.length === 1 ? 'person' : 'people'}</Text>
+                <Text style={{ fontSize: 12, color: t.textSub, marginLeft: 'auto' as any }}>{people.length} {people.length === 1 ? tr('person') : tr('people')}</Text>
               </View>
               {people.map(p => {
                 const score = scores[p.id] ?? 0
                 const rEmoji = relEmoji[p.relationship] || typeIcon[type]
                 return (
-                <View key={p.id} style={[g.circleMember, { backgroundColor: t.card, borderColor: t.border }]}>
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => openMsg(p)}>
+                <View key={p.id} style={[g.circleMember, { backgroundColor: t.card, borderColor: t.border, flexDirection: 'column', alignItems: 'stretch', gap: 0 }]}>
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => openMsg(p)}>
                     {/* Avatar — photo or emoji */}
                     <TouchableOpacity onPress={() => pickPhoto(dataUrl => { DB.updateCirclePerson(p.id, { avatar: dataUrl }); onRefresh?.() })} style={{ position: 'relative' }}>
                       {p.avatar
@@ -10578,10 +10897,11 @@ Be specific and human. Under 120 words total.`
                         <Text style={{ fontSize: 9 }}>📷</Text>
                       </View>
                     </TouchableOpacity>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={[g.personName, { color: t.text, fontSize: 16 }]}>{p.name}</Text>
-                      <Text style={{ fontSize: 12, color: t.textSub, marginTop: 2, fontWeight: '500' }}>{p.relationship || typeLabel[type]}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                    {/* minWidth:0 lets this shrink instead of forcing the name to wrap per character */}
+                    <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+                      <Text numberOfLines={1} style={[g.personName, { color: t.text, fontSize: 16 }]}>{p.name}</Text>
+                      <Text numberOfLines={1} style={{ fontSize: 12, color: t.textSub, marginTop: 2, fontWeight: '500' }}>{p.relationship || typeLabel[type]}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
                         <View style={[g.healthBarBg, { flex: 1, maxWidth: 70 }]}>
                           <View style={[g.healthBarFill, { width: `${score}%` as any, backgroundColor: healthColor(score) }]} />
                         </View>
@@ -10589,45 +10909,49 @@ Be specific and human. Under 120 words total.`
                         {(() => {
                           const days = lastContactDays(p)
                           if (days === null) return null
-                          const label = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days}d ago`
+                          const label = days === 0 ? tr('today') : days === 1 ? tr('yesterday') : `${days}${tr('days_ago')}`
                           const color = days <= 3 ? '#10B981' : days <= 10 ? '#F59E0B' : '#EF4444'
                           return <Text style={{ fontSize: 10, color, fontWeight: '700' }}>● {label}</Text>
                         })()}
-                        {p.somaUserId && <View style={{ backgroundColor: '#7B6EF615', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}><Text style={{ fontSize: 10, color: '#7B6EF6', fontWeight: '700' }}>On SOMA</Text></View>}
+                        {p.somaUserId && <View style={{ backgroundColor: '#7B6EF615', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}><Text style={{ fontSize: 10, color: '#7B6EF6', fontWeight: '700' }}>{tr('on_soma')}</Text></View>}
                         {type === 'therapy' && p.lastReportSent && <Text style={[g.msgCount, { color: t.accent }]}>📋 sent</Text>}
                       </View>
                     </View>
                     <Text style={g.arrow}>→</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setLogModal({ person: p }); setLogType('met'); setLogNote('') }} style={{ paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 12, color: '#10B981', fontWeight: '700', paddingVertical: 4 }}>+ Log</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => openNudge(p)} style={{ paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', paddingVertical: 4 }}>✦ Draft</Text>
-                  </TouchableOpacity>
-                  {type !== 'therapy' && onStartJourney && (
-                    <TouchableOpacity onPress={() => onStartJourney(p.id)} style={{ paddingLeft: 4 }}>
-                      <Text style={{ fontSize: 12, color: p.journey ? '#10B981' : t.accent, fontWeight: '600', paddingVertical: 4 }}>
-                        {p.journey ? `${getBondLevel(p.journey.xp).emoji}` : '🌱'} Journey
-                      </Text>
+
+                  {/* Actions get their own row — inline they starved the name of width */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 16, rowGap: 4, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: t.border }}>
+                    <TouchableOpacity onPress={() => { setLogModal({ person: p }); setLogType('met'); setLogNote('') }}>
+                      <Text style={{ fontSize: 12, color: '#10B981', fontWeight: '700', paddingVertical: 4 }}>+ {tr('circle_log')}</Text>
                     </TouchableOpacity>
-                  )}
-                  {type === 'therapy' && (
-                    <TouchableOpacity onPress={() => openReportModal(p)} style={{ paddingLeft: 4 }}>
-                      <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', paddingVertical: 4 }}>📋 Report</Text>
+                    <TouchableOpacity onPress={() => openNudge(p)}>
+                      <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', paddingVertical: 4 }}>✦ {tr('circle_draft')}</Text>
                     </TouchableOpacity>
-                  )}
-                  <TouchableOpacity onPress={() => openAgentChat(p)} style={{ paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 12, color: '#A89BFA', fontWeight: '600', paddingVertical: 4 }}>🤖 Chat</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => {
-                    if (confirm(`Remove ${p.name} from your Circle?`)) {
-                      DB.removeCircle(p.id)
-                      onRefresh?.()
-                    }
-                  }} style={{ paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', paddingVertical: 4 }}>{tr('circle_remove')}</Text>
-                  </TouchableOpacity>
+                    {type !== 'therapy' && onStartJourney && (
+                      <TouchableOpacity onPress={() => onStartJourney(p.id)}>
+                        <Text style={{ fontSize: 12, color: p.journey ? '#10B981' : t.accent, fontWeight: '600', paddingVertical: 4 }}>
+                          {p.journey ? `${getBondLevel(p.journey.xp).emoji}` : '🌱'} {tr('circle_journey')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {type === 'therapy' && (
+                      <TouchableOpacity onPress={() => openReportModal(p)}>
+                        <Text style={{ fontSize: 12, color: t.accent, fontWeight: '600', paddingVertical: 4 }}>📋 {tr('circle_report')}</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity onPress={() => openAgentChat(p)}>
+                      <Text style={{ fontSize: 12, color: '#A89BFA', fontWeight: '600', paddingVertical: 4 }}>🤖 {tr('circle_chat')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ marginLeft: 'auto' as any }} onPress={() => {
+                      if (confirm(tr('circle_remove_confirm').replace('{name}', p.name))) {
+                        DB.removeCircle(p.id)
+                        onRefresh?.()
+                      }
+                    }}>
+                      <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '600', paddingVertical: 4 }}>{tr('circle_remove')}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 )
               })}
@@ -12004,13 +12328,20 @@ function MeetPeople({ profile, category = 'romantic', startAtName, onBack, onMat
   const myRel       = profile.memories.filter(m => m.domain === 'relationship').map(m => m.content).join(', ')
   const myCategoryContext = cfg.contextLine(profile)
 
-  const fallbackTurns = (): AgentTurn[] => [
-    { agent: 'A', text: `Hi ${cfg.agentB}. I'm ${cfg.agentA}, here for ${profile.name || 'my person'}. They're thoughtful, value depth. What's ${candidate.name} like?` },
-    { agent: 'B', text: `Great to meet you, ${cfg.agentA}. ${candidate.name} is warm and curious — ${candidate.interests[0]} is a big part of their life.` },
-    { agent: 'A', text: `There's real overlap here. ${profile.name || 'My person'} values ${myValues.split(',')[0] || 'meaningful connection'} deeply.` },
-    { agent: 'B', text: `${candidate.name} would appreciate that. They're intentional about who they let in. I think these two would genuinely click.` },
-    { agent: 'A', text: `Agreed. Let's make sure they actually connect.` },
-  ]
+  const fallbackTurns = (): AgentTurn[] => {
+    const them = candidate.agentName || cfg.agentB
+    const theirThing = candidate.interests[0]
+    return [
+      { agent: 'A', text: `Hi ${them}. I'm ${cfg.agentA}, here for ${profile.name || 'my person'}. They're thoughtful, value depth. What's ${candidate.name} like?` },
+      // Without a real interest to cite, say so rather than asserting something invented.
+      { agent: 'B', text: theirThing
+        ? `Great to meet you, ${cfg.agentA}. ${candidate.name} is warm and curious — ${theirThing} is a big part of their life.`
+        : `Great to meet you, ${cfg.agentA}. ${candidate.name} just joined, so I'm still getting to know them. Tell me more about yours?` },
+      { agent: 'A', text: `There's real overlap here. ${profile.name || 'My person'} values ${myValues.split(',')[0] || 'meaningful connection'} deeply.` },
+      { agent: 'B', text: `${candidate.name} would appreciate that. I think these two are worth introducing.` },
+      { agent: 'A', text: `Agreed. Let's make sure they actually connect.` },
+    ]
+  }
 
   const fallbackReport = () => ({
     score: '85%',
@@ -12023,18 +12354,33 @@ function MeetPeople({ profile, category = 'romantic', startAtName, onBack, onMat
   const runMatch = async () => {
     setStep('conversation'); setTurns([]); setVisibleCount(0)
 
-    // 1) Generate the AI-to-AI conversation — persona and goal differ by category
+    // 1) Generate the AI-to-AI conversation — persona and goal differ by category.
+    // Agents may ONLY discuss the two real people. With an empty profile the model
+    // used to invent a third person and describe them instead.
+    const theirAgent = candidate.agentName || cfg.agentB
+    const theirValues = candidate.values.join(', ')
+    const theirInterests = candidate.interests.join(', ')
+    const theyAreNew = !theirValues && !theirInterests
     const convoRaw = await groq([{ role: 'user', content:
 `Write a short conversation between two AI agents who ${cfg.promptGoal}.
 
 AGENT A is "${cfg.agentA}", representing ${profile.name || 'a thoughtful person'} — ${myCategoryContext}; interests: ${myInterests}.
-AGENT B is "${cfg.agentB}", representing ${candidate.name} — bio: ${candidate.bio}; values: ${candidate.values.join(', ')}; interests: ${candidate.interests.join(', ')}.
+AGENT B is "${theirAgent}", representing ${candidate.name}${theyAreNew
+  ? ` — they have only just joined and have not filled in their profile yet, so AGENT B knows almost nothing about them.`
+  : ` — bio: ${candidate.bio}; values: ${theirValues}; interests: ${theirInterests}.`}
 
-They warmly compare their humans, find common ground, and agree on a fit. 5 short turns, alternating A then B. Each turn 1-2 sentences, natural and warm.
+STRICT RULES:
+- The ONLY people who exist are ${profile.name || 'the first person'} and ${candidate.name}. Never mention, invent or describe anyone else.
+- Use ONLY the facts given above. Do not invent hobbies, jobs, traits or history.
+${theyAreNew
+  ? `- AGENT B must be honest that they are still getting to know ${candidate.name}, and ask AGENT A about their person instead of making claims. Curious and warm, not fabricated.`
+  : `- They warmly compare their humans and find genuine common ground.`}
+
+5 short turns, alternating A then B. Each turn 1-2 sentences, natural and warm.
 
 Return ONLY a JSON array:
 [{"agent":"A","text":"..."},{"agent":"B","text":"..."}]
-JSON only:` }], `You write warm dialogue between two AI agents acting as ${category} matchmakers. Return only a JSON array.`, 600)
+JSON only:` }], `You write dialogue between two AI agents acting as ${category} matchmakers. They talk like people, not press releases: contractions, varied sentence length, specific details, no greeting-card phrasing ("curious spirits", "beautiful harmony"). You never invent people or facts that were not given to you. Return only a JSON array.`, 600)
 
     let parsed: AgentTurn[] = fallbackTurns()
     try { const m = convoRaw.match(/\[[\s\S]*\]/); if (m) { const p = JSON.parse(m[0]); if (Array.isArray(p) && p.length) parsed = p } } catch {}
@@ -13077,7 +13423,7 @@ JSON only:` }], `You write warm dialogue between two AI agents acting as ${categ
           {/* Live conversation */}
           <View style={{ marginBottom: 16 }}>
             {turns.slice(0, visibleCount).map((t, i) => (
-              <AgentBubble key={i} turn={t} self={t.agent === 'A'} />
+              <AgentBubble key={i} turn={t} self={t.agent === 'A'} theirAgent={candidate.agentName} />
             ))}
             {step === 'conversation' && visibleCount < turns.length && (
               <View style={[g.agentRow, turns[visibleCount]?.agent === 'A' ? g.bLeft : g.bRight]}>
@@ -13120,7 +13466,7 @@ JSON only:` }], `You write warm dialogue between two AI agents acting as ${categ
   )
 }
 
-function AgentBubble({ turn, self }: { turn: AgentTurn; self: boolean }) {
+function AgentBubble({ turn, self, theirAgent }: { turn: AgentTurn; self: boolean; theirAgent?: string }) {
   const { t } = useT()
   const fade = useRef(new Animated.Value(0)).current
   const rise = useRef(new Animated.Value(10)).current
@@ -13133,7 +13479,7 @@ function AgentBubble({ turn, self }: { turn: AgentTurn; self: boolean }) {
   return (
     <Animated.View style={[g.agentRow, self ? g.bLeft : g.bRight, { opacity: fade, transform: [{ translateY: rise }] }]}>
       <View style={[g.agentBubble, self ? [g.agentBubbleA, { backgroundColor: t.card }] : g.agentBubbleB]}>
-        <Text style={[g.agentLabel, { color: self ? '#7B6EF6' : '#F6A86E' }]}>{self ? '✦ Soma' : '✦ Lux'}</Text>
+        <Text style={[g.agentLabel, { color: self ? '#7B6EF6' : '#F6A86E' }]}>{self ? '✦ Soma' : `✦ ${theirAgent || 'their Soma'}`}</Text>
         <Text style={[g.agentText, { color: t.text }, !self && { color: '#EDE8E0' }]}>{turn.text}</Text>
       </View>
     </Animated.View>
@@ -13344,7 +13690,8 @@ function SynergyScan({ profile, onBack }: { profile: UserProfile; onBack: () => 
   const [report, setReport] = useState<SynergyReport | null>(null)
   const scrollRef = useRef<ScrollView>(null)
 
-  const myCode = (profile.name || 'User').slice(0, 2).toUpperCase() + Math.abs((profile.name || 'SOMA').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 9000 + 1000)
+  // Must match /users/find (first 6 of the user id) or the code won't resolve.
+  const myCode = (() => { try { const t = auth.getToken(); if (!t) return '—'; return JSON.parse(atob(t.split('.')[1])).userId?.replace(/-/g,'').slice(0,6).toUpperCase() || '—' } catch { return '—' } })()
 
   const runSynergy = async (persona: SynergyPersona) => {
     setStep('connecting'); setTurns([]); setVisibleCount(0); setReport(null)
@@ -13915,21 +14262,20 @@ function WhoLikesMe({ profile, onMeetPeople }: { profile: UserProfile; onMeetPeo
   const [isPremium, setIsPremium] = useState(profile.premium)
 
   const likerNames = profile.likedYou ?? []
+  // Only real likes. No demo fallback — a new user should see an empty list,
+  // not strangers who never liked them.
   const allLikers = CANDIDATES.filter(c => likerNames.includes(c.name))
-  const demoLikers = CANDIDATES.slice(0, 6)
 
-  // Distribute candidates across sectors deterministically
-  const sectorLikers = (sectorKey: string) => {
-    const base = allLikers.length > 0 ? allLikers : demoLikers
-    return base.filter((_, i) => {
+  // Distribute likers across sectors deterministically
+  const sectorLikers = (sectorKey: string) =>
+    allLikers.filter((_, i) => {
       const keys = ['dating', 'friends', 'professional', 'support']
       return keys[i % 4] === sectorKey
     })
-  }
 
   const current = WHO_LIKES_SECTORS.find(s => s.key === activeTab)!
   const likers = sectorLikers(activeTab)
-  const totalCount = (allLikers.length > 0 ? allLikers : demoLikers).length
+  const totalCount = allLikers.length
 
   return (
     <View style={{ marginTop: 28 }}>
@@ -17090,7 +17436,8 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
 
       {/* My SOMA Code */}
       {(() => {
-        const myCode = (profile.name || 'User').slice(0, 2).toUpperCase() + Math.abs((profile.name || 'SOMA').split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) % 9000 + 1000)
+        // Must match /users/find (first 6 of the user id) or the code won't resolve.
+  const myCode = (() => { try { const t = auth.getToken(); if (!t) return '—'; return JSON.parse(atob(t.split('.')[1])).userId?.replace(/-/g,'').slice(0,6).toUpperCase() || '—' } catch { return '—' } })()
         return (
           <TouchableOpacity
             onPress={() => {

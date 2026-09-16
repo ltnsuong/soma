@@ -257,7 +257,7 @@ app.post('/auth/password-reset-request', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' })
 
     const resetToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' })
-    const appUrl = process.env.APP_URL || 'https://dist-mysomaapp.vercel.app'
+    const appUrl = process.env.APP_URL || 'https://mysoma.site'
     const resetLink = `${appUrl}/?reset=${resetToken}`
 
     await sendEmail({
@@ -1533,6 +1533,47 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
   }
 })
 
+// PUBLIC PROFILE FOR ONE USER — what the person chose to share, for viewing
+// from a chat header. Never returns email, telegram_id or auth fields.
+app.get('/users/:id/profile', auth, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { data: u, error } = await supabase
+      .from('users').select('id, name, avatar, created_at').eq('id', id).maybeSingle()
+    if (error) throw error
+    if (!u) return res.status(404).json({ error: 'User not found' })
+
+    const { data: dp } = await supabase
+      .from('dating_profiles')
+      .select('age, photo, photos, bio, interests, values, love_language, attachment, connection_type, work, city')
+      .eq('user_id', id).maybeSingle()
+
+    res.json({
+      userId: u.id,
+      name: u.name,
+      // Same derivation /users/find uses, so a shared code actually resolves.
+      somaCode: u.id.replace(/-/g, '').slice(0, 6).toUpperCase(),
+      avatar: u.avatar || null,
+      joinedAt: u.created_at,
+      age: dp?.age ?? null,
+      photo: dp?.photo ?? null,
+      photos: dp?.photos ?? [],
+      bio: dp?.bio ?? null,
+      interests: dp?.interests ?? [],
+      values: dp?.values ?? [],
+      loveLanguage: dp?.love_language ?? null,
+      attachment: dp?.attachment ?? null,
+      connectionType: dp?.connection_type ?? null,
+      work: dp?.work ?? null,
+      city: dp?.city ?? null,
+      hasDatingProfile: !!dp,
+    })
+  } catch (err) {
+    console.error('[user profile]', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ════════════════════════════════════════════════════════════
 // FIND USER BY INVITE CODE
 // code = first 6 chars of user UUID (uppercase)
@@ -1582,7 +1623,11 @@ app.listen(PORT, async () => {
   console.log(`💎 Premium endpoints ready`)
   // Auto-register Telegram bot webhook
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
-  const BACKEND_URL_ENV = process.env.APP_URL || 'https://soma-backend-production-4a3b.up.railway.app'
+  // Must be THIS server's own public URL, never APP_URL — APP_URL is the web app,
+  // and pointing the webhook there silently kills the bot.
+  const BACKEND_URL_ENV = process.env.BACKEND_PUBLIC_URL
+    || (process.env.RAILWAY_PUBLIC_DOMAIN && `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`)
+    || 'https://soma-backend-production-4a3b.up.railway.app'
   if (BOT_TOKEN) {
     try {
       const webhookUrl = `${BACKEND_URL_ENV}/telegram/webhook`
