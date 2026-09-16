@@ -164,7 +164,15 @@ Return this exact JSON structure (no markdown, no extra text):
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const content = response.content[0].text;
+    let content = response.content[0].text;
+    console.log('Raw LLM response:', content.substring(0, 200));
+
+    // Extract JSON if wrapped in markdown
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      content = jsonMatch[0];
+    }
+
     const extracted = JSON.parse(content);
 
     // Save to database
@@ -310,7 +318,15 @@ Provide compatibility analysis and return ONLY valid JSON:
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const content = response.content[0].text;
+    let content = response.content[0].text;
+    console.log('Raw compatibility analysis response:', content.substring(0, 200));
+
+    // Extract JSON if wrapped in markdown
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      content = jsonMatch[0];
+    }
+
     const analysis = JSON.parse(content);
 
     // Save analysis
