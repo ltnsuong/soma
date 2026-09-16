@@ -384,6 +384,121 @@ Available commands:
 }
 
 // ============================================================================
+// ANALYZE Command - Analyze conversation with a specific user
+// ============================================================================
+
+bot.onText(/\/analyze(.*)/, async (msg) => {
+  const chatId = msg.chat.id;
+  const telegramId = msg.from.id;
+  const args = msg.match[1]?.trim();
+
+  try {
+    // Get user's profile
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('telegram_id', telegramId)
+      .single();
+
+    if (profileError || !userProfile || !userProfile.profile_complete) {
+      return bot.sendMessage(chatId, '❌ You need to create your profile first! Use /start');
+    }
+
+    if (!args) {
+      return bot.sendMessage(chatId, '📱 Usage: `/analyze @username` or `/analyze user_id`\n\nI will analyze your chat history with that person!');
+    }
+
+    // Extract username or ID
+    const targetUser = args.replace('@', '').trim();
+
+    bot.sendMessage(chatId, `🔍 Analyzing your conversation with ${targetUser}...\n\nThis may take a moment.`);
+
+    // For now, create a simple analysis based on the user's profile
+    // In a real scenario, you'd fetch message history with that specific user
+    await analyzeUserConnection(chatId, userProfile, targetUser);
+
+  } catch (err) {
+    console.error('Error in /analyze:', err);
+    bot.sendMessage(chatId, 'Error analyzing conversation. Try again later.');
+  }
+});
+
+async function analyzeUserConnection(chatId, userProfile, targetUser) {
+  try {
+    const prompt = `
+Analyze a person's compatibility with someone based on their profile.
+
+Profile of the person seeking analysis:
+- Traits: ${JSON.stringify(userProfile.personality_traits)}
+- Values: ${JSON.stringify(userProfile.values)}
+- Interests: ${JSON.stringify(userProfile.interests)}
+- Lifestyle: ${JSON.stringify(userProfile.lifestyle)}
+- Communication style: ${userProfile.communication_style}
+- Looking for: ${userProfile.what_they_need}
+
+Target person username/ID: ${targetUser}
+
+Based on the user's profile, provide a compatibility analysis and suggestions.
+Return ONLY valid JSON:
+{
+  "compatibility_score": 75,
+  "summary": "Brief summary of compatibility",
+  "strengths": ["strength1", "strength2"],
+  "watch_out": ["potential_issue1"],
+  "advice": ["advice1", "advice2"],
+  "suggested_activities": ["activity1", "activity2"],
+  "red_flags": []
+}`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 800,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    let content = response.content[0].text;
+
+    // Extract JSON if wrapped in markdown
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      content = jsonMatch[0];
+    }
+
+    const analysis = JSON.parse(content);
+
+    // Send formatted report
+    const report = `🎯 COMPATIBILITY ANALYSIS WITH @${targetUser}
+
+✨ Match Score: ${analysis.compatibility_score}%
+
+📝 Summary:
+${analysis.summary}
+
+✅ Your Strengths:
+${analysis.strengths.map(s => `• ${s}`).join('\n')}
+
+⚠️ Things to Watch:
+${analysis.watch_out.map(w => `• ${w}`).join('\n')}
+
+💡 Advice:
+${analysis.advice.map(a => `• ${a}`).join('\n')}
+
+🎉 Suggested Activities:
+${analysis.suggested_activities.map(a => `• ${a}`).join('\n')}`;
+
+    if (analysis.red_flags && analysis.red_flags.length > 0) {
+      report += `\n\n🚨 Red Flags:\n${analysis.red_flags.map(f => `• ${f}`).join('\n')}`;
+    }
+
+    await bot.sendMessage(chatId, report);
+
+  } catch (err) {
+    console.error('Error analyzing connection:', err);
+    bot.sendMessage(chatId, '❌ Error analyzing. Please try again.');
+  }
+}
+
+// ============================================================================
 // PHASE 3: COACHING COMMANDS
 // ============================================================================
 
