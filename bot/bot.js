@@ -462,6 +462,10 @@ Return ONLY valid JSON:
       messages: [{ role: 'user', content: prompt }]
     });
 
+    if (!response.content || !response.content[0] || !response.content[0].text) {
+      throw new Error('Invalid API response: no content');
+    }
+
     let content = response.content[0].text;
     console.log('Raw LLM response:', content.substring(0, 300));
 
