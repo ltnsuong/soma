@@ -1585,7 +1585,16 @@ app.get('/users/find', async (req, res) => {
     if (email && typeof email === 'string' && email.includes('@')) {
       query = query.ilike('email', email.trim())
     } else if (code && typeof code === 'string' && code.length >= 4) {
-      query = query.ilike('id', `${code.toLowerCase().trim().replace(/-/g,'')}%`)
+      // `id` is a uuid column, and Postgres has no ILIKE for uuid — the old
+      // query.ilike('id', ...) threw "operator does not exist: uuid ~~*" on every
+      // lookup. The code is the leading hex of the uuid, so match it as a range
+      // instead: everything from <code>00.. to <code>ff.., which uses the PK index.
+      const hex = code.toLowerCase().trim().replace(/[^0-9a-f]/g, '').slice(0, 8)
+      if (hex.length < 4) return res.status(400).json({ error: 'Code must be at least 4 characters' })
+      const lo = hex.padEnd(8, '0'), hi = hex.padEnd(8, 'f')
+      query = query
+        .gte('id', `${lo}-0000-0000-0000-000000000000`)
+        .lte('id', `${hi}-ffff-ffff-ffff-ffffffffffff`)
     } else {
       return res.status(400).json({ error: 'Provide an email address or a code (min 4 chars)' })
     }

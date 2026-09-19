@@ -3648,7 +3648,9 @@ export default function App() {
     if (screen === 'forgotpassword') return <ForgotPasswordScreen onBack={() => go('login')} />
     if (screen === 'resetpassword' && resetToken) return <ResetPasswordScreen token={resetToken} onDone={() => go('login')} />
     if (screen === 'verifyemail' && verifyToken) return <VerifyEmailScreen token={verifyToken} onDone={() => { refresh(); go('home') }} />
-    if (screen === 'aura')        return <SomaChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" />
+    // Every route here means "talk to Soma now" — open straight into the conversation
+    // rather than an interstitial asking them to confirm they meant it.
+    if (screen === 'aura')        return <SomaChat mode="full" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Soma" autoStart />
     if (screen === 'diary')       return <SomaChat mode="diary" profile={profile} onRefresh={refresh} onDone={() => go('home')} title="Today's Diary" isDiary />
     if (screen === 'circle')      return <CircleScreen profile={profile} onBack={() => { setPendingAddCode(null); go('home') }} onStartJourney={(id) => { setBondPersonId(id); go('bondjourney') }} onViewInsights={() => go('relinsights')} onRefresh={refresh} initialFindCode={pendingAddCode} />
     if (screen === 'bondjourney' && bondPersonId) {
@@ -3706,10 +3708,10 @@ export default function App() {
       borderTopWidth: 0.5, borderTopColor: themeVal.t.border,
       paddingBottom: Platform.OS === 'ios' ? 28 : 10, paddingTop: 6, paddingHorizontal: 16,
     }}>
-      {TAB_ITEMS.map(item => {
+      {TAB_ITEMS.flatMap((item, i) => {
         const active = tab === item.id
         const showBadge = (item.id === 'circle' && unread > 0) || (item.id === 'chat' && dmUnread > 0)
-        return (
+        const tabBtn = (
           <TouchableOpacity key={item.id} onPress={() => { setTab(item.id); if (item.id === 'chat') setDmUnread(0); if (screen !== 'home') go('home') }} style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 }}>
             <View style={{ position: 'relative' }}>
               <Ionicons name={item.icon} size={22} color={active ? '#7B6EF6' : themeVal.t.textSub} />
@@ -3722,6 +3724,10 @@ export default function App() {
             <Text style={{ fontSize: 10, fontWeight: active ? '600' : '500', color: active ? '#7B6EF6' : themeVal.t.textSub }}>{item.label}</Text>
           </TouchableOpacity>
         )
+        // SOMA sits dead centre, between the two pairs of tabs.
+        return i === 2
+          ? [<SomaConnectionButton key="soma" bg={themeVal.t.bg} onPress={() => go('aura')} />, tabBtn]
+          : [tabBtn]
       })}
     </View>
   )
@@ -7775,6 +7781,77 @@ function BondTab({ profile, go }: { profile: UserProfile; go: (s: Screen) => voi
         You found your person. 🎉{'\n'}SOMA is now your relationship companion.
       </Text>
     </ScrollView>
+  )
+}
+
+// The SOMA connection button — the centre of the tab bar and the way into Soma from
+// anywhere. Two rings breathe out of phase so the mark reads as two forms drawn
+// toward each other rather than one pulsing blob. On press they converge, then open.
+function SomaConnectionButton({ onPress, bg }: { onPress: () => void; bg: string }) {
+  const outer = useRef(new Animated.Value(0)).current   // slow halo
+  const inner = useRef(new Animated.Value(0)).current   // faster counter-ring
+  const press = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    const loop = (v: Animated.Value, ms: number) =>
+      Animated.loop(Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: ms, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: ms, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]))
+    const a = loop(outer, 2200), b = loop(inner, 1500)
+    a.start(); b.start()
+    return () => { a.stop(); b.stop() }
+  }, [])
+
+  const enter = () => {
+    // converge → release, then hand over. Short enough not to delay the tap.
+    Animated.sequence([
+      Animated.timing(press, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(press, { toValue: 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start()
+    haptic.success()
+    onPress()
+  }
+
+  // The lift lives on the touchable, not the inner view — otherwise the circle renders
+  // above its own hit area and the top third of the button silently ignores taps.
+  return (
+    <TouchableOpacity
+      onPress={enter}
+      activeOpacity={0.9}
+      accessibilityRole="button"
+      accessibilityLabel="Talk with Soma"
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: 62, marginTop: -20 }}>
+      <View style={{ width: 62, height: 62, alignItems: 'center', justifyContent: 'center' }}>
+        {/* outer halo — the space between the two forms */}
+        <Animated.View style={{
+          position: 'absolute', width: 62, height: 62, borderRadius: 31,
+          backgroundColor: '#7B6EF6',
+          opacity: outer.interpolate({ inputRange: [0, 1], outputRange: [0.16, 0.30] }),
+          transform: [{ scale: Animated.add(outer.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.12] }),
+                                            press.interpolate({ inputRange: [0, 1], outputRange: [0, 0.35] })) }],
+        }} />
+        {/* counter-ring, out of phase with the halo */}
+        <Animated.View style={{
+          position: 'absolute', width: 54, height: 54, borderRadius: 27,
+          borderWidth: 1.5, borderColor: '#A89BFA',
+          opacity: inner.interpolate({ inputRange: [0, 1], outputRange: [0.75, 0.35] }),
+          transform: [{ scale: Animated.add(inner.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.14] }),
+                                            press.interpolate({ inputRange: [0, 1], outputRange: [0, -0.12] })) }],
+        }} />
+        {/* the mark itself — unchanged logo */}
+        <Animated.View style={{
+          width: 46, height: 46, borderRadius: 23, backgroundColor: '#7B6EF6',
+          alignItems: 'center', justifyContent: 'center',
+          borderWidth: 3, borderColor: bg,
+          shadowColor: '#7B6EF6', shadowOpacity: 0.55, shadowRadius: 14, shadowOffset: { width: 0, height: 4 },
+          elevation: 8,
+          transform: [{ scale: press.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] }) }],
+        }}>
+          <Image source={require('./assets/icon.png')} style={{ width: 30, height: 30, borderRadius: 9 }} />
+        </Animated.View>
+      </View>
+    </TouchableOpacity>
   )
 }
 
