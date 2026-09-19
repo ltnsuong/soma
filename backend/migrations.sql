@@ -19,7 +19,10 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 -- Profile data (extends users with SOMA-specific data)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- UNIQUE is load-bearing: /profile/sync upserts with ON CONFLICT (user_id).
+  -- Without it Postgres rejects every sync with "there is no unique or exclusion
+  -- constraint matching the ON CONFLICT specification" and no profile ever saves.
+  user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   ai_name TEXT DEFAULT 'Soma',
   ai_photo TEXT,
   trusted_contact_name TEXT,
@@ -34,6 +37,30 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- Create index on user_id
 CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
+
+-- Backfill for databases created before profiles.user_id was UNIQUE. The CREATE TABLE
+-- above is IF NOT EXISTS, so it never alters an existing table — without this block,
+-- every /profile/sync on an older database keeps failing. Applied in production as
+-- migration add_unique_user_id_to_profiles. Safe to re-run.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = 'public' AND t.relname = 'profiles'
+      AND c.contype = 'u'
+      AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute
+                            WHERE attrelid = t.oid AND attname = 'user_id')]
+  ) THEN
+    -- Drop any duplicate rows first, keeping the most recently updated per user,
+    -- or the ALTER fails on databases that accumulated more than one row per user.
+    DELETE FROM profiles p USING profiles q
+      WHERE p.user_id = q.user_id
+        AND (p.updated_at, p.id) < (q.updated_at, q.id);
+    ALTER TABLE public.profiles ADD CONSTRAINT profiles_user_id_key UNIQUE (user_id);
+  END IF;
+END $$;
 
 -- Password reset tokens
 CREATE TABLE IF NOT EXISTS reset_tokens (
