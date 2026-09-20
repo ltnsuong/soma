@@ -279,6 +279,11 @@ const STRINGS: Record<string, Record<string, string>> = {
     circle_chat: 'Chat', circle_report: 'Report',
     circle_remove_confirm: 'Remove {name} from your Circle?',
     add_to_circle_as: 'Add to your Circle as',
+    last_step: 'Last step',
+    add_a_photo: 'Add a photo of you',
+    photo_why: "It's how people recognise you — and without one, you won't show up for anyone.",
+    choose_photo: 'Choose a photo', finish_profile: 'Finish my profile →',
+    photo_required: 'Add a photo to continue',
     copied: 'Copied!',
     soma_code: 'SOMA code', looking_for: 'Looking for', love_language: 'Love language',
     attachment: 'Attachment style', member_since: 'Member since',
@@ -401,6 +406,11 @@ const STRINGS: Record<string, Record<string, string>> = {
     circle_chat: 'Чат', circle_report: 'Отчёт',
     circle_remove_confirm: 'Удалить {name} из твоего круга?',
     add_to_circle_as: 'Добавить в круг как',
+    last_step: 'Последний шаг',
+    add_a_photo: 'Добавь своё фото',
+    photo_why: 'По нему тебя узнают — без фото тебя никто не увидит.',
+    choose_photo: 'Выбрать фото', finish_profile: 'Завершить профиль →',
+    photo_required: 'Добавь фото, чтобы продолжить',
     copied: 'Скопировано!',
     soma_code: 'Код SOMA', looking_for: 'Ищет', love_language: 'Язык любви',
     attachment: 'Тип привязанности', member_since: 'В SOMA с',
@@ -3452,7 +3462,11 @@ export default function App() {
     const t = setTimeout(() => {
       startupSync.finally(() => {
         const p = DB.get()
-        setScreen(!p.languageChosen ? 'language' : !DB.onboardingDone() ? 'onboarding' : 'home')
+        // Gate only people without an account. A signed-in user who looks un-onboarded
+        // is almost always a returning user on a fresh device or cleared browser —
+        // sending them to onboarding locks them out of an account they already have.
+        const needsOnboarding = !DB.onboardingDone() && !auth.getToken()
+        setScreen(!p.languageChosen ? 'language' : needsOnboarding ? 'onboarding' : 'home')
       })
     }, 1900)
     return () => clearTimeout(t)
@@ -3644,7 +3658,11 @@ export default function App() {
         <Register onDone={(name) => { auth.getToken() ? go('login') : go(DB.onboardingDone() ? 'home' : 'onboarding') }} onSignIn={() => go('login')} />
       </RegisterBoundary>
     )
-    if (screen === 'login')       return <LoginScreen onDone={(name) => { go(DB.onboardingDone() ? 'home' : 'onboarding') }} onRegister={() => go('register')} onForgot={() => go('forgotpassword')} />
+    // Signing IN means the account already exists — always go home. Routing a returning
+    // user into onboarding locks them out of their own account, because onboardingDone()
+    // reads local state and a fresh device or cleared browser always looks un-onboarded.
+    // The onboarding gate belongs on the sign-UP path, which is handled separately below.
+    if (screen === 'login')       return <LoginScreen onDone={(name) => { go('home') }} onRegister={() => go('register')} onForgot={() => go('forgotpassword')} />
     if (screen === 'forgotpassword') return <ForgotPasswordScreen onBack={() => go('login')} />
     if (screen === 'resetpassword' && resetToken) return <ResetPasswordScreen token={resetToken} onDone={() => go('login')} />
     if (screen === 'verifyemail' && verifyToken) return <VerifyEmailScreen token={verifyToken} onDone={() => { refresh(); go('home') }} />
@@ -4106,6 +4124,7 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
 
   const color = phase >= 1 && phase <= 3 ? COLORS[phase - 1] : '#7B6EF6'
   const [quickAnswer, setQuickAnswer] = useState('')
+  const [onboardPhoto, setOnboardPhoto] = useState('')
   const [somaReply, setSomaReply] = useState('')
   const [somaReplyLoading, setSomaReplyLoading] = useState(false)
   const [typeMode, setTypeMode] = useState(false)
@@ -4483,7 +4502,7 @@ Write a warm, personal 2-3 sentence response to them. Rules:
               "{somaReply}"
             </Text>
           </View>
-          <TouchableOpacity onPress={() => setPhase(8)}
+          <TouchableOpacity onPress={() => setPhase(12)}
             style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, paddingHorizontal: 48, width: '100%', alignItems: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.45, shadowRadius: 22, shadowOffset: { width: 0, height: 7 } }}>
             <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>Show me what's possible →</Text>
           </TouchableOpacity>
@@ -4491,6 +4510,58 @@ Write a warm, personal 2-3 sentence response to them. Rules:
       )}
     </View>
   )
+
+  // Phase 12 — one photo, required. Without it nobody appears in Explore, and a
+  // faceless card is the thing people skip past.
+  if (phase === 12) {
+    const shot = onboardPhoto || DB.get().dating?.photo || ''
+    return (
+      <View style={{ flex: 1, backgroundColor: '#080418', padding: 32, justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(123,110,246,0.10)' }} />
+
+        <Text style={{ fontSize: 13, fontWeight: '800', color: '#7B6EF6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>
+          {tr('last_step')}
+        </Text>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: '#fff', lineHeight: 36, letterSpacing: -0.5, marginBottom: 10 }}>
+          {tr('add_a_photo')}
+        </Text>
+        <Text style={{ fontSize: 15, color: 'rgba(168,155,250,0.6)', lineHeight: 22, marginBottom: 32 }}>
+          {tr('photo_why')}
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => pickPhoto(dataUrl => {
+            setOnboardPhoto(dataUrl)
+            DB.saveDating({ photo: dataUrl, photos: [dataUrl] })
+          })}
+          style={{ alignSelf: 'center', marginBottom: 32 }}>
+          {shot ? (
+            <View>
+              <Image source={{ uri: shot }} style={{ width: 168, height: 168, borderRadius: 30 }} />
+              <View style={{ position: 'absolute', bottom: -8, right: -8, backgroundColor: '#7B6EF6', borderRadius: 18, width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#080418' }}>
+                <Ionicons name="pencil" size={15} color="#fff" />
+              </View>
+            </View>
+          ) : (
+            <View style={{ width: 168, height: 168, borderRadius: 30, borderWidth: 2, borderStyle: 'dashed', borderColor: 'rgba(123,110,246,0.45)', backgroundColor: 'rgba(123,110,246,0.07)', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Ionicons name="camera-outline" size={34} color="#7B6EF6" />
+              <Text style={{ fontSize: 13, color: '#A89BFA', fontWeight: '600' }}>{tr('choose_photo')}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          disabled={!shot}
+          onPress={() => setPhase(8)}
+          style={{ backgroundColor: shot ? '#7B6EF6' : 'rgba(123,110,246,0.25)', borderRadius: 18, paddingVertical: 18, alignItems: 'center',
+                   ...(shot ? { shadowColor: '#7B6EF6', shadowOpacity: 0.45, shadowRadius: 22, shadowOffset: { width: 0, height: 7 } } : {}) }}>
+          <Text style={{ color: shot ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: 17, fontWeight: '900' }}>
+            {shot ? tr('finish_profile') : tr('photo_required')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
 
   // Phase 4 — Processing
   if (phase === 4) return (
@@ -12428,29 +12499,33 @@ function MeetPeople({ profile, category = 'romantic', startAtName, onBack, onMat
     intimacy: category === 'romantic' ? 'Your SOMAs noted you both value emotionally present, unhurried closeness.' : undefined,
   })
 
-  const runMatch = async () => {
+  // Takes the matched person explicitly. It used to read the render-scope `candidate`,
+  // but when like() fires this via setTimeout, setLiked hasn't flushed yet and that
+  // falls through to CANDIDATES[0] — so the agents discussed a demo profile instead
+  // of whoever you actually matched with.
+  const runMatch = async (who: Candidate = candidate) => {
     setStep('conversation'); setTurns([]); setVisibleCount(0)
 
     // 1) Generate the AI-to-AI conversation — persona and goal differ by category.
     // Agents may ONLY discuss the two real people. With an empty profile the model
     // used to invent a third person and describe them instead.
-    const theirAgent = candidate.agentName || cfg.agentB
-    const theirValues = candidate.values.join(', ')
-    const theirInterests = candidate.interests.join(', ')
+    const theirAgent = who.agentName || cfg.agentB
+    const theirValues = who.values.join(', ')
+    const theirInterests = who.interests.join(', ')
     const theyAreNew = !theirValues && !theirInterests
     const convoRaw = await groq([{ role: 'user', content:
 `Write a short conversation between two AI agents who ${cfg.promptGoal}.
 
 AGENT A is "${cfg.agentA}", representing ${profile.name || 'a thoughtful person'} — ${myCategoryContext}; interests: ${myInterests}.
-AGENT B is "${theirAgent}", representing ${candidate.name}${theyAreNew
+AGENT B is "${theirAgent}", representing ${who.name}${theyAreNew
   ? ` — they have only just joined and have not filled in their profile yet, so AGENT B knows almost nothing about them.`
-  : ` — bio: ${candidate.bio}; values: ${theirValues}; interests: ${theirInterests}.`}
+  : ` — bio: ${who.bio}; values: ${theirValues}; interests: ${theirInterests}.`}
 
 STRICT RULES:
-- The ONLY people who exist are ${profile.name || 'the first person'} and ${candidate.name}. Never mention, invent or describe anyone else.
+- The ONLY people who exist are ${profile.name || 'the first person'} and ${who.name}. Never mention, invent or describe anyone else.
 - Use ONLY the facts given above. Do not invent hobbies, jobs, traits or history.
 ${theyAreNew
-  ? `- AGENT B must be honest that they are still getting to know ${candidate.name}, and ask AGENT A about their person instead of making claims. Curious and warm, not fabricated.`
+  ? `- AGENT B must be honest that they are still getting to know ${who.name}, and ask AGENT A about their person instead of making claims. Curious and warm, not fabricated.`
   : `- They warmly compare their humans and find genuine common ground.`}
 
 5 short turns, alternating A then B. Each turn 1-2 sentences, natural and warm.
@@ -12479,12 +12554,12 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
     const totalDelay = parsed.length * 1600 + 800
     setTimeout(async () => {
       const reportPrompt = category === 'romantic'
-        ? `Two people matched romantically. Return ONLY JSON.\n\nPERSON A: interests ${myInterests}; values ${myValues}; love language ${myLove}; attachment ${myAttach}; intimacy notes (PRIVATE): "${myIntimacy}"\nPERSON B (${candidate.name}): ${candidate.bio}; values ${candidate.values.join(', ')}; love language ${candidate.loveLanguage}; attachment ${candidate.attachment}; intimacy notes (PRIVATE): "${candidate.intimacy}"\n\nReturn: {"score":"87%","why":"2 sentences on emotional fit","date":"one specific ideal first date","activities":"2 activities comma separated","intimacy":"one discreet sentence on intimacy alignment"}\nJSON only:`
+        ? `Two people matched romantically. Return ONLY JSON.\n\nPERSON A: interests ${myInterests}; values ${myValues}; love language ${myLove}; attachment ${myAttach}; intimacy notes (PRIVATE): "${myIntimacy}"\nPERSON B (${who.name}): ${who.bio}; values ${who.values.join(', ')}; love language ${who.loveLanguage}; attachment ${who.attachment}; intimacy notes (PRIVATE): "${who.intimacy}"\n\nReturn: {"score":"87%","why":"2 sentences on emotional fit","date":"one specific ideal first date","activities":"2 activities comma separated","intimacy":"one discreet sentence on intimacy alignment"}\nJSON only:`
         : category === 'friends'
-        ? `Two people matched as potential friends. Return ONLY JSON.\n\nPERSON A: hobbies ${myInterests}; vibe: ${myValues}\nPERSON B (${candidate.name}): ${candidate.bio}; interests: ${candidate.interests.join(', ')}\n\nReturn: {"score":"84%","why":"2 sentences on friendship fit and shared energy","date":"one fun activity they'd enjoy together","activities":"2 shared things comma separated"}\nJSON only:`
+        ? `Two people matched as potential friends. Return ONLY JSON.\n\nPERSON A: hobbies ${myInterests}; vibe: ${myValues}\nPERSON B (${who.name}): ${who.bio}; interests: ${who.interests.join(', ')}\n\nReturn: {"score":"84%","why":"2 sentences on friendship fit and shared energy","date":"one fun activity they'd enjoy together","activities":"2 shared things comma separated"}\nJSON only:`
         : category === 'professional'
-        ? `Two people matched professionally. Return ONLY JSON.\n\nPERSON A: goals ${myInterests}; purpose ${myValues}\nPERSON B (${candidate.name}): ${candidate.bio}; values: ${candidate.values.join(', ')}\n\nReturn: {"score":"82%","why":"2 sentences on professional synergy","date":"a specific collaboration or meeting format","activities":"2 ways they could work together comma separated"}\nJSON only:`
-        : `Two people matched for mutual support. Return ONLY JSON.\n\nPERSON A: what they're working on: ${myInterests}\nPERSON B (${candidate.name}): ${candidate.bio}; values: ${candidate.values.join(', ')}\n\nReturn: {"score":"88%","why":"2 sentences on how they can support each other","date":"a low-key first check-in format","activities":"2 ways they could support each other"}\nJSON only:`
+        ? `Two people matched professionally. Return ONLY JSON.\n\nPERSON A: goals ${myInterests}; purpose ${myValues}\nPERSON B (${who.name}): ${who.bio}; values: ${who.values.join(', ')}\n\nReturn: {"score":"82%","why":"2 sentences on professional synergy","date":"a specific collaboration or meeting format","activities":"2 ways they could work together comma separated"}\nJSON only:`
+        : `Two people matched for mutual support. Return ONLY JSON.\n\nPERSON A: what they're working on: ${myInterests}\nPERSON B (${who.name}): ${who.bio}; values: ${who.values.join(', ')}\n\nReturn: {"score":"88%","why":"2 sentences on how they can support each other","date":"a low-key first check-in format","activities":"2 ways they could support each other"}\nJSON only:`
 
       const raw = await groq([{ role: 'user', content: reportPrompt }], `You are a thoughtful ${category} matchmaker AI. Return only JSON.`, 400)
       try { const m = raw.match(/\{[\s\S]*\}/); setReport(m ? JSON.parse(m[0]) : fallbackReport()) } catch { setReport(fallbackReport()) }
@@ -12527,7 +12602,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
     // Turn the report into a short agent dialogue
     const agentTurns: AgentTurn[] = [
       { agent: 'A', text: `Hello. I'm Soma, ${profile.name || 'my person'}'s AI companion. I know them well — their dreams, how they love, what they're working through. Ready to compare notes?` },
-      { agent: 'B', text: `I'm ${candidate.agentName || 'Lux'}, here for ${candidate.name}. I've been listening to them too. Let's see what we find.` },
+      { agent: 'B', text: `I'm ${candidate.agentName || 'their Soma'}, here for ${candidate.name}. I've been listening to them too. Let's see what we find.` },
     ]
     if (common.length >= 2) {
       agentTurns.push({ agent: 'A', text: `There's real common ground here — ${common[0]}. And ${common[1] || common[0]}.` })
@@ -12655,7 +12730,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
       // Real user: start AI agent conversation immediately, send like in background
       haptic.success()
       setStep('matched')
-      setTimeout(() => runMatch(), 100)
+      setTimeout(() => runMatch(pick), 100)
       datingApi.like(realId).then(res => {
         if (res.matched) {
           DB.upsertConnection({
@@ -12676,7 +12751,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
       // Demo profile — start AI agent conversation immediately
       haptic.success()
       setStep('matched')
-      setTimeout(() => runMatch(), 100)
+      setTimeout(() => runMatch(pick), 100)
     }
   }
 

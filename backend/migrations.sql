@@ -132,9 +132,16 @@ CREATE TABLE IF NOT EXISTS dating_profiles (
   lng DOUBLE PRECISION,
   city TEXT DEFAULT '',
   active BOOLEAN DEFAULT TRUE,
+  -- Fingerprint of the memories this profile was derived from, so /profile/sync
+  -- only re-derives when the user has told Soma something new.
+  derived_from TEXT,
   updated_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_dating_profiles_geo ON dating_profiles(lat, lng) WHERE active = TRUE;
+
+-- Backfill for databases created before dating_profiles.derived_from existed.
+-- Must sit AFTER the CREATE TABLE above, or it fails on a fresh database.
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS derived_from TEXT;
 
 CREATE TABLE IF NOT EXISTS dating_likes (
   liker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

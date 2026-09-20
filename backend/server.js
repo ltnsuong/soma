@@ -707,10 +707,73 @@ app.put('/profile/sync', auth, async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message })
     res.json({ ok: true })
+
+    // Answer the client first, then derive their dating profile from what they've told
+    // Soma. Matching reads dating_profiles; talking to Soma writes profiles.memories.
+    // Without this bridge nothing a user says to Soma ever reaches matching, and they
+    // stay invisible in Explore until they happen to open the "nearby" tab with
+    // location enabled. Fire-and-forget: a failure here must not fail the sync.
+    deriveDatingProfile(req.user.userId, p).catch(e =>
+      console.error('[deriveDatingProfile]', e.message))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
+
+// Turn the memories someone shared with Soma into the fields matching actually reads.
+// Only runs when their memories have changed since the last derivation, so an idle
+// client polling sync doesn't burn an LLM call every time.
+async function deriveDatingProfile(userId, p) {
+  const memories = (p.memories || []).filter(m => m?.content)
+  if (memories.length < 3) return   // too little to say anything true about them
+
+  const { data: existing } = await supabase
+    .from('dating_profiles').select('*').eq('user_id', userId).maybeSingle()
+
+  // Skip if nothing new to learn from.
+  const fingerprint = String(memories.length) + ':' + (memories[0]?.id || '')
+  if (existing?.derived_from === fingerprint) return
+
+  const byDomain = {}
+  for (const m of memories) (byDomain[m.domain] ||= []).push(m.content)
+  const summary = Object.entries(byDomain)
+    .map(([d, items]) => `${d}: ${items.slice(0, 6).join('; ')}`).join('\n')
+
+  const raw = await callGroq(
+    'You turn what someone told an AI companion into a connection profile. Use ONLY what is stated — never invent hobbies, jobs or traits. Return only valid JSON.',
+    `Someone shared this about their life:\n${summary}\n\nReturn ONLY JSON:
+{
+ "bio": "<2 warm sentences in their own register, first person, no clichés, only facts above>",
+ "interests": ["<up to 6, concrete things they actually do>"],
+ "values": ["<up to 4 things that clearly matter to them>"],
+ "work": "<their job if stated, else empty string>",
+ "lookingFor": "<one short line on what connection would suit them>"
+}`, 500)
+
+  let d
+  try { d = JSON.parse(raw.replace(/```json|```/g, '').match(/\{[\s\S]*\}/)?.[0] || '') } catch { return }
+  if (!d) return
+
+  const { data: user } = await supabase.from('users').select('name').eq('id', userId).maybeSingle()
+
+  // Anything the user set by hand wins; derivation only fills the blanks.
+  await supabase.from('dating_profiles').upsert({
+    user_id: userId,
+    name: existing?.name || user?.name || p.name || 'Someone',
+    bio: existing?.bio || d.bio || '',
+    interests: existing?.interests?.length ? existing.interests : (d.interests || []).slice(0, 6),
+    values: existing?.values?.length ? existing.values : (d.values || []).slice(0, 4),
+    work: existing?.work || d.work || '',
+    looking_for: existing?.looking_for || d.lookingFor || '',
+    photo: existing?.photo || p.dating?.photo || '',
+    age: existing?.age ?? (Number(p.dating?.age) || null),
+    city: existing?.city || p.dating?.location || '',
+    love_language: existing?.love_language || p.dating?.loveLanguage || '',
+    attachment: existing?.attachment || p.dating?.attachment || '',
+    derived_from: fingerprint,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id' })
+}
 
 // ════════════════════════════════════════════════════════════
 // PREMIUM / SUBSCRIPTION
