@@ -18,7 +18,7 @@ Three deployables, three manifests, one repo:
 | The API | `backend/` | Railway | `backend/server.js` (1,717 lines) |
 | Telegram bot | `bot/` | Railway | `bot/bot.js` |
 
-`frontend/` is a **fourth, unreferenced React app** — nothing imports it and nothing deploys it. See BACKLOG.md before touching it.
+That is the complete list. A `frontend/` directory — an earlier Telegram Mini App built Aug 30–Sep 6 and abandoned when the Expo approach became `App.tsx` — was deleted on 2026-09-20 because nothing imported or deployed it while it carried a second, diverging copy of the API client. Recover it from git history if you ever need it; do not reintroduce a parallel client.
 
 ## Commands
 

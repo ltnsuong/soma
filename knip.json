@@ -17,10 +17,6 @@
     "bot": {
       "entry": ["bot.js"],
       "project": ["**/*.js"]
-    },
-    "frontend": {
-      "entry": ["src/main.jsx"],
-      "project": ["src/**/*.{js,jsx}"]
     }
   },
   "ignore": [

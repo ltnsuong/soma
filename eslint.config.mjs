@@ -67,7 +67,7 @@ export default tseslint.config(
   },
   {
     // Node scripts and the standalone bot — plain Node, not TypeScript, not a browser.
-    files: ['backend/**/*.js', 'bot/**/*.js', 'scripts/**/*.mjs', 'frontend/src/**/*.js'],
+    files: ['backend/**/*.js', 'bot/**/*.js', 'scripts/**/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: {

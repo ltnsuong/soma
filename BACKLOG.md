@@ -16,11 +16,9 @@ The module graph is **16 modules, 11 dependencies** for the whole product. That 
 
 ---
 
-## 1. Decide what `frontend/` is
+## ~~1. Decide what `frontend/`~~ — done 2026-09-20
 
-An entire React app — `main.jsx`, five screens, `lib/api.js`, `lib/telegram.js`, its own `package.json` with `react-router-dom` and Tailwind. **Nothing imports it, no Procfile or vercel config references it, and it is not deployed.** It also carries its own copy of the API client (16 unused exports), so it's a second, diverging definition of how the product talks to the backend.
-
-It is either abandoned or someone's parallel work. **Ask before deleting.** Resolve to one of: delete it, move it to its own repo, or document why it stays. Until then everything below has an unused twin.
+Deleted. It was the earlier Telegram Mini App (Aug 30–Sep 6), abandoned when the Expo approach became `App.tsx`, still carrying a second copy of the API client. 26 files, in git history if ever needed.
 
 ## 2. Five dead backend files
 
@@ -34,7 +32,7 @@ Nothing requires them:
 
 The live Telegram path is `POST /telegram/webhook` in `server.js` plus the separate `bot/bot.js`. The two `telegram-bot*.js` files are a third implementation of the same thing — likely the cause of the "which bot is actually running" confusion. Confirm against the Railway service list, then delete.
 
-Also unused per knip: `node-telegram-bot-api` and `nodemailer` (backend), `axios` (bot), `react-router-dom` and `@tabler/icons-react` (frontend), `expo-crypto`, `expo-device`, `expo-status-bar` (root).
+Also unused per knip: `node-telegram-bot-api` and `nodemailer` (backend), `axios` (bot), `expo-crypto`, `expo-device`, `expo-status-bar` (root).
 
 ## 3. Reconcile the two LLM paths
 
