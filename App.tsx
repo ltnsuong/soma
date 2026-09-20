@@ -14,6 +14,7 @@ import * as Notifications from 'expo-notifications'
 import * as Location from 'expo-location'
 import * as Haptics from 'expo-haptics'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
+import { DOMAINS, type DomainKey } from './src/shared/domains'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
 const haptic = {
@@ -115,19 +116,6 @@ const TOKEN_KEY   = 'soma_auth_token'
 const REFRESH_KEY = 'soma_refresh_token'
 
 // ── LIFE DOMAINS (Circle of Life) ──────────────────────────
-const DOMAINS = [
-  { key: 'health',       label: 'Health',  icon: '❤️',  color: '#F66E8E' },
-  { key: 'career',       label: 'Career',  icon: '💼',  color: '#6E8BF6' },
-  { key: 'finance',      label: 'Finance', icon: '💰',  color: '#6EF6A8' },
-  { key: 'relationship', label: 'Love',    icon: '💞',  color: '#7B6EF6' },
-  { key: 'family',       label: 'Family',  icon: '👨‍👩‍👧', color: '#F6C26E' },
-  { key: 'growth',       label: 'Growth',  icon: '🌱',  color: '#6EE6C0' },
-  { key: 'hobby',        label: 'Fun',     icon: '🎨',  color: '#F6A86E' },
-  { key: 'purpose',      label: 'Purpose', icon: '🎯',  color: '#6ECFF6' },
-  { key: 'mind',         label: 'Mind',    icon: '🧘',  color: '#A89BFA' },
-  { key: 'environment',  label: 'Home',    icon: '🏡',  color: '#C9A0F6' },
-] as const
-type DomainKey = typeof DOMAINS[number]['key']
 const DOMAIN_ICONS: Record<DomainKey, keyof typeof Ionicons.glyphMap> = {
   health:       'fitness-outline',
   career:       'briefcase-outline',
