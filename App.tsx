@@ -15,6 +15,7 @@ import * as Location from 'expo-location'
 import * as Haptics from 'expo-haptics'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
+import { OPENING, coveredDomains, isDone, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
 const haptic = {
@@ -3915,7 +3916,11 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
   const [profileSummary, setProfileSummary] = useState('')
   const [profilePhotoUri, setProfilePhotoUri] = useState('')
   const [sectionConvo, setSectionConvo] = useState<{role:'soma'|'user', text:string, isFollowUp?:boolean}[]>([])
-  const [qIdx, setQIdx] = useState(0)   // which of the 3 onboarding questions we're on
+  const [finished, setFinished] = useState(false)          // the conversation reached its end
+  const [covered, setCovered] = useState<DomainKey[]>([])  // wheel domains filled so far
+  // Read inside async callbacks, which would otherwise capture a stale list.
+  const askedRef = useRef<string[]>([])
+  const beatRef = useRef<Beat | null>(null)
   const [voiceOn, setVoiceOn] = useState(true)   // Soma reads her messages aloud
   const [somaGenerating, setSomaGenerating] = useState(false)
   const [followUpCount, setFollowUpCount] = useState(0)
@@ -3936,9 +3941,9 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
   const touchStartX = useRef(0)
   const fadeAnim = useRef(new Animated.Value(1)).current
   const pulseAnim = useRef(new Animated.Value(1)).current
+  const thinkTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const micAnim = useRef(new Animated.Value(1)).current
 
-  const QUESTIONS = [t('ob_q1'), t('ob_q2'), t('ob_q3')]
   const COLORS = ['#4CAF7D', '#7B6EF6', '#F59E0B']
   const LABELS = [t('ob_physical_self'), t('ob_social_self'), t('ob_inner_self')]
 
@@ -3981,24 +3986,6 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
       pulseAnim.setValue(1)
     }
   }, [somaThinking])
-
-  // Init conversation and speak question when entering a phase
-  useEffect(() => {
-    if (phase >= 1 && phase <= 3) {
-      const q = QUESTIONS[phase - 1]
-      const initial = [{role: 'soma' as const, text: q}]
-      setSectionConvo(initial)
-      sectionConvoRef.current = initial
-      setFollowUpCount(0)
-      setSomaGenerating(false)
-      setTranscript('')
-      setSomaThinking(true)
-      speak(q)
-      const ms = Math.min(q.length * 55, 8000)
-      const timer = setTimeout(() => setSomaThinking(false), ms)
-      return () => clearTimeout(timer)
-    }
-  }, [phase])
 
   const startListening = () => {
     if (listening) {
@@ -4186,13 +4173,25 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
   const [somaReplyLoading, setSomaReplyLoading] = useState(false)
   const [typeMode, setTypeMode] = useState(false)
 
-  // ── Onboarding conversation ──────────────────────────────
-  // Three fixed questions so nobody faces a blank page, but delivered as chat:
-  // Soma follows up once when an answer is too thin to extract anything from.
-  // QUESTIONS reuses ob_q1/q2/q3, which are already translated in all 11 languages.
+  // ── The First Conversation ───────────────────────────────
+  // Three acts driven by src/features/onboarding/script.ts, delivered as chat.
+  // Soma discloses before it asks, follows up at most once, and stops as soon as
+  // the wheel is full enough — so someone who talks a lot finishes SOONER.
+  // See docs/onboarding-interview.md.
   const THIN_ANSWER = 60          // chars below which Soma probes once before moving on
-  const answeredCount = sectionConvo.filter(m => m.role === 'user' && !m.isFollowUp).length
-  const allAnswered = qIdx >= QUESTIONS.length
+  const allAnswered = finished
+
+  const currentProgress = (): Progress => {
+    const p = DB.get()
+    const f = p.facts || {}
+    return {
+      covered: coveredDomains(p.memories),
+      knownFacts: (['age', 'heightCm', 'city', 'job'] as FactKey[]).filter(k => f[k] !== undefined)
+        .concat(f.hobbies?.length ? ['hobbies'] : []),
+      exchanges: sectionConvoRef.current.filter(m => m.role === 'user').length,
+      asked: askedRef.current,
+    }
+  }
 
   // Flatten every user answer into the single blob the extractor expects.
   const convoTranscript = () =>
@@ -4208,12 +4207,41 @@ Also: 1-2 short sentences. Never give advice yet — you're only getting to know
     setSectionConvo(sectionConvoRef.current)
     if (voiceOnRef.current) speak(text)
     setTimeout(() => convoScrollRef.current?.scrollToEnd({ animated: true }), 60)
+    // Pulse the newest bubble for roughly as long as it takes to say it. This
+    // used to be driven by the phase 1-3 effect; now every Soma message gets it.
+    clearTimeout(thinkTimerRef.current)
+    setSomaThinking(true)
+    thinkTimerRef.current = setTimeout(() => setSomaThinking(false), Math.min(text.length * 55, 8000))
+  }
+
+  // Everything a beat gave us, saved immediately. Two reasons: the stop rule reads
+  // covered domains, and a conversation someone abandons halfway is still worth
+  // something — before this, dropping out saved nothing at all.
+  const absorb = (intel: Awaited<ReturnType<typeof extract>>) => {
+    if (intel.name) DB.setName(intel.name)
+    if (intel.facts) DB.setFacts(intel.facts)
+    intel.memories.forEach(m => DB.addMemory(m.domain, m.content, m.sentiment))
+    intel.people.forEach(pe => DB.upsertPerson(pe.name, pe.relationship, pe.context, pe.interests || []))
+    setCovered(coveredDomains(DB.get().memories))
+  }
+
+  // Ask the next thing worth asking. Beats whose domains are already covered get
+  // skipped, so one rich answer can retire three later questions — which is what
+  // keeps this from feeling like a form. Returns false when there is nothing left.
+  const askNextBeat = (): boolean => {
+    const beat = nextBeat(currentProgress())
+    if (!beat) return false
+    askedRef.current = [...askedRef.current, beat.id]
+    beatRef.current = beat
+    if (beat.opener) pushSoma(beat.opener)
+    pushSoma(beat.ask)
+    return true
   }
 
   const openConversation = () => {
     if (sectionConvoRef.current.length) return
-    setQIdx(0)
-    pushSoma(QUESTIONS[0])
+    pushSoma(OPENING)
+    askNextBeat()
   }
 
   const sendToSoma = async (raw: string) => {
@@ -4232,32 +4260,40 @@ Also: 1-2 short sentences. Never give advice yet — you're only getting to know
       content: m.text,
     }))
 
-    // Thin answer and we haven't probed yet → ask about what they just said.
+    // Thin answer and we haven't probed yet → one follow-up, never two.
+    // The scripted follow-up wins when the beat has one: it is on-message and
+    // costs no round trip. Only beats without one fall back to the model.
     if (text.length < THIN_ANSWER && followUpCount === 0) {
+      setFollowUpCount(1)
+      const scripted = beatRef.current?.followUp
+      if (scripted) { pushSoma(scripted); setSomaGenerating(false); return }
       const probe = await groq(history,
         `${somaSystem()}\nTheir answer was brief. Ask ONE short, specific follow-up about what they just said, so they have something concrete to respond to. Do not move to a new topic.`,
         100)
-      setFollowUpCount(1)
       if (probe) pushSoma(probe)
       setSomaGenerating(false)
       return
     }
 
-    // Otherwise move on: next question, or acknowledge and finish.
-    const next = qIdx + 1
+    // Otherwise move on. Save what they just said BEFORE choosing the next beat —
+    // the stop rule reads covered domains, so extracting after the decision would
+    // make the conversation blind to everything it just heard.
     setFollowUpCount(0)
-    setQIdx(next)
-    if (next < QUESTIONS.length) {
-      const bridge = await groq(history,
+    const [bridge, intel] = await Promise.all([
+      groq(history,
         `${somaSystem()}\nAcknowledge what they said in ONE short sentence. Do not ask anything — the next question follows immediately.`,
-        70)
-      if (bridge) pushSoma(bridge)
-      pushSoma(QUESTIONS[next])
-    } else {
+        70),
+      extract(text),
+    ])
+    absorb(intel)
+    if (bridge) pushSoma(bridge)
+
+    if (isDone(currentProgress()) || !askNextBeat()) {
       const closing = await groq(history,
-        `${somaSystem()}\nThis is your last message: warmly acknowledge what they shared and say you have enough to build their profile. Do NOT ask a question.`,
+        `${somaSystem()}\nThis is your last message: warmly acknowledge what they shared and say you have enough to start. Do NOT ask a question.`,
         110)
       pushSoma(closing || `Thank you for sharing all of that. I have what I need — let's build your profile.`)
+      setFinished(true)
     }
     setSomaGenerating(false)
   }
@@ -4439,16 +4475,16 @@ Write a warm, personal 2-3 sentence response to them. Rules:
             style={{ padding: 6, marginRight: 2 }}>
             <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={19} color={voiceOn ? '#A89BFA' : 'rgba(168,155,250,0.35)'} />
           </TouchableOpacity>
-          <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
-            {QUESTIONS.map((_, i) => (
-              <View key={i} style={{
-                width: i === qIdx && !allAnswered ? 20 : 7, height: 7, borderRadius: 4,
-                backgroundColor: i < qIdx || allAnswered ? '#7B6EF6' : i === qIdx ? '#A89BFA' : 'rgba(168,155,250,0.22)',
+          {/* The wheel, in miniature, filling as they talk. Deliberately NOT a
+              counter: "3 of 12" turns a conversation into a form, and the length
+              is adaptive anyway. The payoff and the progress are the same thing. */}
+          <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+            {DOMAINS.map(d => (
+              <View key={d.key} style={{
+                width: 7, height: 7, borderRadius: 4,
+                backgroundColor: covered.includes(d.key) ? d.color : 'rgba(168,155,250,0.22)',
               }} />
             ))}
-            <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.45)', fontWeight: '700', marginLeft: 4 }}>
-              {Math.min(qIdx + (allAnswered ? 0 : 1), QUESTIONS.length)}/{QUESTIONS.length}
-            </Text>
           </View>
         </View>
 

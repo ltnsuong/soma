@@ -1,0 +1,191 @@
+// The First Conversation — see docs/onboarding-interview.md for the reasoning.
+//
+// Three acts: you, your people, what's missing. The user never sees a question
+// count, because a counter turns a conversation into a form.
+//
+// Pure data and pure functions only. Nothing here imports App.tsx — that would
+// make a cycle the moment App.tsx imports this.
+import { DOMAINS, type DomainKey } from '../../shared/domains'
+
+export interface Beat {
+  id: string
+  act: 1 | 2 | 3
+  /** Said before the question, on its own. Soma discloses first: people match
+   *  the depth they are given, and this is the highest-leverage rule we have. */
+  opener?: string
+  ask: string
+  /** At most one follow-up per thread. Two reads as an interrogation. */
+  followUp?: string
+  /** Domains this beat is expected to fill. Used to decide what to skip. */
+  covers: DomainKey[]
+  /** Plain facts this beat asks for outright rather than inferring. */
+  facts?: FactKey[]
+}
+
+export const OPENING =
+  "I'm Soma. I'll be straight with you — I'm not much use until I actually know you, " +
+  "so this first bit is me getting to know you rather than a form. Skip anything you " +
+  "don't feel like answering. I mean that."
+
+export const BEATS: Beat[] = [
+  // ── ACT I — You ──────────────────────────────────────────
+  {
+    id: 'why',
+    act: 1,
+    ask: 'What made you download this? Even if the answer\'s just "curious".',
+    followUp: 'Was something specific going on, or more of a general itch?',
+    covers: ['purpose'],
+  },
+  {
+    // The highest-yield question in the set. One answer usually touches work,
+    // health, home, fun and mood at once — concrete recall, nothing to perform.
+    id: 'yesterday',
+    act: 1,
+    ask: 'Walk me through yesterday. Not the highlights — the actual shape of it.',
+    followUp: 'Which part of that was actually yours? The bit where nobody needed anything.',
+    covers: ['career', 'health', 'environment', 'hobby', 'mind'],
+  },
+  {
+    // Age and height ride along here, exactly as the old ob_q1 did it. In a body
+    // frame height reads as health; on a form next to "looking for" it reads as a
+    // dating profile. That is the whole reason there is no separate basics step.
+    id: 'body',
+    act: 1,
+    ask: "How's your body treating you lately? And the boring bits while I'm asking — " +
+      'how old are you, how tall, that kind of thing.',
+    followUp: 'Is that normal for you, or is this a rough patch?',
+    covers: ['health', 'mind'],
+    facts: ['age', 'heightCm'],
+  },
+  {
+    id: 'work',
+    act: 1,
+    ask: 'What do you actually do? And what does that look like day to day?',
+    covers: ['career'],
+    facts: ['job'],
+  },
+  {
+    // "Just for you" is doing the work — it separates real interests from
+    // obligations. "What are your hobbies?" returns a list of nouns.
+    id: 'hobbies',
+    act: 1,
+    ask: 'And what do you do that\'s just for you?',
+    covers: ['hobby'],
+    facts: ['hobbies'],
+  },
+  {
+    id: 'ahead',
+    act: 1,
+    ask: 'What are you trying to get better at at the moment?',
+    followUp: 'If the next year went well, what would be different?',
+    covers: ['growth', 'purpose'],
+  },
+  {
+    // Asked plainly. Euphemism about money reads as embarrassment, which is
+    // contagious — and this is the domain people skip first.
+    id: 'money',
+    act: 1,
+    ask: 'Is money a stress right now, or is that handled?',
+    covers: ['finance'],
+  },
+
+  // ── ACT II — Your people ─────────────────────────────────
+  {
+    id: 'who',
+    act: 2,
+    opener: 'Lives tend to make sense to me once I know who\'s in them.',
+    ask: 'Who did you talk to most this week?',
+    followUp: 'What are they to you?',
+    covers: ['relationship', 'family'],
+  },
+  {
+    // The most important question in Act II. It surfaces the drifting
+    // relationship the Circle exists to repair — a bid for connection, in
+    // Gottman's sense. Most people have never been asked it.
+    id: 'missed',
+    act: 2,
+    ask: 'And who do you wish you\'d talked to?',
+    covers: ['relationship', 'family'],
+  },
+  {
+    // Deliberately not romance-coded: the answer can be a friend, a parent, a
+    // colleague. Yields how someone receives care from a story, which beats
+    // asking them to pick a love language off a list — and works for someone
+    // who isn't dating at all.
+    id: 'understood',
+    act: 2,
+    ask: 'Think of a time you felt really understood by someone. What were they actually doing?',
+    covers: ['relationship'],
+  },
+
+  // ── ACT III — What's missing (one question, lightly) ─────
+  {
+    id: 'missing',
+    act: 3,
+    ask: 'Is there a kind of connection you\'re missing right now? Could be a friend, ' +
+      'could be someone who gets a particular part of your life, could be more than that. ' +
+      "Or nothing — that's a real answer too.",
+    covers: [],
+  },
+]
+
+/** Domains we want covered before the conversation can end early. */
+export const TARGET_DOMAINS = 7
+/** Hard ceiling. Someone who gives short answers still gets out in time. */
+export const MAX_EXCHANGES = 12
+
+export type FactKey = 'age' | 'heightCm' | 'city' | 'job' | 'hobbies'
+
+export interface Progress {
+  /** Domains that already hold at least one memory. */
+  covered: DomainKey[]
+  /** Facts we already have. A beat that only asks for known facts is skipped. */
+  knownFacts?: FactKey[]
+  /** User replies so far. */
+  exchanges: number
+  /** Beat ids already asked. */
+  asked: string[]
+}
+
+export const coveredDomains = (memories: { domain: DomainKey }[]): DomainKey[] => {
+  const seen = new Set<DomainKey>()
+  for (const m of memories) if (DOMAINS.some(d => d.key === m.domain)) seen.add(m.domain)
+  return [...seen]
+}
+
+/**
+ * Adaptive stop. Someone who talks a lot finishes SOONER, not later — the
+ * conversation exists to fill the wheel, so a full wheel means it is done.
+ * Act III is always offered, because connection intent is the one thing no
+ * amount of talking about yesterday will reveal.
+ */
+export const isDone = (p: Progress): boolean => {
+  if (!p.asked.includes('missing')) return false
+  return p.covered.length >= TARGET_DOMAINS || p.exchanges >= MAX_EXCHANGES
+}
+
+/**
+ * The next thing to ask. Beats whose domains are already covered get skipped,
+ * so a rich answer to "walk me through yesterday" can retire three later
+ * questions — that is what stops this feeling like a form.
+ */
+export const nextBeat = (p: Progress): Beat | null => {
+  const covered = new Set(p.covered)
+  const remaining = BEATS.filter(b => !p.asked.includes(b.id))
+
+  // Out of room: go straight to the one question nothing else can answer.
+  if (p.exchanges >= MAX_EXCHANGES - 1) {
+    return remaining.find(b => b.id === 'missing') ?? null
+  }
+
+  // A beat earns its place if it asks for a fact we don't have, or reaches a
+  // domain nothing has filled. Someone who mentions cooking while describing
+  // yesterday should not then be asked what they do for fun.
+  const known = new Set(p.knownFacts ?? [])
+  const worthAsking = remaining.find(b =>
+    b.act === 3
+    || b.facts?.some(f => !known.has(f))
+    || b.covers.some(d => !covered.has(d))
+  )
+  return worthAsking ?? remaining[0] ?? null
+}
