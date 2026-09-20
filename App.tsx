@@ -12450,6 +12450,27 @@ function mySide(profile: UserProfile): Side {
   }
 }
 
+// A derived profile often has no photo. A blank rectangle reads as a broken
+// card; initials read as a person who hasn't uploaded one yet.
+function CardPhoto({ uri, name }: { uri?: string; name: string }) {
+  if (uri) return <Image source={{ uri }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' } as any} resizeMode="cover" />
+  return (
+    <View style={{ position: 'absolute', inset: 0, backgroundColor: '#2A2350', alignItems: 'center', justifyContent: 'center' } as any}>
+      <Text style={{ fontSize: 72, fontWeight: '800', color: 'rgba(255,255,255,0.65)' }}>
+        {(name || '?').trim().slice(0, 2).toUpperCase()}
+      </Text>
+      <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 10 }}>No photo yet</Text>
+    </View>
+  )
+}
+
+// Only the life facts they actually gave. An "About them" heading over two
+// empty chips is worse than no section at all.
+const lifeFacts = (c: Candidate) => ([
+  { icon: 'people-outline' as const, value: c.children },
+  { icon: 'paw-outline' as const, value: c.pets },
+].filter(f => !!f.value?.trim()))
+
 // The bio written for THIS kind of connection. A romantic paragraph under
 // Professional is what made all four profiles look like the same person.
 export const bioFor = (c: Candidate, type: ConnectionType): string =>
@@ -13175,8 +13196,6 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             const allPhotos = (currentBrowse.photos && currentBrowse.photos.length > 0) ? currentBrowse.photos : (currentBrowse.photo ? [currentBrowse.photo] : [])
             const safeIdx = Math.min(photoIdx, Math.max(0, allPhotos.length - 1))
             const displayPhoto = allPhotos[safeIdx] || currentBrowse.photo
-            const ct = (currentBrowse as any).connectionType || 'dating'
-            const categoryEmoji: Record<string, string> = { dating: '💜', friends: '😊', professional: '💼', support: '🤝' }
             return (
               <Animated.View
                 {...swipePanResponder.panHandlers}
@@ -13190,7 +13209,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                 <TouchableOpacity activeOpacity={1}
                   onPress={() => { if (allPhotos.length > 1) setPhotoIdx((safeIdx + 1) % allPhotos.length) }}
                   style={{ width: '100%', height: '100%' }}>
-                  <Image source={{ uri: displayPhoto }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' } as any} resizeMode="cover" />
+                  <CardPhoto uri={displayPhoto} name={currentBrowse.name} />
 
                   {/* LIKE overlay */}
                   <Animated.View style={{ position: 'absolute', top: 44, left: 20, zIndex: 20, opacity: likeOpacity, transform: [{ rotate: '-15deg' }] }}>
@@ -13248,7 +13267,9 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                   <View style={{ position: 'absolute', left: 18, right: 18, bottom: 16, zIndex: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
                       <Text style={{ color: '#fff', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>{currentBrowse.name}</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 22, fontWeight: '300' }}>{currentBrowse.age}</Text>
+                      {currentBrowse.age > 0 && (
+                        <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 22, fontWeight: '300' }}>{currentBrowse.age}</Text>
+                      )}
                     </View>
                     {/* Interest chips ON card */}
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -13271,12 +13292,14 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
 
           {/* Quick stats row */}
           <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 16, gap: 0 }}>
+            {/* Only the stats they actually have. Empty boxes with a lone icon in
+                them made a derived profile look like a loading failure. */}
             {[
               { icon: 'barbell-outline' as const, label: currentBrowse.height },
               { icon: 'resize-outline' as const, label: currentBrowse.weight },
               { icon: 'briefcase-outline' as const, label: currentBrowse.work },
-            ].map((s, i) => (
-              <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRightWidth: i < 2 ? 1 : 0, borderColor: '#EAE8F2' }}>
+            ].filter(s => !!s.label?.trim()).map((s, i, arr) => (
+              <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRightWidth: i < arr.length - 1 ? 1 : 0, borderColor: '#EAE8F2' }}>
                 <Ionicons name={s.icon} size={18} color="#7B6EF6" />
                 <Text style={{ color: '#3D3A56', fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center' }}>{s.label}</Text>
               </View>
@@ -13290,18 +13313,19 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             </View>
           </View>
 
-          {/* Life facts */}
+          {/* Life facts. Hidden entirely when there are none — an "About them"
+              heading over two empty chips is worse than no section at all, and
+              children and pets are only asked about for a romantic connection. */}
+          {lifeFacts(currentBrowse).length > 0 && shows(asConnectionType(category), 'age') && (
           <View style={g.dSection}>
             <Text style={g.dH}>About them</Text>
             <View style={g.dTags}>
-              <View style={g.dTag}>
-                <Ionicons name="people-outline" size={13} color="#6E7191" />
-                <Text style={g.dTagTxt}>{currentBrowse.children}</Text>
-              </View>
-              <View style={g.dTag}>
-                <Ionicons name="paw-outline" size={13} color="#6E7191" />
-                <Text style={g.dTagTxt}>{currentBrowse.pets}</Text>
-              </View>
+              {lifeFacts(currentBrowse).map(f => (
+                <View key={f.icon} style={g.dTag}>
+                  <Ionicons name={f.icon} size={13} color="#6E7191" />
+                  <Text style={g.dTagTxt}>{f.value}</Text>
+                </View>
+              ))}
             </View>
             {(() => {
               const mine = (profile.dating.children || '').toLowerCase()
@@ -13319,6 +13343,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               return null
             })()}
           </View>
+          )}
 
           {/* Why Soma matched */}
           <View style={g.dSection}>

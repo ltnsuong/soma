@@ -752,6 +752,8 @@ async function deriveDatingProfile(userId, p) {
  "interests": ["<up to 6, concrete things they actually do>"],
  "values": ["<up to 4 things that clearly matter to them>"],
  "work": "<their job if stated, else empty string>",
+ "age": <their age in years as a number if they stated it anywhere, else null>,
+ "city": "<the city they live in if stated, else empty string>",
  "lookingFor": "<one short line on what connection would suit them>",
  "sectorBios": {
    "dating": "<2 sentences: what they want from a relationship and how they are with people closest to them>",
@@ -786,8 +788,11 @@ async function deriveDatingProfile(userId, p) {
     work: existing?.work || facts.job || d.work || '',
     looking_for: existing?.looking_for || d.lookingFor || '',
     photo: existing?.photo || p.dating?.photo || '',
-    age: existing?.age ?? (Number(p.dating?.age) || facts.age || null),
-    city: existing?.city || p.dating?.location || facts.city || '',
+    // Age and city were only ever read from a form the user never filled in, so
+    // every derived profile showed "Alex 0" with no city. Facts they stated
+    // outright win; otherwise take what the model found in their own words.
+    age: existing?.age ?? (Number(p.dating?.age) || facts.age || Number(d.age) || null),
+    city: existing?.city || p.dating?.location || facts.city || d.city || '',
     love_language: existing?.love_language || p.dating?.loveLanguage || '',
     attachment: existing?.attachment || p.dating?.attachment || '',
     // Four bios, one per connection type. Anything the user wrote themselves wins.
