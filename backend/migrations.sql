@@ -158,6 +158,27 @@ CREATE TABLE IF NOT EXISTS dating_matches (
   PRIMARY KEY (user_a, user_b)
 );
 
+-- ════════════════════════════════════════════════════════════
+-- PROACTIVE MESSAGES FROM SOMA
+-- ════════════════════════════════════════════════════════════
+
+-- Local time, so nothing arrives at 3am. JS getTimezoneOffset() sign:
+-- positive is WEST of UTC (UTC-5 is 300).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tz_offset INT DEFAULT 0;
+
+-- Every message Soma sends first. Doubles as the rate limiter (how many this
+-- week, when was the last) and as the only way to tell whether any of this
+-- works: opened_at against sent_at is the whole measurement.
+CREATE TABLE IF NOT EXISTS nudges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,              -- reconnect | gap | return
+  body TEXT NOT NULL,
+  sent_at TIMESTAMP DEFAULT NOW(),
+  opened_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_nudges_user_sent ON nudges(user_id, sent_at DESC);
+
 -- Push notifications token per user
 ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token TEXT;
 

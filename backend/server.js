@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import crypto from 'crypto'
+import { pickNudge, NUDGE_VOICE } from './nudges.js'
 import { dirname, join } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -978,9 +979,11 @@ async function getUserPushToken(userId) {
 // Save/update device push token for the authenticated user
 app.post('/notifications/token', auth, async (req, res) => {
   try {
-    const { token } = req.body
+    const { token, tzOffset } = req.body
     if (!token) return res.status(400).json({ error: 'token required' })
-    await supabase.from('users').update({ push_token: token }).eq('id', req.user.userId)
+    const patch = { push_token: token }
+    if (Number.isInteger(tzOffset)) patch.tz_offset = tzOffset
+    await supabase.from('users').update(patch).eq('id', req.user.userId)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -1726,6 +1729,112 @@ app.get('/privacy', (req, res) => {
 })
 
 // HEALTH (also serves "/" for Railway/uptime root checks)
+// ════════════════════════════════════════════════════════════
+// PROACTIVE MESSAGES FROM SOMA
+// ════════════════════════════════════════════════════════════
+//
+// Everything about WHETHER and WHAT lives in nudges.js and is unit-tested.
+// This half only gathers state, asks, writes the sentence, and sends it.
+//
+// Runs on one Railway instance. Scaled to more, this would double-send — the
+// fix then is a per-user advisory lock, not a longer interval.
+
+const NUDGE_SWEEP_MS = 60 * 60 * 1000
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
+// Everything the decision needs, for every user who could receive one.
+async function gatherNudgeState() {
+  const { data: users } = await supabase
+    .from('users').select('id, push_token, tz_offset').not('push_token', 'is', null).limit(500)
+  if (!users?.length) return []
+
+  const ids = users.map(u => u.id)
+  const [{ data: profiles }, { data: recent }] = await Promise.all([
+    supabase.from('profiles').select('user_id, data, updated_at').in('user_id', ids),
+    supabase.from('nudges').select('user_id, sent_at')
+      .in('user_id', ids).gte('sent_at', new Date(Date.now() - WEEK_MS).toISOString()),
+  ])
+
+  const byUser = new Map(ids.map(id => [id, { profile: null, lastActiveAt: null, sent: [] }]))
+  for (const p of profiles || []) {
+    const e = byUser.get(p.user_id)
+    if (e) { e.profile = p.data || {}; e.lastActiveAt = p.updated_at }
+  }
+  for (const n of recent || []) byUser.get(n.user_id)?.sent.push(n.sent_at)
+
+  return users.map(u => {
+    const e = byUser.get(u.id)
+    const sent = e.sent.sort()
+    return {
+      userId: u.id,
+      pushToken: u.push_token,
+      state: {
+        profile: e.profile || {},
+        lastActiveAt: e.lastActiveAt,
+        lastNudgeAt: sent[sent.length - 1] || null,
+        sentThisWeek: sent.length,
+        tzOffsetMinutes: u.tz_offset || 0,
+        hasPushToken: true,
+      },
+    }
+  })
+}
+
+// Turn a brief into one sentence that sounds like Soma and not like an app.
+async function writeNudge(brief, profile) {
+  const name = profile?.name ? `Their name is ${profile.name}. ` : ''
+  const text = await callGroq(
+    NUDGE_VOICE,
+    `${name}${brief}\n\nWrite only the notification text. No quotes, no emoji, no sign-off.`,
+    90,
+  )
+  return (text || '').replace(/^["'\s]+|["'\s]+$/g, '').slice(0, 160)
+}
+
+async function nudgeOne(entry, now) {
+  const decision = pickNudge(entry.state, now)
+  if (!decision) return false
+  const body = await writeNudge(decision.brief, entry.state.profile)
+  if (!body) return false
+
+  await sendPush(entry.pushToken, 'Soma', body, { screen: 'aura', nudge: decision.kind })
+  await supabase.from('nudges').insert({ user_id: entry.userId, kind: decision.kind, body })
+  return true
+}
+
+async function runNudgeSweep() {
+  if (process.env.NUDGES_ENABLED !== 'true') return
+  try {
+    const now = Date.now()
+    const entries = await gatherNudgeState()
+    let sent = 0
+    for (const e of entries) {
+      try { if (await nudgeOne(e, now)) sent++ }
+      catch (err) { console.error('[nudge] failed for', e.userId, err.message) }
+    }
+    if (sent) console.log(`[nudge] sent ${sent} of ${entries.length} candidates`)
+  } catch (err) {
+    console.error('[nudge] sweep failed:', err.message)
+  }
+}
+
+setInterval(runNudgeSweep, NUDGE_SWEEP_MS)
+setTimeout(runNudgeSweep, 60 * 1000)   // once shortly after boot, not during it
+
+// Mark a nudge opened. Without this there is no way to tell whether any of
+// this works — opened_at against sent_at is the entire measurement.
+app.post('/notifications/opened', auth, async (req, res) => {
+  try {
+    const { data: last } = await supabase.from('nudges')
+      .select('id').eq('user_id', req.user.userId).is('opened_at', null)
+      .order('sent_at', { ascending: false }).limit(1).maybeSingle()
+    if (last) await supabase.from('nudges').update({ opened_at: new Date().toISOString() }).eq('id', last.id)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.get(['/', '/health'], (req, res) => res.json({ status: 'ok', service: 'soma-backend' }))
 
 // START

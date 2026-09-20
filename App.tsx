@@ -1773,7 +1773,10 @@ async function registerPushToken(): Promise<void> {
     fetch(`${BACKEND_URL}/notifications/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
-      body: JSON.stringify({ token }),
+      // The timezone rides along so the server knows their local hour. Without
+      // it every proactive message would be scheduled in UTC and land at 3am
+      // for anyone far enough from Greenwich.
+      body: JSON.stringify({ token, tzOffset: new Date().getTimezoneOffset() }),
     }).catch(() => {})
   } catch {}
 }
