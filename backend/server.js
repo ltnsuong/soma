@@ -731,7 +731,10 @@ async function deriveDatingProfile(userId, p) {
     .from('dating_profiles').select('*').eq('user_id', userId).maybeSingle()
 
   // Skip if nothing new to learn from.
+  // Facts are part of the fingerprint: without them, telling Soma your job after
+  // the profile was already derived would never reach matching.
   const fingerprint = String(memories.length) + ':' + (memories[0]?.id || '')
+    + ':' + JSON.stringify(p.facts || {})
   if (existing?.derived_from === fingerprint) return
 
   const byDomain = {}
@@ -756,18 +759,27 @@ async function deriveDatingProfile(userId, p) {
 
   const { data: user } = await supabase.from('users').select('name').eq('id', userId).maybeSingle()
 
+  // Facts the user stated outright beat anything the model inferred from prose.
+  // They were asked directly ("how old are you", "what do you actually do"), so a
+  // derived guess must never overwrite them. See docs/onboarding-interview.md.
+  const facts = p.facts || {}
+  const hobbies = Array.isArray(facts.hobbies) ? facts.hobbies : []
+  const interests = existing?.interests?.length
+    ? existing.interests
+    : [...new Set([...hobbies, ...(d.interests || [])])].slice(0, 6)
+
   // Anything the user set by hand wins; derivation only fills the blanks.
   await supabase.from('dating_profiles').upsert({
     user_id: userId,
     name: existing?.name || user?.name || p.name || 'Someone',
     bio: existing?.bio || d.bio || '',
-    interests: existing?.interests?.length ? existing.interests : (d.interests || []).slice(0, 6),
+    interests,
     values: existing?.values?.length ? existing.values : (d.values || []).slice(0, 4),
-    work: existing?.work || d.work || '',
+    work: existing?.work || facts.job || d.work || '',
     looking_for: existing?.looking_for || d.lookingFor || '',
     photo: existing?.photo || p.dating?.photo || '',
-    age: existing?.age ?? (Number(p.dating?.age) || null),
-    city: existing?.city || p.dating?.location || '',
+    age: existing?.age ?? (Number(p.dating?.age) || facts.age || null),
+    city: existing?.city || p.dating?.location || facts.city || '',
     love_language: existing?.love_language || p.dating?.loveLanguage || '',
     attachment: existing?.attachment || p.dating?.attachment || '',
     derived_from: fingerprint,

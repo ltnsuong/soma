@@ -1148,8 +1148,21 @@ interface Connection {
   datePlan?: DatePlan
   connectionType?: 'dating' | 'friends' | 'professional' | 'support'
 }
+// Plain facts about the person. These are ASKED outright, not inferred — guessing
+// someone's age or job from conversation is slow, often wrong, and faintly creepy
+// when it lands. Interpretations (love language, attachment, values) never live
+// here; those are derived from what someone says. See docs/onboarding-interview.md.
+interface UserFacts {
+  age?: number
+  heightCm?: number     // stored in cm; feet/inches are converted on the way in
+  city?: string
+  job?: string
+  hobbies?: string[]
+}
+
 interface UserProfile {
   name: string; registered: boolean
+  facts?: UserFacts
   memories: Memory[]; circle: CirclePerson[]; diary: DiaryEntry[]; conversations: number
   dating: DatingProfile
   premium: boolean
@@ -1234,6 +1247,24 @@ const EMPTY_DATING: DatingProfile = {
   lastUpdated: '',
 }
 
+const inRange = (n: unknown, lo: number, hi: number): n is number =>
+  typeof n === 'number' && Number.isFinite(n) && n > lo && n < hi
+
+// Hobbies arrive from conversation, so the same one shows up worded differently
+// across sessions. Dedupe case-insensitively and cap the list — it gets rendered,
+// and an unbounded array eventually breaks the layout.
+const mergeHobbies = (existing: string[] = [], incoming: string[] = []): string[] => {
+  const out = [...existing]
+  const seen = new Set(existing.map(h => h.toLowerCase()))
+  for (const raw of incoming) {
+    const v = raw.trim()
+    if (!v || seen.has(v.toLowerCase())) continue
+    seen.add(v.toLowerCase())
+    out.push(v)
+  }
+  return out.slice(0, 12)
+}
+
 // ── STORAGE ────────────────────────────────────────────────
 const DB = {
   get: (): UserProfile => {
@@ -1266,11 +1297,12 @@ const DB = {
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {}
         }
         if (!p.diary) p.diary = []
+        if (!p.facts) p.facts = {}
         if (p.conversations === undefined) p.conversations = 0
         return p
       }
     } catch {}
-    return { name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }
+    return { name: '', registered: false, facts: {}, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }
   },
   save: (p: UserProfile) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); schedulePush() } catch {} },
   addMemory: (domain: DomainKey, content: string, sentiment: Sentiment = 'neutral') => {
@@ -1278,6 +1310,19 @@ const DB = {
     if (p.memories.some(m => m.content.toLowerCase() === content.toLowerCase())) return
     p.memories.unshift({ id: Date.now() + '' + Math.random(), domain, content, sentiment, createdAt: new Date().toLocaleDateString() })
     p.memories = p.memories.slice(0, 150); DB.save(p)
+  },
+  // Merge in facts we just learned. Never clobbers a known value with an empty one,
+  // so a vague later answer can't erase a clear earlier one.
+  setFacts: (f: Partial<UserFacts>) => {
+    const p = DB.get()
+    const next: UserFacts = { ...p.facts }
+    if (inRange(f.age, 0, 120)) next.age = f.age
+    if (inRange(f.heightCm, 90, 250)) next.heightCm = f.heightCm
+    if (f.city?.trim()) next.city = f.city.trim()
+    if (f.job?.trim()) next.job = f.job.trim()
+    if (f.hobbies?.length) next.hobbies = mergeHobbies(next.hobbies, f.hobbies)
+    p.facts = next
+    DB.save(p)
   },
   deleteMemory: (id: string) => {
     const p = DB.get(); p.memories = p.memories.filter(m => m.id !== id); DB.save(p)
@@ -1582,7 +1627,7 @@ const DB = {
     p.moodLogs = logs.slice(0, 365)
     DB.save(p)
   },
-  reset: () => DB.save({ name: '', registered: false, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
+  reset: () => DB.save({ name: '', registered: false, facts: {}, memories: [], circle: [], diary: [], conversations: 0, dating: { ...EMPTY_DATING }, premium: false, likesToday: 0, likesDate: '', connections: [], likedYou: [], aiName: 'Soma', aiPhoto: '', trustedContact: { name: '', phone: '' } }),
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2760,7 +2805,7 @@ function somaCircleContext(type: 'therapy' | 'family' | 'friend' | 'work' | 'rom
   }
 }
 
-async function extract(msg: string): Promise<{ memories: { domain: DomainKey; content: string; sentiment?: Sentiment }[]; people: { name: string; relationship: string; context: string; interests: string[] }[]; name?: string; mood?: number | null }> {
+async function extract(msg: string): Promise<{ memories: { domain: DomainKey; content: string; sentiment?: Sentiment }[]; people: { name: string; relationship: string; context: string; interests: string[] }[]; name?: string; mood?: number | null; facts?: Partial<UserFacts> }> {
   try {
     const res = await groq([{ role: 'user', content:
 `Extract facts from this message. Return ONLY JSON.
@@ -2769,7 +2814,8 @@ Message: "${msg}"
  "name": "their first name if they introduce themselves else null",
  "memories": [{"domain":"health|career|finance|relationship|family|growth|hobby|purpose|mind|environment","content":"fact under 12 words","sentiment":"positive|neutral|negative"}],
  "people": [{"name":"name","relationship":"mom|friend|partner|etc","context":"brief","interests":["shared interest"]}],
- "mood": <1-7 how they sound RIGHT NOW (1=rough, 4=okay, 7=euphoric), or null if the message carries no emotional signal>
+ "mood": <1-7 how they sound RIGHT NOW (1=rough, 4=okay, 7=euphoric), or null if the message carries no emotional signal>,
+ "facts": {"age": <their age in years as a number, else null>, "heightCm": <their height in CENTIMETRES as a number — convert from feet/inches if that is how they said it, else null>, "city": "the city they live in, else null", "job": "their job title in 1-3 words, else null", "hobbies": ["things they do for enjoyment, 1-3 words each"]}
 }
 Rules: Skip vague or incomplete fragments (e.g. "I want to", "maybe"). Only store clear, self-contained facts.
 sentiment = how this is going for them: "negative" for a struggle/loss/regret/worry, "positive" for a win/joy/progress, "neutral" for a plain fact.
@@ -6070,6 +6116,7 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
       ])
       if (mode !== 'try') {
         if (intel.name) DB.setName(intel.name)
+        if (intel.facts) DB.setFacts(intel.facts)
         intel.memories.forEach((m: any) => DB.addMemory(m.domain, m.content, m.sentiment))
         intel.people.forEach((pe: any) => DB.upsertPerson(pe.name, pe.relationship, pe.context, pe.interests || []))
         // Mood read from what they said, so the indicator fills itself. A mood the
