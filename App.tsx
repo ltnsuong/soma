@@ -17,6 +17,7 @@ import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { OPENING, coveredDomains, isDone, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
+import { scoreFit, overlap, shows, type ConnectionType, type Side } from './src/features/connections/scoring'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
 const haptic = {
@@ -7172,13 +7173,16 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
                     what actually helps you decide whether to connect. */}
                 {!profileLoading && (
                   <View style={{ backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' }}>
-                    {([
+                    {(() => { const vt = asConnectionType(viewProfile.connectionType); return ([
                       viewProfile.somaCode && { label: tr('soma_code'), value: viewProfile.somaCode, mono: true, copy: true },
                       viewProfile.connectionType && { label: tr('looking_for'), value: tr(`ct_${viewProfile.connectionType}`) },
-                      viewProfile.loveLanguage && { label: tr('love_language'), value: viewProfile.loveLanguage },
-                      viewProfile.attachment && { label: tr('attachment'), value: viewProfile.attachment },
+                      // Attachment style and love language belong to a romantic
+                      // introduction and nowhere else. On a work profile they are
+                      // both useless and intrusive.
+                      shows(vt, 'loveLanguage') && viewProfile.loveLanguage && { label: tr('love_language'), value: viewProfile.loveLanguage },
+                      shows(vt, 'attachment') && viewProfile.attachment && { label: tr('attachment'), value: viewProfile.attachment },
                       viewProfile.joinedAt && { label: tr('member_since'), value: new Date(viewProfile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) },
-                    ].filter(Boolean) as { label: string; value: string; mono?: boolean; copy?: boolean }[]).map((row, i) => {
+                    ].filter(Boolean) as { label: string; value: string; mono?: boolean; copy?: boolean }[]) })().map((row, i) => {
                       const RowWrap: any = row.copy ? TouchableOpacity : View
                       return (
                         <RowWrap
@@ -12377,61 +12381,60 @@ const DEMO_CONNECTIONS: Connection[] = []
 const LOVE_LANGUAGES = ['Words of Affirmation', 'Quality Time', 'Acts of Service', 'Physical Touch', 'Receiving Gifts']
 const ATTACHMENT_STYLES = ['Secure', 'Anxious', 'Avoidant', 'Disorganized']
 
-// Attachment compatibility matrix (0..1) — based on attachment theory
-function attachmentFit(a: string, b: string): number {
-  const M: Record<string, Record<string, number>> = {
-    Secure:       { Secure: 1.0, Anxious: 0.85, Avoidant: 0.8,  Disorganized: 0.7 },
-    Anxious:      { Secure: 0.85, Anxious: 0.6,  Avoidant: 0.4,  Disorganized: 0.5 },
-    Avoidant:     { Secure: 0.8,  Anxious: 0.4,  Avoidant: 0.5,  Disorganized: 0.45 },
-    Disorganized: { Secure: 0.7,  Anxious: 0.5,  Avoidant: 0.45, Disorganized: 0.4 },
-  }
-  return M[a]?.[b] ?? 0.65
+// Which algorithm answers which question. The Meet screen calls romantic
+// matching "romantic"; the profile field is "dating".
+const CATEGORY_TYPE: Record<string, ConnectionType> = {
+  romantic: 'dating', dating: 'dating', friends: 'friends',
+  professional: 'professional', support: 'support', purpose: 'professional',
 }
-// Love language compatibility (0..1)
-function loveFit(a: string, b: string): number {
-  if (!a || !b) return 0.7
-  if (a === b) return 1.0                       // speak the same language
-  // touch+words and time+service are common complements
-  const complements = [['Physical Touch','Words of Affirmation'], ['Quality Time','Acts of Service']]
-  if (complements.some(([x,y]) => (a===x&&b===y)||(a===y&&b===x))) return 0.85
-  return 0.7
+export const asConnectionType = (category?: string): ConnectionType =>
+  CATEGORY_TYPE[category ?? ''] ?? 'dating'
+
+const kmOf = (d?: string): number | undefined => {
+  const n = parseFloat(String(d ?? '').replace(',', '.'))
+  return Number.isFinite(n) ? n : undefined
 }
 
-// Compute real two-sided alignment: interests + psychology
-function alignmentScore(profile: UserProfile, c: Candidate): {
-  score: number; shared: string[]; psych: { attach: number; love: number; note: string }
+// The user's own side, as the scorers want it.
+function mySide(profile: UserProfile): Side {
+  const wellbeing: Partial<Record<DomainKey, number>> = {}
+  for (const d of DOMAINS) wellbeing[d.key] = domainWellbeing(profile.memories, d.key)
+  const dating = profile.dating
+  return {
+    interests: [...(profile.facts?.hobbies ?? []), ...(dating.interests ?? [])],
+    values: dating.relationshipValues ?? [],
+    work: profile.facts?.job || dating.work,
+    city: profile.facts?.city || dating.location,
+    attachment: dating.attachment,
+    loveLanguage: dating.loveLanguage,
+    wellbeing,
+  }
+}
+
+const theirSide = (c: Candidate): Side => ({
+  interests: c.interests ?? [],
+  values: c.values ?? [],
+  work: c.work,
+  city: c.location,
+  distanceKm: kmOf(c.distance),
+  attachment: c.attachment,
+  loveLanguage: c.loveLanguage,
+})
+
+// Score a candidate for the connection actually being looked for. The old version
+// ran attachment style and love language over everyone, so a work contact was
+// ranked on how they behave in romantic relationships.
+// See src/features/connections/scoring.ts for what each type optimises for.
+function alignmentScore(profile: UserProfile, c: Candidate, type: ConnectionType = 'dating'): {
+  score: number; shared: string[]; reasons: string[]
 } {
-  const userText = profile.memories.map(m => m.content.toLowerCase()).join(' ')
-  const candTerms = [...c.interests, ...c.values.map(v => v.toLowerCase())]
-  const shared: string[] = []
-  let hits = 0
-  candTerms.forEach(term => {
-    const t = term.toLowerCase()
-    if (userText.includes(t) || userText.includes(t.slice(0, 4))) {
-      hits++; if (!shared.includes(term)) shared.push(term)
-    }
-  })
-  const overlap = candTerms.length ? hits / candTerms.length : 0
-
-  // Psychology — only if the user built their dating profile
-  const d = profile.dating
-  const hasPsych = d.complete && d.attachment && d.loveLanguage
-  const attach = hasPsych ? attachmentFit(d.attachment, c.attachment) : 0.72
-  const love   = hasPsych ? loveFit(d.loveLanguage, c.loveLanguage) : 0.72
-
-  let note = ''
-  if (hasPsych) {
-    const aGood = attach >= 0.8, lGood = love >= 0.85
-    if (aGood && lGood) note = `Your ${d.attachment} + their ${c.attachment} attachment fit beautifully, and you both value ${d.loveLanguage === c.loveLanguage ? d.loveLanguage.toLowerCase() : 'complementary love languages'}.`
-    else if (aGood) note = `Your attachment styles (${d.attachment} + ${c.attachment}) balance each other well.`
-    else if (attach < 0.5) note = `Heads up: ${d.attachment} + ${c.attachment} can be a challenging pairing — worth going slow.`
-    else note = `Different love languages (${d.loveLanguage} vs ${c.loveLanguage}) — workable with awareness.`
+  const me = mySide(profile)
+  const fit = scoreFit(type, me, theirSide(c))
+  return {
+    score: fit.score,
+    shared: overlap(me.interests, c.interests ?? []).shared,
+    reasons: fit.reasons,
   }
-
-  // Blend: interests 35% · attachment 30% · love language 20% · base 15%
-  let score = Math.round((0.15 + overlap * 0.35 + attach * 0.30 + love * 0.20) * 100)
-  score = Math.max(55, Math.min(98, score))
-  return { score, shared, psych: { attach, love, note } }
 }
 
 // Categories for Meet New People
@@ -12621,7 +12624,7 @@ function MeetPeople({ profile, category = 'romantic', startAtName, onBack, onMat
   // Rank candidates by REAL alignment with the user's memories (best first), respecting active age filter
   const ranked = [...CANDIDATES]
     .filter(c => c.age >= ageMin && c.age <= ageMax)
-    .map(c => ({ c, ...alignmentScore(profile, c) }))
+    .map(c => ({ c, ...alignmentScore(profile, c, asConnectionType(category)) }))
     .sort((a, b) => b.score - a.score)
   const candidate = liked[liked.length - 1] ?? ranked[0]?.c ?? CANDIDATES[0]
 
@@ -12844,15 +12847,21 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
   const allUsersRanked = allUsers
     .filter(u => !u.age || (u.age >= ageMin && u.age <= ageMax))
     .map(u => {
+      // Real users get the same per-type algorithm as everyone else. The
+      // server's `compatibility` is a single type-blind number, so using it here
+      // put real people on a romantic scale even on the professional tab.
       const c = nearbyToCandidate(u)
-      return { c, score: u.compatibility || 50, shared: (u.interests || []).slice(0, 3), psych: { attach: 0, love: 0, note: u.hasDatingProfile ? (u.city || '') : 'New to SOMA' } }
+      const fit = alignmentScore(profile, c, asConnectionType(category))
+      const note = u.hasDatingProfile ? u.city : 'New to SOMA — still telling Soma about themselves.'
+      return { c, ...fit, reasons: note ? [...fit.reasons, note] : fit.reasons }
     })
 
   const realRanked = realNearby
     .filter(u => (!u.age || (u.age >= ageMin && u.age <= ageMax)))
     .map(u => {
       const c = nearbyToCandidate(u)
-      return { c, score: u.compatibility, shared: (c.interests || []).slice(0, 3), psych: { attach: 0, love: 0, note: `${u.distanceKm} km away` } }
+      const fit = alignmentScore(profile, c, asConnectionType(category))
+      return { c, ...fit, reasons: [`${u.distanceKm} km away.`, ...fit.reasons] }
     })
 
   const useReal = browseTab === 'nearby' ? (realStatus === 'ready' && realRanked.length > 0) : allUsersRanked.length > 0
@@ -12860,12 +12869,11 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
     ? (realRanked.length > 0 ? realRanked : allUsersRanked)
     : (allUsersRanked.length > 0 ? allUsersRanked : ranked)
 
-  const safeActive = activeRanked.length > 0 ? activeRanked : [{ c: CANDIDATES[0], score: 0, shared: [] as string[], psych: { attach: 0, love: 0, note: '' } }]
-  const safeRanked = ranked.length > 0 ? ranked : [{ c: CANDIDATES[0], score: 0, shared: [] as string[], psych: { attach: 0, love: 0, note: '' } }]
+  const safeActive = activeRanked.length > 0 ? activeRanked : [{ c: CANDIDATES[0], score: 0, shared: [] as string[], reasons: [] as string[] }]
+  const safeRanked = ranked.length > 0 ? ranked : [{ c: CANDIDATES[0], score: 0, shared: [] as string[], reasons: [] as string[] }]
   const current = safeActive[Math.min(index, safeActive.length - 1)].c
   const currentScore = safeRanked[Math.min(index, safeRanked.length - 1)].score
-  const currentShared = safeRanked[Math.min(index, safeRanked.length - 1)].shared
-  const currentPsych = safeRanked[Math.min(index, safeRanked.length - 1)].psych
+  const currentReasons = safeRanked[Math.min(index, safeRanked.length - 1)].reasons ?? []
   const pass = () => { haptic.light(); setPhotoIdx(0); if (index < safeActive.length - 1) setIndex(index + 1); else setIndex(0) }
 
   const [showRegisterPrompt, setShowRegisterPrompt] = useState(false)
@@ -13088,7 +13096,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
   if (step === 'browse') {
     const demoFallback = CANDIDATES
       .filter(c => !genderPref || genderPref === 'both' || c.gender === genderPref)
-      .map(c => ({ c, ...alignmentScore(profile, c) }))
+      .map(c => ({ c, ...alignmentScore(profile, c, asConnectionType(category)) }))
     const filteredRanked = browseTab === 'nearby'
       ? (realRanked.length > 0 ? realRanked : demoFallback)
       : (allUsersRanked.length > 0 ? allUsersRanked : demoFallback)
@@ -13276,21 +13284,17 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                 <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>{cfg.matchLabel} · {currentScore}%</Text>
               </View>
               <View style={{ backgroundColor: '#F8F6FF', padding: 16 }}>
-                <Text style={{ color: '#3D3A56', fontSize: 15, lineHeight: 23, fontWeight: '500' }}>
-                  {currentShared.length > 0
-                    ? `You both connect on ${currentShared.slice(0, 4).join(', ')}.`
-                    : 'Talk to Soma about your hobbies and values — matches get sharper the more she knows you.'}
-                </Text>
-                {currentPsych.note ? (
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                    <View style={{ backgroundColor: '#7B6EF615', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#7B6EF630' }}>
-                      <Text style={{ color: '#7B6EF6', fontSize: 12, fontWeight: '700' }}>attachment {Math.round(currentPsych.attach * 100)}%</Text>
-                    </View>
-                    <View style={{ backgroundColor: '#7B6EF615', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#7B6EF630' }}>
-                      <Text style={{ color: '#7B6EF6', fontSize: 12, fontWeight: '700' }}>love lang {Math.round(currentPsych.love * 100)}%</Text>
-                    </View>
-                  </View>
-                ) : null}
+                {/* Why THIS algorithm ranked them here. A work introduction gets a
+                    reason about work; only a romantic one mentions attachment. */}
+                {currentReasons.length > 0 ? currentReasons.slice(0, 3).map((r, i) => (
+                  <Text key={i} style={{ color: '#3D3A56', fontSize: 15, lineHeight: 23, fontWeight: '500', marginTop: i === 0 ? 0 : 8 }}>
+                    {r}
+                  </Text>
+                )) : (
+                  <Text style={{ color: '#3D3A56', fontSize: 15, lineHeight: 23, fontWeight: '500' }}>
+                    Talk to Soma about your life — matches get sharper the more she knows you.
+                  </Text>
+                )}
               </View>
             </View>
           </View>
