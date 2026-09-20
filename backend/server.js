@@ -733,7 +733,15 @@ async function deriveDatingProfile(userId, p) {
   // Skip if nothing new to learn from.
   // Facts are part of the fingerprint: without them, telling Soma your job after
   // the profile was already derived would never reach matching.
-  const fingerprint = String(memories.length) + ':' + (memories[0]?.id || '')
+  // Bump when the derivation changes what it produces. Without this the
+  // fingerprint only tracks the USER's data, so a fix to the derivation never
+  // reaches anyone who doesn't happen to say something new — Alex told Soma he
+  // was 30, the age column stayed null, and no amount of fixing the code would
+  // have backfilled it. Raising this re-derives everyone once.
+  //   v2: reads age and city from what they said; writes the four sector bios.
+  const DERIVE_VERSION = 'v2'
+
+  const fingerprint = DERIVE_VERSION + ':' + String(memories.length) + ':' + (memories[0]?.id || '')
     + ':' + JSON.stringify(p.facts || {})
   if (existing?.derived_from === fingerprint) return
 
