@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { OPENING, coveredDomains, isDone, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
+import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
 const haptic = {
@@ -1254,6 +1255,39 @@ const mergeHobbies = (existing: string[] = [], incoming: string[] = []): string[
   return out.slice(0, 12)
 }
 
+// Scalars are FIRST-WINS. Someone says "I'm a nurse in Lisbon", then later
+// mentions working nights, and the extractor reports the job as "Night shift
+// worker" — a vaguer restatement overwriting a clear answer. People refer to
+// their work, city and age repeatedly, so last-wins means the profile churns for
+// the rest of the conversation. Hobbies accumulate instead, since a second hobby
+// is more information rather than a correction.
+//
+// `overwrite` is for when the user edited the field themselves: then the new
+// value is meant to replace the old one.
+const SCALAR_FACTS = ['age', 'heightCm', 'city', 'job'] as const
+
+// Validation only: anything out of range or blank becomes undefined and is dropped.
+const cleanFacts = (f: Partial<UserFacts>): Partial<UserFacts> => ({
+  age: inRange(f.age, 0, 120) ? f.age : undefined,
+  heightCm: inRange(f.heightCm, 90, 250) ? f.heightCm : undefined,
+  city: f.city?.trim() || undefined,
+  job: f.job?.trim() || undefined,
+})
+
+export const mergeFacts = (
+  existing: UserFacts, incoming: Partial<UserFacts>, overwrite: boolean,
+): UserFacts => {
+  const next: UserFacts = { ...existing }
+  const clean = cleanFacts(incoming)
+  for (const k of SCALAR_FACTS) {
+    if (clean[k] === undefined) continue
+    if (!overwrite && next[k] !== undefined) continue
+    Object.assign(next, { [k]: clean[k] })
+  }
+  if (incoming.hobbies?.length) next.hobbies = mergeHobbies(next.hobbies, incoming.hobbies)
+  return next
+}
+
 // ── STORAGE ────────────────────────────────────────────────
 const DB = {
   get: (): UserProfile => {
@@ -1300,17 +1334,9 @@ const DB = {
     p.memories.unshift({ id: Date.now() + '' + Math.random(), domain, content, sentiment, createdAt: new Date().toLocaleDateString() })
     p.memories = p.memories.slice(0, 150); DB.save(p)
   },
-  // Merge in facts we just learned. Never clobbers a known value with an empty one,
-  // so a vague later answer can't erase a clear earlier one.
-  setFacts: (f: Partial<UserFacts>) => {
+  setFacts: (f: Partial<UserFacts>, opts: { overwrite?: boolean } = {}) => {
     const p = DB.get()
-    const next: UserFacts = { ...p.facts }
-    if (inRange(f.age, 0, 120)) next.age = f.age
-    if (inRange(f.heightCm, 90, 250)) next.heightCm = f.heightCm
-    if (f.city?.trim()) next.city = f.city.trim()
-    if (f.job?.trim()) next.job = f.job.trim()
-    if (f.hobbies?.length) next.hobbies = mergeHobbies(next.hobbies, f.hobbies)
-    p.facts = next
+    p.facts = mergeFacts(p.facts || {}, f, opts.overwrite === true)
     DB.save(p)
   },
   deleteMemory: (id: string) => {
@@ -4184,10 +4210,14 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
   const currentProgress = (): Progress => {
     const p = DB.get()
     const f = p.facts || {}
+    // Listed as a const tuple so each key indexes UserFacts; 'name' lives on the
+    // profile itself and 'hobbies' is an array, so both are appended separately.
+    const known: FactKey[] = (['age', 'heightCm', 'city', 'job'] as const).filter(k => f[k] !== undefined)
+    if (f.hobbies?.length) known.push('hobbies')
+    if (p.name?.trim()) known.push('name')
     return {
       covered: coveredDomains(p.memories),
-      knownFacts: (['age', 'heightCm', 'city', 'job'] as FactKey[]).filter(k => f[k] !== undefined)
-        .concat(f.hobbies?.length ? ['hobbies'] : []),
+      knownFacts: known,
       exchanges: sectionConvoRef.current.filter(m => m.role === 'user').length,
       asked: askedRef.current,
     }
@@ -4263,7 +4293,7 @@ Also: 1-2 short sentences. Never give advice yet — you're only getting to know
     // Thin answer and we haven't probed yet → one follow-up, never two.
     // The scripted follow-up wins when the beat has one: it is on-message and
     // costs no round trip. Only beats without one fall back to the model.
-    if (text.length < THIN_ANSWER && followUpCount === 0) {
+    if (!beatRef.current?.terse && text.length < THIN_ANSWER && followUpCount === 0) {
       setFollowUpCount(1)
       const scripted = beatRef.current?.followUp
       if (scripted) { pushSoma(scripted); setSomaGenerating(false); return }
@@ -4286,6 +4316,12 @@ Also: 1-2 short sentences. Never give advice yet — you're only getting to know
       extract(text),
     ])
     absorb(intel)
+    // Extraction is prompted for the name, but a bare "Sofia" sometimes reads as
+    // no introduction at all. Only trust a one- or two-word reply to this beat.
+    if (beatRef.current?.id === 'name' && !intel.name && !DB.get().name.trim()) {
+      const said = text.trim()
+      if (said.split(/\s+/).length <= 2 && /^[\p{L}][\p{L}\s'-]{0,23}$/u.test(said)) DB.setName(said)
+    }
     if (bridge) pushSoma(bridge)
 
     if (isDone(currentProgress()) || !askNextBeat()) {
@@ -4326,20 +4362,23 @@ Extract a JSON profile from this text. Return ONLY valid JSON, no markdown, no e
 }
 Rules: use 5 for any domain not mentioned. Only include memories for domains clearly mentioned. Max 4 memories.`
 
-    const replyPrompt = `You are Soma, a warm and deeply empathetic AI life companion. Someone just joined the app.
-Their name is ${name || 'unknown'}. They told you: "${said}"
+    // This is the LAST thing they read, and the end is what people remember —
+    // so it has to sound like the conversation they just had. The old prompt
+    // asked for "genuine excitement about walking this journey together", which
+    // is precisely the flowery sign-off SOMA_VOICE exists to prevent: nine warm,
+    // specific exchanges followed by a greetings card.
+    const replyPrompt = `${name ? `You're talking to ${name}.` : ''} They just told you about their life:
+"${said}"
 
-Write a warm, personal 2-3 sentence response to them. Rules:
-- Use their name if you have it
-- Reference something specific they wrote
-- Make them feel truly seen and not alone
-- End with genuine excitement about walking this journey together
-- Tone: wise caring friend, not therapist
-- Under 60 words`
+${SOMA_VOICE}
+
+Say ONE thing you actually noticed — not a summary of what they said, and not a
+compliment. The kind of small, specific observation a friend makes. Under 45 words.
+Do not ask a question. Never mention a journey, a path, or being excited.`
 
     const [extractRaw, reply] = await Promise.allSettled([
       groq([{ role: 'user', content: extractPrompt }], 'Return only valid JSON.', 400, 0.3),
-      groq([{ role: 'user', content: replyPrompt }], 'You are Soma. Warm, human, brief.', 150),
+      groq([{ role: 'user', content: replyPrompt }], `You are Soma.${langDirective()}`, 150),
     ])
 
     // Parse and save extracted profile
@@ -4572,8 +4611,12 @@ Write a warm, personal 2-3 sentence response to them. Rules:
   }
 
   // Phase 10 — Soma's "wow moment" response
+  // Scrolls: with the overview in place this is taller than a phone screen, and
+  // a centred flex View would push the continue button off the bottom edge.
   if (phase === 10) return (
-    <View style={{ flex: 1, backgroundColor: '#080418', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: '#080418' }}
+      contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: 72, paddingBottom: 48, flexGrow: 1 }}>
       <View style={{ position: 'absolute', top: -60, left: -60, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(123,110,246,0.1)' }} />
 
       {/* Soma avatar */}
@@ -4590,7 +4633,15 @@ Write a warm, personal 2-3 sentence response to them. Rules:
         </>
       ) : (
         <>
-          <View style={{ backgroundColor: 'rgba(123,110,246,0.12)', borderRadius: 24, padding: 22, borderWidth: 1, borderColor: 'rgba(123,110,246,0.25)', marginBottom: 36, width: '100%' }}>
+          {/* The payoff the opening promised: proof that talking produced
+              something, shown before we ask for anything else. */}
+          <ProfileOverview
+            name={DB.get().name}
+            facts={DB.get().facts || {}}
+            covered={coveredDomains(DB.get().memories)}
+            people={DB.get().circle.map(c => c.name)}
+          />
+          <View style={{ backgroundColor: 'rgba(123,110,246,0.12)', borderRadius: 24, padding: 22, borderWidth: 1, borderColor: 'rgba(123,110,246,0.25)', marginBottom: 28, width: '100%' }}>
             <Text style={{ fontSize: 16, color: '#E8E5FF', lineHeight: 26, textAlign: 'center', fontStyle: 'italic' }}>
               "{somaReply}"
             </Text>
@@ -4601,7 +4652,7 @@ Write a warm, personal 2-3 sentence response to them. Rules:
           </TouchableOpacity>
         </>
       )}
-    </View>
+    </ScrollView>
   )
 
   // Phase 12 — one photo, required. Without it nobody appears in Explore, and a

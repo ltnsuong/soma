@@ -45,36 +45,45 @@ describe('the script itself', () => {
 })
 
 describe('nextBeat', () => {
-  it('opens on why they are here', () => {
-    expect(nextBeat(progress())?.id).toBe('why')
+  it('opens by asking what to call them', () => {
+    // A companion that never learned your name reads as a form.
+    expect(nextBeat(progress())?.id).toBe('name')
+  })
+
+  it('moves to why they are here once it knows the name', () => {
+    expect(nextBeat(progress({ asked: ['name'], knownFacts: ['name'] }))?.id).toBe('why')
+  })
+
+  it('marks the name beat terse, so a one-word answer is never probed', () => {
+    expect(BEATS.find(b => b.id === 'name')?.terse).toBe(true)
   })
 
   it('skips a beat whose domains are already covered', () => {
     // A rich answer to "walk me through yesterday" should retire later questions.
-    const p = progress({ asked: ['why'], covered: ['purpose', 'career', 'health', 'environment', 'hobby', 'mind'] })
+    const p = progress({ asked: ['name', 'why'], knownFacts: ['name'], covered: ['purpose', 'career', 'health', 'environment', 'hobby', 'mind'] })
     expect(nextBeat(p)?.id).not.toBe('yesterday')
   })
 
   it('still asks a beat that carries facts, even when its domains are covered', () => {
     // Age and height are asked outright; no amount of talking reveals them.
-    const p = progress({ asked: ['why', 'yesterday'], covered: ['health', 'mind'] })
+    const p = progress({ asked: ['name', 'why', 'yesterday'], knownFacts: ['name'], covered: ['health', 'mind'] })
     expect(nextBeat(p)?.id).toBe('body')
   })
 
   it('skips a fact beat once every fact it asks for is known', () => {
     // Someone who mentioned cooking while describing yesterday should not then
     // be asked what they do for fun.
-    const p = progress({ asked: ['why', 'yesterday'], covered: ['hobby'], knownFacts: ['hobbies'] })
+    const p = progress({ asked: ['name', 'why', 'yesterday'], covered: ['hobby'], knownFacts: ['name', 'hobbies'] })
     expect(nextBeat(p)?.id).not.toBe('hobbies')
   })
 
   it('still asks when only some of its facts are known', () => {
-    const p = progress({ asked: ['why', 'yesterday'], covered: ['health', 'mind'], knownFacts: ['age'] })
+    const p = progress({ asked: ['name', 'why', 'yesterday'], covered: ['health', 'mind'], knownFacts: ['name', 'age'] })
     expect(nextBeat(p)?.id).toBe('body')   // height still missing
   })
 
   it('goes straight to the act III question when out of room', () => {
-    const p = progress({ asked: ['why'], exchanges: MAX_EXCHANGES - 1 })
+    const p = progress({ asked: ['name', 'why'], exchanges: MAX_EXCHANGES - 1 })
     expect(nextBeat(p)?.id).toBe('missing')
   })
 
@@ -101,9 +110,9 @@ describe('stored facts drive the skip', () => {
   it('never asks what they do for fun once hobbies came up on their own', () => {
     const p = progress({
       covered: ['health', 'hobby', 'career', 'family'],
-      knownFacts: knownFactsOf(stored),
+      knownFacts: [...knownFactsOf(stored), 'name'],
       exchanges: 3,
-      asked: ['why', 'yesterday', 'body', 'work'],
+      asked: ['name', 'why', 'yesterday', 'body', 'work'],
     })
     expect(nextBeat(p)?.id).not.toBe('hobbies')
   })

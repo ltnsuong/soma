@@ -20,6 +20,10 @@ export interface Beat {
   covers: DomainKey[]
   /** Plain facts this beat asks for outright rather than inferring. */
   facts?: FactKey[]
+  /** A short answer is a COMPLETE answer here, so never probe for more.
+   *  Asking "what should I call you?" and replying "that's brief, tell me more"
+   *  is the single most obviously robotic thing this could do. */
+  terse?: boolean
 }
 
 export const OPENING =
@@ -29,6 +33,17 @@ export const OPENING =
 
 export const BEATS: Beat[] = [
   // ── ACT I — You ──────────────────────────────────────────
+  {
+    // Before anything else. Soma uses the name from here on, and a companion
+    // that never learned what to call you reads as a form no matter how warm
+    // its questions are.
+    id: 'name',
+    act: 1,
+    ask: 'First though — what should I call you?',
+    covers: [],
+    facts: ['name'],
+    terse: true,
+  },
   {
     id: 'why',
     act: 1,
@@ -134,7 +149,7 @@ export const TARGET_DOMAINS = 7
 /** Hard ceiling. Someone who gives short answers still gets out in time. */
 export const MAX_EXCHANGES = 12
 
-export type FactKey = 'age' | 'heightCm' | 'city' | 'job' | 'hobbies'
+export type FactKey = 'name' | 'age' | 'heightCm' | 'city' | 'job' | 'hobbies'
 
 export interface Progress {
   /** Domains that already hold at least one memory. */
