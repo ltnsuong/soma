@@ -1,0 +1,36 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["index.ts", "App.tsx", "app/**/*.{ts,tsx}", "scripts/*.mjs"],
+      "project": ["App.tsx", "index.ts", "src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}", "scripts/**/*.mjs"],
+      "ignoreBinaries": ["vercel", "railway", "eas", "dot"],
+      "ignoreDependencies": [
+        "expo-router", "react-native-web", "@expo/metro-runtime",
+        "sharp"
+      ]
+    },
+    "backend": {
+      "entry": ["server.js"],
+      "project": ["**/*.js"]
+    },
+    "bot": {
+      "entry": ["bot.js"],
+      "project": ["**/*.js"]
+    },
+    "frontend": {
+      "entry": ["src/main.jsx"],
+      "project": ["src/**/*.{js,jsx}"]
+    }
+  },
+  "ignore": [
+    "**/dist/**",
+    "**/build/**",
+    "expo-web/**",
+    ".vercel/**",
+    "android/**",
+    "ios/**",
+    "logo-exports/**"
+  ],
+  "includeEntryExports": false
+}

@@ -23,16 +23,32 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/react": "~19.2.2",
+    "dependency-cruiser": "^18.3.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-sonarjs": "^4.2.1",
+    "knip": "^6.37.0",
     "sharp": "^0.34.5",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build:web": "expo export -p web && bash scripts/postbuild-web.sh"
+    "build:web": "expo export -p web && bash scripts/postbuild-web.sh",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "deadcode": "knip",
+    "cycles": "depcruise --validate .dependency-cruiser.json App.tsx index.ts src backend bot",
+    "test": "vitest run",
+    "verify": "node scripts/quality-gate.mjs",
+    "verify:accept": "node scripts/quality-gate.mjs --accept",
+    "cycles:graph": "depcruise --output-type dot App.tsx index.ts src | dot -T svg > dependency-graph.svg"
   },
   "private": true
 }

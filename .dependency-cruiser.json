@@ -1,0 +1,76 @@
+{
+  "forbidden": [
+    {
+      "name": "no-circular",
+      "severity": "error",
+      "comment": "A cycle means neither module can be understood, tested, or moved on its own.",
+      "from": {},
+      "to": { "circular": true }
+    },
+    {
+      "name": "no-orphans",
+      "severity": "warn",
+      "comment": "Nothing imports this and it is not an entry point — likely left over from an extraction.",
+      "from": {
+        "orphan": true,
+        "pathNot": [
+          "(^|/)\\.[^/]+\\.(js|cjs|mjs|ts|tsx|json)$",
+          "\\.d\\.ts$",
+          "(^|/)tsconfig\\.json$",
+          "(^|/)(babel|metro|jest|vitest)\\.config\\.(js|cjs|mjs|ts)$"
+        ]
+      },
+      "to": {}
+    },
+    {
+      "name": "no-feature-cross-import",
+      "severity": "warn",
+      "comment": "Features talk through src/shared, never reach into each other's internals. This is what keeps extraction from just re-creating App.tsx across many files.",
+      "from": { "path": "^src/features/([^/]+)/" },
+      "to": {
+        "path": "^src/features/([^/]+)/",
+        "pathNot": [
+          "^src/features/$1/",
+          "^src/features/[^/]+/index\\.(ts|tsx)$"
+        ]
+      }
+    },
+    {
+      "name": "no-shared-to-feature",
+      "severity": "error",
+      "comment": "Shared code must not depend on a feature — that inverts the dependency and makes it unshareable.",
+      "from": { "path": "^src/shared/" },
+      "to": { "path": "^src/features/" }
+    },
+    {
+      "name": "no-dev-dep-in-app",
+      "severity": "error",
+      "comment": "A devDependency imported from shipped code breaks the production bundle.",
+      "from": { "path": "^(App\\.tsx|index\\.ts|src)", "pathNot": "\\.(test|spec)\\.(ts|tsx)$" },
+      "to": { "dependencyTypes": ["npm-dev"] }
+    },
+    {
+      "name": "not-to-deprecated",
+      "severity": "warn",
+      "from": {},
+      "to": { "dependencyTypes": ["deprecated"] }
+    }
+  ],
+  "options": {
+    "doNotFollow": { "path": "node_modules" },
+    "exclude": {
+      "path": "(^|/)(node_modules|dist|build|expo-web|\\.vercel|android|ios|logo-exports)/"
+    },
+    "tsConfig": { "fileName": "tsconfig.json" },
+    "tsPreCompilationDeps": true,
+    "enhancedResolveOptions": {
+      "exportsFields": ["exports"],
+      "conditionNames": ["import", "require", "react-native", "browser", "default"],
+      "extensions": [".ts", ".tsx", ".js", ".jsx", ".json"]
+    },
+    "reporterOptions": {
+      "dot": { "collapsePattern": "^src/(features|shared)/[^/]+" },
+      "text": { "highlightFocused": true }
+    }
+  }
+}
