@@ -743,15 +743,23 @@ async function deriveDatingProfile(userId, p) {
     .map(([d, items]) => `${d}: ${items.slice(0, 6).join('; ')}`).join('\n')
 
   const raw = await callGroq(
-    'You turn what someone told an AI companion into a connection profile. Use ONLY what is stated — never invent hobbies, jobs or traits. Return only valid JSON.',
+    'You turn what someone told an AI companion into a connection profile. Use ONLY what is stated — never invent hobbies, jobs or traits. '
+    + 'Each sector bio is written from that sector\'s material only: never mention attachment style or love language outside the dating bio, '
+    + 'and never mention relationships in the professional one. Keep the four bios genuinely different. Return only valid JSON.',
     `Someone shared this about their life:\n${summary}\n\nReturn ONLY JSON:
 {
  "bio": "<2 warm sentences in their own register, first person, no clichés, only facts above>",
  "interests": ["<up to 6, concrete things they actually do>"],
  "values": ["<up to 4 things that clearly matter to them>"],
  "work": "<their job if stated, else empty string>",
- "lookingFor": "<one short line on what connection would suit them>"
-}`, 500)
+ "lookingFor": "<one short line on what connection would suit them>",
+ "sectorBios": {
+   "dating": "<2 sentences: what they want from a relationship and how they are with people closest to them>",
+   "friends": "<2 sentences: what they actually DO — activities and rhythms. A reader should think of something to invite them to>",
+   "professional": "<2 sentences: what they work on and what they could use help with. No feelings, no home life>",
+   "support": "<2 sentences: what they are working through and what support helps. Plain, never pitying, never a diagnosis>"
+ }
+}`, 900)
 
   let d
   try { d = JSON.parse(raw.replace(/```json|```/g, '').match(/\{[\s\S]*\}/)?.[0] || '') } catch { return }
@@ -782,6 +790,10 @@ async function deriveDatingProfile(userId, p) {
     city: existing?.city || p.dating?.location || facts.city || '',
     love_language: existing?.love_language || p.dating?.loveLanguage || '',
     attachment: existing?.attachment || p.dating?.attachment || '',
+    // Four bios, one per connection type. Anything the user wrote themselves wins.
+    sector_bios: (existing?.sector_bios && Object.keys(existing.sector_bios).length)
+      ? existing.sector_bios
+      : (d.sectorBios || {}),
     derived_from: fingerprint,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id' })
@@ -1029,10 +1041,14 @@ app.get('/dating/nearby', auth, async (req, res) => {
     // RPC doesn't return photos column — fetch it separately
     const nearbyIds = (nearbyRows || []).map(r => r.user_id)
     const photosMap = {}
+    const sectorBiosMap = {}
     if (nearbyIds.length) {
       const { data: photoRows } = await supabase.from('dating_profiles')
-        .select('user_id, photos').in('user_id', nearbyIds)
-      ;(photoRows || []).forEach(r => { photosMap[r.user_id] = r.photos || [] })
+        .select('user_id, photos, sector_bios').in('user_id', nearbyIds)
+      ;(photoRows || []).forEach(r => {
+        photosMap[r.user_id] = r.photos || []
+        sectorBiosMap[r.user_id] = r.sector_bios || {}
+      })
     }
 
     const results = (nearbyRows || [])
@@ -1040,6 +1056,7 @@ app.get('/dating/nearby', auth, async (req, res) => {
       .map(r => ({
         userId: r.user_id, name: r.name, age: r.age, photo: r.photo,
         photos: photosMap[r.user_id] || (r.photo ? [r.photo] : []),
+        sectorBios: sectorBiosMap[r.user_id] || {},
         bio: r.bio, interests: r.interests, values: r.values, loveLanguage: r.love_language,
         attachment: r.attachment, connectionType: r.connection_type || 'dating', work: r.work, city: r.city,
         distanceKm: Math.round(r.distance_km * 10) / 10,
@@ -1620,7 +1637,7 @@ app.get('/users/:id/profile', auth, async (req, res) => {
 
     const { data: dp } = await supabase
       .from('dating_profiles')
-      .select('age, photo, photos, bio, interests, values, love_language, attachment, connection_type, work, city')
+      .select('age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city')
       .eq('user_id', id).maybeSingle()
 
     res.json({
@@ -1634,6 +1651,7 @@ app.get('/users/:id/profile', auth, async (req, res) => {
       photo: dp?.photo ?? null,
       photos: dp?.photos ?? [],
       bio: dp?.bio ?? null,
+      sectorBios: dp?.sector_bios ?? {},
       interests: dp?.interests ?? [],
       values: dp?.values ?? [],
       loveLanguage: dp?.love_language ?? null,

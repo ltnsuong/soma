@@ -17,7 +17,7 @@ import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { OPENING, coveredDomains, isDone, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
-import { scoreFit, overlap, shows, type ConnectionType, type Side } from './src/features/connections/scoring'
+import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
 const haptic = {
@@ -2374,6 +2374,7 @@ interface NearbyUser {
   userId: string; name: string; age: number; photo: string; photos: string[]; bio: string
   interests: string[]; values: string[]; loveLanguage: string; attachment: string
   work: string; city: string; distanceKm: number; compatibility: number
+  sectorBios?: Partial<Record<ConnectionType, string>>
   connectionType?: 'dating' | 'friends' | 'professional' | 'support'
 }
 
@@ -2609,6 +2610,7 @@ function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string; con
     distance: u.distanceKm != null ? `${u.distanceKm} km` : '',
     height: '', weight: '',
     bio: u.bio || (hasProfile ? '' : '✨ Just joined SOMA — profile coming soon.'),
+    sectorBios: u.sectorBios || {},
     values: u.values || [], interests: u.interests || [],
     agentName: 'their Soma', loveLanguage: u.loveLanguage || '', attachment: u.attachment || '',
     intimacy: '', work: u.work || '', children: '', pets: '',
@@ -7213,7 +7215,9 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
 
                 {!!viewProfile.bio && (
                   <View style={{ backgroundColor: theme.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: theme.border }}>
-                    <Text style={{ fontSize: 15, color: theme.text, lineHeight: 22 }}>{viewProfile.bio}</Text>
+                    <Text style={{ fontSize: 15, color: theme.text, lineHeight: 22 }}>
+                      {(viewProfile.sectorBios?.[asConnectionType(viewProfile.connectionType)] || '').trim() || viewProfile.bio}
+                    </Text>
                   </View>
                 )}
 
@@ -7568,12 +7572,46 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
   )
 }
 
+// Each sector gets its own bio, written from its own material. The briefs live in
+// src/features/connections/scoring.ts next to the field rules, so what a sector
+// may WRITE about and what it may SHOW cannot drift apart.
+//
+// The old prompts leaked: the friends bio was fed the user's love language, and
+// the support bio their attachment style. That is how four profiles end up
+// sounding like the same romantic profile in different clothes.
+const whoAndWhere = (p: UserProfile): string =>
+  `Name: ${p.name || 'they'}.` + (p.facts?.city ? ` Lives in ${p.facts.city}.` : '')
+
+const doesList = (p: UserProfile): string =>
+  [...(p.facts?.hobbies ?? []), ...(p.dating.interests ?? [])].slice(0, 6).join(', ') || 'not said yet'
+
+const workingThrough = (p: UserProfile): string =>
+  p.memories.filter(m => m.domain === 'growth' || m.domain === 'health')
+    .slice(0, 3).map(m => m.content).join('; ') || 'personal growth'
+
+// One builder per sector, each handed only its own material. Split up so no
+// single function decides what four different kinds of profile get to know.
+const SECTOR_FACTS: Record<SectorKey, (p: UserProfile) => string> = {
+  dating: p => `${whoAndWhere(p)} Age ${p.dating.age || p.facts?.age || '?'}. Love language: ${p.dating.loveLanguage || 'unknown'}. Attachment: ${p.dating.attachment || 'unknown'}. Wants: ${p.dating.lookingFor || 'unsure'}. Values: ${(p.dating.values ?? []).slice(0, 3).join(', ')}.`,
+  friends: p => `${whoAndWhere(p)} Things they actually do: ${doesList(p)}.`,
+  professional: p => `${whoAndWhere(p)} Work: ${p.facts?.job || p.dating.work || 'not said'}. Values: ${(p.dating.values ?? []).slice(0, 3).join(', ')}.`,
+  support: p => `${whoAndWhere(p)} Working through: ${workingThrough(p)}.`,
+}
+
 const SECTOR_META = {
-  dating:       { label: 'Serious Dater',  emoji: '💜', color: '#F66E8E', bg: '#F66E8E18', icon: 'heart-outline'     as const, prompt: (p: UserProfile) => `You are writing a dating profile bio for someone named ${p.name}. Their love language is "${p.dating.loveLanguage}", attachment style is "${p.dating.attachment}", they are ${p.dating.age} years old, looking for: "${p.dating.lookingFor}". Their interests: ${p.dating.interests.slice(0,5).join(', ')}. Values: ${p.dating.values.slice(0,3).join(', ')}. Write a warm, genuine 2-sentence bio that shows their romantic personality. First person, no quotes.` },
-  friends:      { label: 'New Friends',    emoji: '😊', color: '#10B981', bg: '#10B98118', icon: 'people-outline'    as const, prompt: (p: UserProfile) => `Write a friendly 2-sentence "looking for friends" bio for ${p.name}. Their interests: ${p.dating.interests.slice(0,5).join(', ')}. Vibe/love language: ${p.dating.loveLanguage}. Show their personality and what kind of friend they would be. First person, no quotes.` },
-  professional: { label: 'Professional',   emoji: '💼', color: '#378ADD', bg: '#378ADD18', icon: 'briefcase-outline' as const, prompt: (p: UserProfile) => `Write a 2-sentence professional networking bio for ${p.name}. Their work: "${p.dating.work || 'not specified'}". Values: ${p.dating.values.slice(0,3).join(', ')}. Show their professional mindset and what they can offer collaborators. First person, no quotes.` },
-  support:      { label: 'Support Seeker', emoji: '🤝', color: '#F59E0B', bg: '#F59E0B18', icon: 'headset-outline'  as const, prompt: (p: UserProfile) => `Write a 2-sentence "looking for support / accountability partner" bio for ${p.name}. Attachment style: "${p.dating.attachment}". Their goals touch on: ${p.memories.filter(m=>m.domain==='growth'||m.domain==='health').slice(0,3).map(m=>m.content).join(', ') || 'personal growth'}. Show their openness and what support they seek. First person, no quotes.` },
+  dating:       { label: 'Serious Dater',  emoji: '💜', color: '#F66E8E', bg: '#F66E8E18', icon: 'heart-outline'     as const },
+  friends:      { label: 'New Friends',    emoji: '😊', color: '#10B981', bg: '#10B98118', icon: 'people-outline'    as const },
+  professional: { label: 'Professional',   emoji: '💼', color: '#378ADD', bg: '#378ADD18', icon: 'briefcase-outline' as const },
+  support:      { label: 'Support Seeker', emoji: '🤝', color: '#F59E0B', bg: '#F59E0B18', icon: 'headset-outline'  as const },
 } as const
+
+const sectorPrompt = (p: UserProfile, key: SectorKey): string =>
+  `Write this person's ${key} profile bio, first person, 2 sentences, under 60 words, no quotes.
+
+${SECTOR_FACTS[key](p)}
+
+Write about: ${BIO_BRIEF[key]}
+Use only what is above. Never invent a job, a hobby or a feeling they did not mention.`
 
 type SectorKey = keyof typeof SECTOR_META
 
@@ -7591,7 +7629,7 @@ function SectorProfileModal({ sector, profile, onClose }: { sector: SectorKey; p
   const generate = async () => {
     setGenerating(true)
     try {
-      const prompt = meta.prompt(profile)
+      const prompt = sectorPrompt(profile, sector)
       const res = await groq([{ role: 'user', content: prompt }], 'You write authentic, warm profile bios. Keep them under 60 words, human-sounding, never generic.', 120, 0.85)
       setBio(res.trim())
     } catch { setBio('') }
@@ -7724,10 +7762,9 @@ function HowOthersSeeMe({ profile, onEdit, onClose }: { profile: UserProfile; on
     if (missing.length === 0) return
     setGenerating(true)
     Promise.all(missing.map(async key => {
-      const meta = SECTOR_META[key]
       try {
         const bio = await groq(
-          [{ role: 'user', content: meta.prompt(profile) }],
+          [{ role: 'user', content: sectorPrompt(profile, key) }],
           'You write authentic, warm profile bios. Keep them under 60 words, human-sounding, never generic.',
           120, 0.85
         )
@@ -12316,6 +12353,8 @@ interface Candidate {
   photos?: string[]
   location: string; distance: string; height: string; weight: string
   bio: string; values: string[]; interests: string[]; agentName: string
+  /** One bio per connection type. Falls back to `bio` when a sector has none. */
+  sectorBios?: Partial<Record<ConnectionType, string>>
   loveLanguage: string; attachment: string; intimacy: string
   work: string; children: string; pets: string
   tags: { icon: string; label: string }[]
@@ -12410,6 +12449,11 @@ function mySide(profile: UserProfile): Side {
     wellbeing,
   }
 }
+
+// The bio written for THIS kind of connection. A romantic paragraph under
+// Professional is what made all four profiles look like the same person.
+export const bioFor = (c: Candidate, type: ConnectionType): string =>
+  (c.sectorBios?.[type] || '').trim() || c.bio
 
 const theirSide = (c: Candidate): Side => ({
   interests: c.interests ?? [],
@@ -13242,7 +13286,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           {/* About — quote style */}
           <View style={[g.dSection, { marginTop: 16 }]}>
             <View style={{ borderLeftWidth: 3, borderColor: '#7B6EF6', paddingLeft: 14 }}>
-              <Text style={{ color: '#1A1A2E', fontSize: 16, lineHeight: 26, fontStyle: 'italic', fontWeight: '400' }}>"{currentBrowse.bio}"</Text>
+              <Text style={{ color: '#1A1A2E', fontSize: 16, lineHeight: 26, fontStyle: 'italic', fontWeight: '400' }}>"{bioFor(currentBrowse, asConnectionType(category))}"</Text>
             </View>
           </View>
 

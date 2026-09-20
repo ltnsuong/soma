@@ -213,5 +213,10 @@ RETURNS TABLE (
   LIMIT p_limit;
 $$;
 
+-- One bio per connection type. A single bio meant the same romantic paragraph
+-- showed up under Friends, Professional and Support — see
+-- docs/onboarding-interview.md and src/features/connections/scoring.ts.
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS sector_bios JSONB DEFAULT '{}'::jsonb;
+
 -- Add connection_type to dating_profiles (dating / friends / professional / support)
 ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS connection_type TEXT DEFAULT 'dating';
