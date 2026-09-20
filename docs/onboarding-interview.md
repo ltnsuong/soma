@@ -13,6 +13,40 @@ That order is the product, so it has to be the order of the conversation. Anythi
 step 3 as the point makes this a dating app with journaling bolted on, which is not what we're
 building. **The first conversation covers 1 and 2. It barely touches 3.**
 
+## Facts you ask. Interpretations you infer.
+
+These are two different things and the distinction runs through the whole design.
+
+**Ask directly — they're facts, they're quick, and nobody minds:**
+name, age, height, city, job, hobbies.
+
+Guessing these from conversation is slow, often wrong, and faintly creepy when it lands. Asking
+is faster and friendlier. They also make good early questions: easy wins build momentum before
+anything personal gets asked.
+
+**Never ask — they're interpretations, and self-report is unreliable:**
+love language, attachment style, values, what you're looking for, how balanced your life is.
+
+Ask someone to pick their attachment style from four options and you get a guess dressed as
+data. Derive it from a story about being understood and you get something usable. This is the
+rule the earlier draft got wrong by stating it too broadly.
+
+**Where each basic fact gets asked** — woven in, never a form:
+
+| Fact | Asked in | Note |
+|---|---|---|
+| Name | Opening, before anything else | Already asked today |
+| Age, height | The body question in Act I | Already done this way in `ob_q1`, and it works — in a body frame, height reads as health, not dating |
+| Job | The work question in Act I | Capture the title as a fact *and* the day-to-day as a story |
+| Hobbies | Act I, direct question | "What do you do that's just for you?" — not a checklist |
+| City | Close, next to the photo | Only needed for Explore |
+
+> **Implementation note.** `UserProfile` has `name` but no `age`, and **no `height` exists
+> anywhere in the data model** — today it survives only as free text in a memory, so nothing can
+> use it. `DatingProfile` holds `age`, `location`, `work` and `interests`. Making these real
+> requires a small structured `facts` block on `UserProfile`: `age`, `heightCm`, `city`, `job`,
+> `hobbies[]`. Without it, asking for height collects a string that goes nowhere.
+
 ## The reframe
 
 The app needs about thirty data points: ten Wheel of Life domains, the people in someone's
@@ -93,16 +127,35 @@ mood at once. Concrete recall, low stakes, nothing to perform.
 *Feeds:* career, health, environment, hobby, mind, work, mood.
 *Follow-up:* "Which part of that was actually yours? The bit where nobody needed anything."
 
-**3. The body**
-> **How's your body been treating you lately — sleep, energy, that kind of thing?**
+**3. The body** — and the basics, folded in
+> **How's your body treating you lately? And the boring bits while I'm asking — how old are
+> you, how tall, that kind of thing.**
 
-*Feeds:* health, mind. *Follow-up:* "Is that normal for you, or is this a rough patch?"
+Age and height ride along here, exactly as `ob_q1` already does it. In a body frame they read as
+health rather than a dating profile, which is why this is the right place for them and a
+standalone "basics" form is not.
 
-**4. Where you're headed**
+*Feeds:* health, mind, age, height.
+*Follow-up:* "Is that normal for you, or is this a rough patch?"
+
+**4. Work, and what's yours**
+> **What do you actually do? And what does that look like day to day?**
+
+One question, two returns: the job title as a fact, the day-to-day as a story.
+
+> **And what do you do that's just for you?**
+
+Hobbies, asked outright rather than inferred — but phrased as a question about their life, not a
+checklist of categories. "Just for you" is doing the work: it separates real interests from
+obligations.
+
+*Feeds:* career, work, hobby, interests.
+
+**5. Where you're headed**
 > **What are you trying to get better at at the moment?**
 > **If the next year went well, what would be different?**
 
-*Feeds:* growth, purpose, career, finance.
+*Feeds:* growth, purpose, finance.
 Money is asked plainly if it hasn't come up: *"Is money a stress right now, or is that handled?"*
 
 ---
@@ -112,18 +165,18 @@ Money is asked plainly if it hasn't come up: *"Is money a stress right now, or i
 Soma discloses first:
 > Lives tend to make sense to me once I know who's in them.
 
-**5. Who's around**
+**6. Who's around**
 > **Who did you talk to most this week?**
 
 *Follow-up:* "What are they to you?" / "How long's that been?"
 
-**6. The bid** — the most important question in Act II
+**7. The bid** — the most important question in Act II
 > **And who do you wish you'd talked to?**
 
 This surfaces the drifting relationship the Circle exists to repair. Most people have never been
 asked it, and it is the question that makes SOMA feel like it is about their actual life.
 
-**7. Being known**
+**8. Being known**
 > **Think of a time you felt really understood by someone. What were they actually doing?**
 
 Deliberately not romance-coded — the answer can be a friend, a parent, a partner, a colleague.
@@ -155,7 +208,8 @@ app.
 ### Close — the payoff
 
 Show the Wheel of Life filling in with what was heard, then **one genuine observation** — not a
-summary, an actual noticing. Then:
+summary, an actual noticing. City is asked here if it hasn't come up, next to the photo, where
+it reads as setup rather than interrogation. Then:
 
 > The empty bits I'll ask about as we go. No rush.
 
@@ -169,8 +223,9 @@ Only now, after they've invested, ask for the photo. Never before.
 - **Skip always visible** and never penalised.
 - **Adaptive stop.** End when 7 of 10 domains hold at least one memory, or at 12 exchanges,
   whichever comes first. Someone who talks a lot finishes sooner, not later.
-- **Never ask for a field extraction can infer.** No love-language picker, no attachment quiz,
-  no interests checklist.
+- **Ask facts, infer interpretations.** Name, age, height, city, job and hobbies are asked
+  outright — they're quick and nobody minds. Love language, attachment and values are never
+  asked, because self-report on those is unreliable. See the table above.
 - **One question per message.** Two in one bubble and people answer only the second.
 
 ## The interview never really ends
