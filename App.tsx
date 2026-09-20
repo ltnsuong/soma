@@ -24,6 +24,26 @@ const haptic = {
   error: () => { if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {}) },
 }
 
+// Enter sends; Shift+Enter makes a new line. Web only, and deliberately so:
+// on a phone the Return key should still insert a line break.
+//
+// This has to handle the key directly. A `multiline` TextInput renders as a
+// <textarea> on web, and React Native's onSubmitEditing never fires for one —
+// so a chat box with onSubmitEditing looks correct in the source while doing
+// nothing at all. Typing a message, pressing Enter and watching it sit there
+// reads as a frozen app.
+const enterToSend = (send: () => void) => (Platform.OS !== 'web' ? {} : {
+  // react-native-web hands this a React synthetic event, so the key can sit on
+  // either the synthetic event or the DOM one underneath — read both.
+  onKeyPress: (e: any) => {
+    const ev = e.nativeEvent || e
+    const key = e.key || ev.key
+    if (key !== 'Enter' || e.shiftKey || ev.shiftKey) return
+    if (e.preventDefault) e.preventDefault()
+    send()
+  },
+})
+
 WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app reopens
 
 // ════════════════════════════════════════════════════════════
@@ -3131,7 +3151,10 @@ function computeNotifs(profile: UserProfile): Omit<SomaNotif, 'id' | 'read' | 'c
 // Toast component — slides down from top like Duolingo
 function NotifToast({ notif, onDismiss, onAction }: { notif: SomaNotif; onDismiss: () => void; onAction: (n: SomaNotif) => void }) {
   const { t } = useT()
-  const slideY = useRef(new Animated.Value(-120)).current
+  // Slides up from the bottom, not down from the top. A toast has to cover
+  // something, and at top:52 this one covered the life-balance score — the
+  // headline number on Home — for the first five seconds of every session.
+  const slideY = useRef(new Animated.Value(140)).current
   const opacity = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -3145,7 +3168,7 @@ function NotifToast({ notif, onDismiss, onAction }: { notif: SomaNotif; onDismis
 
   const dismiss = () => {
     Animated.parallel([
-      Animated.timing(slideY, { toValue: -120, duration: 250, useNativeDriver: true }),
+      Animated.timing(slideY, { toValue: 140, duration: 250, useNativeDriver: true }),
       Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start(() => onDismiss())
   }
@@ -3157,7 +3180,7 @@ function NotifToast({ notif, onDismiss, onAction }: { notif: SomaNotif; onDismis
   const color = typeColor[notif.type] || '#7B6EF6'
 
   return (
-    <Animated.View style={{ position: 'absolute', top: 52, left: 16, right: 16, zIndex: 9999, transform: [{ translateY: slideY }], opacity }}>
+    <Animated.View style={{ position: 'absolute', bottom: 96, left: 16, right: 16, zIndex: 9999, transform: [{ translateY: slideY }], opacity }}>
       <TouchableOpacity
         onPress={() => { onAction(notif); dismiss() }}
         activeOpacity={0.92}
@@ -4442,7 +4465,7 @@ Write a warm, personal 2-3 sentence response to them. Rules:
               placeholderTextColor="rgba(168,155,250,0.3)"
               multiline
               editable={!somaGenerating && !allAnswered}
-              onSubmitEditing={() => sendToSoma(draft)}
+              {...enterToSend(() => { if (draft.trim() && !somaGenerating && !allAnswered) sendToSoma(draft) })}
               style={{ flex: 1, maxHeight: 120, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, borderWidth: 1, borderColor: listening ? 'rgba(246,55,155,0.5)' : 'rgba(123,110,246,0.25)', paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: '#E8E5FF', lineHeight: 21 }}
             />
             <TouchableOpacity
@@ -4584,6 +4607,21 @@ Write a warm, personal 2-3 sentence response to them. Rules:
     const name = p.name || userName || 'you'
     const goNext = () => tourIdx < 2 ? setTourIdx(i => i + 1) : setPhase(5)
 
+    // Named rather than inline so the send button and the Enter key run the
+    // same path — the two drifting apart is how one of them quietly stops working.
+    const sendTourChat = async () => {
+      const msg = tourChatMsg.trim()
+      if (!msg || tourChatLoading) return
+      setTourChatSent(msg); setTourChatMsg(''); setTourChatLoading(true); setTourChatReply('')
+      try {
+        const context = p.memories.slice(0, 3).map(m => m.content).join('. ')
+        const reply = await groq([{ role: 'user', content: msg }],
+          `You are Soma. The user's name is ${name}. Context: ${context || 'new user'}. Reply warmly in 1-2 sentences. Be personal and specific.`, 120)
+        setTourChatReply(reply || 'I hear you. Let\'s explore that together. 💜')
+      } catch { setTourChatReply('I hear you. Let\'s explore that together. 💜') }
+      finally { setTourChatLoading(false) }
+    }
+
     // Screen 0 — Talk to Soma (live mini chat)
     if (tourIdx === 0) return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
@@ -4650,21 +4688,11 @@ Write a warm, personal 2-3 sentence response to them. Rules:
               onChangeText={setTourChatMsg}
               placeholder="Ask me anything..."
               placeholderTextColor="rgba(168,155,250,0.3)"
+              {...enterToSend(sendTourChat)}
               style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(123,110,246,0.3)', paddingHorizontal: 16, paddingVertical: 13, fontSize: 15, color: '#E8E5FF' }}
             />
             <TouchableOpacity
-              onPress={async () => {
-                const msg = tourChatMsg.trim()
-                if (!msg || tourChatLoading) return
-                setTourChatSent(msg); setTourChatMsg(''); setTourChatLoading(true); setTourChatReply('')
-                try {
-                  const context = p.memories.slice(0, 3).map(m => m.content).join('. ')
-                  const reply = await groq([{ role: 'user', content: msg }],
-                    `You are Soma. The user's name is ${name}. Context: ${context || 'new user'}. Reply warmly in 1-2 sentences. Be personal and specific.`, 120)
-                  setTourChatReply(reply || 'I hear you. Let\'s explore that together. 💜')
-                } catch { setTourChatReply('I hear you. Let\'s explore that together. 💜') }
-                finally { setTourChatLoading(false) }
-              }}
+              onPress={sendTourChat}
               style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: tourChatMsg.trim() ? '#7B6EF6' : 'rgba(123,110,246,0.3)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="send" size={20} color="#fff" />
             </TouchableOpacity>
@@ -5029,6 +5057,7 @@ Write a warm, personal 2-3 sentence response to them. Rules:
               placeholder={listening ? t('ob_listening') : t('ob_type_instead')}
               placeholderTextColor={listening ? color : 'rgba(255,255,255,0.25)'}
               multiline
+              {...enterToSend(() => { if (transcript.trim() && !somaGenerating) submitAnswer() })}
               style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 20, maxHeight: 80 }}
             />
           </View>
@@ -6123,7 +6152,11 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
             <Text style={[g.auraTitle, { color: t.text }]}>{title}</Text>
             <Text style={[g.auraSub, { color: t.textSub }]}>
               {speaking ? '🔊 Speaking...' : listening ? '🎙 Listening...' : loading ? '💭 Thinking...'
-                : mode === 'try' ? 'Try me — no signup needed' : `Remembers ${p.memories.length} things about you`}
+                : mode === 'try' ? 'Try me — no signup needed'
+                // A brand-new user is told "Remembers 0 things about you" otherwise,
+                // which advertises emptiness at the exact moment they need a reason to talk.
+                : p.memories.length === 0 ? 'Here whenever you want to talk'
+                : `Remembers ${p.memories.length} ${p.memories.length === 1 ? 'thing' : 'things'} about you`}
             </Text>
           </View>
           {started && (
@@ -6145,7 +6178,8 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
               {autoStart ? 'Starting your first conversation…'
                 : mode === 'try' ? 'Before you decide anything, just talk.\nShare what is on your mind. Soma is here\nas your friend, right now.'
                 : isDiary ? 'Tell Soma about your day.\nShe will remember it for you.'
-                : `Soma remembers ${p.memories.length} things and\n${p.circle.length} people in your life.`}
+                : p.memories.length === 0 ? 'Tell Soma anything that is on your mind.\nShe will remember it from here on.'
+                : `Soma remembers ${p.memories.length} ${p.memories.length === 1 ? 'thing' : 'things'} and\n${p.circle.length} ${p.circle.length === 1 ? 'person' : 'people'} in your life.`}
             </Text>
             <TouchableOpacity style={g.primaryBtn} onPress={start}><Text style={g.primaryBtnTxt}>{tr('start_talking')}</Text></TouchableOpacity>
             {mode !== 'try' && <TouchableOpacity onPress={onDone}><Text style={g.ghostTxt}>{tr('back')}</Text></TouchableOpacity>}
@@ -6164,7 +6198,8 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
               )}
             </ScrollView>
             <View style={g.inputBar}>
-              <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#9A9DB2" multiline />
+              <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#9A9DB2" multiline
+                {...enterToSend(() => { if (input.trim() && !loading) send(input) })} />
               <TouchableOpacity style={[g.iconBtn, { backgroundColor: t.card, borderColor: t.border }, listening && g.iconOn]} onPress={onMic} disabled={loading}><Text style={{ fontSize: 20 }}>{listening ? '⏹' : '🎙'}</Text></TouchableOpacity>
               <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
             </View>
