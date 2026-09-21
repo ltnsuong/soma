@@ -1016,11 +1016,17 @@ interface Memory { id: string; domain: DomainKey; content: string; createdAt: st
 type WheelDomain = { score: number; note: string }
 interface WheelAssessment { scores: Partial<Record<DomainKey, WheelDomain>>; overall: number; basis: number; at: string }
 interface BondLog { date: string; note: string; xpGained: number }
+type Quest = { id: string; emoji: string; title: string; desc: string; xp: number }
+
 interface BondJourneyData {
   xp: number
   completedQuests: string[]
   logs: BondLog[]
   startedAt: string
+  /** Challenges the user wrote themselves, for this person specifically.
+   *  The pool is generic by necessity; the thing you actually need to do with
+   *  your sister is not on any list. */
+  customQuests?: Quest[]
 }
 interface CircleInteraction {
   id: string
@@ -4000,7 +4006,7 @@ export default function App() {
     if (screen === 'memories')      return <MemoryManager profile={profile} onBack={() => go('settings')} onRefresh={refresh} />
     if (screen === 'asksoma')       return <AskSomaScreen profile={profile} onBack={() => go('home')} />
     if (screen === 'timeline')      return <LifeTimeline profile={profile} onBack={() => go('home')} />
-    return <MainTabs profile={profile} go={go} tab={tab} setTab={setTab} dmUnread={dmUnread} onReset={() => { DB.reset(); go('language') }} onMeetPeople={(cat, startAt?) => { setMeetCategory(cat); setMeetStartAt(startAt); go('meetpeople') }} pendingMatchChat={pendingMatchChat} />
+    return <MainTabs profile={profile} go={go} tab={tab} setTab={setTab} dmUnread={dmUnread} onOpenJourney={(id) => { setBondPersonId(id); go('bondjourney') }} onReset={() => { DB.reset(); go('language') }} onMeetPeople={(cat, startAt?) => { setMeetCategory(cat); setMeetStartAt(startAt); go('meetpeople') }} pendingMatchChat={pendingMatchChat} />
   })()
 
   // On web desktop, reserve space for phone chrome (Dynamic Island + status bar = 54px)
@@ -4700,7 +4706,11 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
 
   // Phase 9 — conversation with Soma
   if (phase === 9) {
-    const draft = (quickAnswer + (transcript ? (quickAnswer ? ' ' : '') + transcript : '')).trim()
+    // NOT trimmed. This is the TextInput's controlled value, so trimming it here
+    // erased the space the moment it was typed: "i" + space -> onChangeText("i ")
+    // -> re-render -> .trim() -> "i". A space could never be entered at all, which
+    // made the whole first conversation untypeable. Trim where it is SENT instead.
+    const draft = quickAnswer + (transcript ? (quickAnswer ? ' ' : '') + transcript : '')
     const canFinish = allAnswered && !somaGenerating
     return (
       <View style={{ flex: 1, backgroundColor: '#080418' }}>
@@ -4800,7 +4810,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
             <TouchableOpacity
               disabled={somaGenerating || allAnswered}
               onPress={() => {
-                if (draft) { sendToSoma(draft); return }
+                if (draft.trim()) { sendToSoma(draft); return }
                 if (listening) {
                   stopListeningRef.current?.()
                   setListening(false)
@@ -4821,7 +4831,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
               }}
               style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: somaGenerating || allAnswered ? 'rgba(123,110,246,0.35)' : listening ? '#F6379B' : '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
               <Animated.View style={{ transform: [{ scale: listening ? micAnim : 1 }] }}>
-                <Ionicons name={draft ? 'send' : listening ? 'stop' : 'mic'} size={draft ? 20 : 22} color="#fff" />
+                <Ionicons name={draft.trim() ? 'send' : listening ? 'stop' : 'mic'} size={draft.trim() ? 20 : 22} color="#fff" />
               </Animated.View>
             </TouchableOpacity>
           </View>
@@ -6674,7 +6684,7 @@ function fmtAgo(iso: string) {
 
 const AVATAR_COLORS = ['#7B6EF6','#F6A86E','#F66E8E','#6EE5F6','#A8F6A0','#F6E96E','#C46EF6','#6E9CF6']
 
-function MyCircleTab({ profile, go, onPersonChat }: { profile: UserProfile; go: (s: Screen) => void; onPersonChat?: (userId: string, name: string) => void }) {
+function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: UserProfile; go: (s: Screen) => void; onPersonChat?: (userId: string, name: string) => void; onOpenJourney?: (personId: string) => void }) {
   const { t: theme } = useT()
   const [showPost, setShowPost] = useState(false)
   const [viewMoment, setViewMoment] = useState<Moment | null>(null)
@@ -6853,10 +6863,16 @@ function MyCircleTab({ profile, go, onPersonChat }: { profile: UserProfile; go: 
                         : <Text style={{ fontSize: 15, fontWeight: '800', color: isMe ? '#fff' : color }}>{post.authorName[0].toUpperCase()}</Text>
                       }
                     </View>
-                    <View style={{ flex: 1 }}>
+                    {/* Tapping who posted opens the journey with them. The name is
+                        the obvious thing to press, and it used to do nothing. */}
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      activeOpacity={isMe ? 1 : 0.6}
+                      disabled={isMe}
+                      onPress={() => { haptic.light(); if (onOpenJourney) onOpenJourney(post.authorId) }}>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>{isMe ? 'You' : post.authorName}</Text>
                       <Text style={{ fontSize: 11, color: theme.textSub, marginTop: 1 }}>{post.relationship} · {fmtAgo(post.postedAt)}</Text>
-                    </View>
+                    </TouchableOpacity>
                     {!isMe && (
                       <TouchableOpacity onPress={() => {
                         const person = profile.circle.find(p => p.id === post.authorId)
@@ -8401,7 +8417,7 @@ function SomaConnectionButton({ onPress, bg }: { onPress: () => void; bg: string
   )
 }
 
-function MainTabs({ profile, go, onReset, tab, setTab, dmUnread, onMeetPeople, pendingMatchChat }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void; tab: TabName; setTab: (t: TabName) => void; dmUnread: number; onMeetPeople: (cat: 'romantic' | 'friends' | 'professional' | 'support', startAt?: string) => void; pendingMatchChat?: { name: string; userId?: string; firstMessage?: string; key: number } | null }) {
+function MainTabs({ profile, go, onReset, tab, setTab, dmUnread, onMeetPeople, pendingMatchChat, onOpenJourney }: { profile: UserProfile; go: (s: Screen) => void; onReset: () => void; tab: TabName; setTab: (t: TabName) => void; dmUnread: number; onMeetPeople: (cat: 'romantic' | 'friends' | 'professional' | 'support', startAt?: string) => void; pendingMatchChat?: { name: string; userId?: string; firstMessage?: string; key: number } | null; onOpenJourney?: (personId: string) => void }) {
   const { t: theme } = useT()
   const [pendingChat, setPendingChat] = useState<{ userId: string; name: string; key: number } | null>(null)
   const unread = profile.connections.filter(c => c.messages.length > 0 && c.messages[c.messages.length - 1].role === 'assistant').length
@@ -8432,7 +8448,7 @@ function MainTabs({ profile, go, onReset, tab, setTab, dmUnread, onMeetPeople, p
       {guestBanner}
       <View style={{ flex: 1 }}>
         {tab === 'inner' && <Home profile={profile} go={go} onReset={onReset} />}
-        {tab === 'circle' && <MyCircleTab profile={profile} go={go} onPersonChat={(userId, name) => { setPendingChat({ userId, name, key: Date.now() }); setTab('chat') }} />}
+        {tab === 'circle' && <MyCircleTab profile={profile} go={go} onOpenJourney={onOpenJourney} onPersonChat={(userId, name) => { setPendingChat({ userId, name, key: Date.now() }); setTab('chat') }} />}
         {tab === 'chat' && <MessagesTab profile={profile} initialChat={pendingChat} pendingMatchChat={pendingMatchChat} />}
         {tab === 'outer' && <OuterWorldTab profile={profile} go={go} onMeetPeople={onMeetPeople} />}
         {tab === 'bond' && <BondTab profile={profile} go={go} />}
@@ -10156,16 +10172,20 @@ function getBondLevel(xp: number) {
   return BOND_LEVELS.slice().reverse().find(l => xp >= l.minXp) || BOND_LEVELS[0]
 }
 
-function getActiveQuests(person: CirclePerson, journey: BondJourneyData): typeof QUEST_POOL {
+function getActiveQuests(person: CirclePerson, journey: BondJourneyData): Quest[] {
+  // Their own challenges first and always. A generic suggestion can wait; the
+  // thing they decided to do for this person should not be rotated away.
+  const mine = (journey.customQuests ?? []).filter(q => !journey.completedQuests.includes(q.id))
   const available = QUEST_POOL.filter(q => !journey.completedQuests.includes(q.id))
-  if (available.length === 0) return []
+  if (available.length === 0) return mine
   // stable deterministic selection based on person id + completed count
   const seed = person.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) + journey.completedQuests.length * 7
-  const result: typeof QUEST_POOL = []
-  for (let i = 0; i < 3 && i < available.length; i++) {
+  const result: Quest[] = []
+  const slots = Math.max(1, 3 - mine.length)
+  for (let i = 0; i < slots && i < available.length; i++) {
     result.push(available[(seed + i * 5) % available.length])
   }
-  return [...new Map(result.map(q => [q.id, q])).values()]
+  return [...new Map([...mine, ...result].map(q => [q.id, q])).values()]
 }
 
 function BondJourney({ person, profile, onBack, onRefresh }: {
@@ -10177,6 +10197,9 @@ function BondJourney({ person, profile, onBack, onRefresh }: {
   )
   const [logModal, setLogModal] = useState(false)
   const [logNote, setLogNote] = useState('')
+  const [questModal, setQuestModal] = useState(false)
+  const [questTitle, setQuestTitle] = useState('')
+  const [questDesc, setQuestDesc] = useState('')
   const [justCompleted, setJustCompleted] = useState<string | null>(null)
   const [levelUpAnim] = useState(new Animated.Value(1))
 
@@ -10202,6 +10225,7 @@ function BondJourney({ person, profile, onBack, onRefresh }: {
 
   const completeQuest = (questId: string) => {
     const quest = QUEST_POOL.find(q => q.id === questId)
+      ?? (journey.customQuests ?? []).find(q => q.id === questId)
     if (!quest || journey.completedQuests.includes(questId)) return
     const newJourney = { ...journey, xp: journey.xp + quest.xp, completedQuests: [...journey.completedQuests, questId] }
     save(newJourney)
@@ -10210,6 +10234,24 @@ function BondJourney({ person, profile, onBack, onRefresh }: {
       Animated.timing(levelUpAnim, { toValue: 1.08, duration: 180, useNativeDriver: true }),
       Animated.spring(levelUpAnim, { toValue: 1, useNativeDriver: true, tension: 120, friction: 6 }),
     ]).start(() => setTimeout(() => setJustCompleted(null), 2000))
+  }
+
+  // A challenge the user sets for themselves, for this person. Worth the same
+  // as a pool quest: deciding what your relationship needs is not less work
+  // than being told.
+  const addCustomQuest = () => {
+    const title = questTitle.trim()
+    if (!title) return
+    const quest: Quest = {
+      id: `own_${Date.now()}`,
+      emoji: '🎯',
+      title: title.slice(0, 60),
+      desc: questDesc.trim().slice(0, 140) || 'Your own challenge',
+      xp: 50,
+    }
+    save({ ...journey, customQuests: [quest, ...(journey.customQuests ?? [])] })
+    setQuestTitle(''); setQuestDesc(''); setQuestModal(false)
+    haptic.success()
   }
 
   const addLog = () => {
@@ -10301,6 +10343,14 @@ function BondJourney({ person, profile, onBack, onRefresh }: {
             </View>
           )
         })}
+
+        {/* Their own challenge. The pool is generic by necessity — what you
+            actually need to do with your own sister is not on any list. */}
+        <TouchableOpacity onPress={() => { haptic.light(); setQuestModal(true) }}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: level.color + '70', backgroundColor: level.color + '0C' }}>
+          <Ionicons name="add" size={17} color={level.color} />
+          <Text style={{ fontSize: 13.5, fontWeight: '800', color: level.color }}>Set your own challenge</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Milestones */}
@@ -10375,6 +10425,40 @@ function BondJourney({ person, profile, onBack, onRefresh }: {
             <TouchableOpacity onPress={addLog} disabled={!logNote.trim()}
               style={{ flex: 2, borderRadius: 14, paddingVertical: 15, alignItems: 'center', backgroundColor: logNote.trim() ? level.color : t.border }}>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Save +20 XP</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Their own challenge, written for this person. */}
+      <Modal visible={questModal} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setQuestModal(false)}>
+        <View style={{ flex: 1, backgroundColor: t.bg, padding: 28 }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: t.text, marginBottom: 6 }}>Your own challenge</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginBottom: 20 }}>
+            Something you want to do for {person.name} specifically. You know this relationship better than any list does.
+          </Text>
+          <TextInput
+            value={questTitle} onChangeText={setQuestTitle}
+            placeholder={`e.g. "Call her on Sunday instead of texting"`}
+            placeholderTextColor={t.textTertiary}
+            autoFocus maxLength={60}
+            style={{ backgroundColor: t.input, borderRadius: 14, padding: 16, fontSize: 15, color: t.text }}
+          />
+          <TextInput
+            value={questDesc} onChangeText={setQuestDesc}
+            placeholder="Why it matters, if you want to say (optional)"
+            placeholderTextColor={t.textTertiary}
+            multiline maxLength={140}
+            style={{ backgroundColor: t.input, borderRadius: 14, padding: 16, fontSize: 14, color: t.text, minHeight: 84, textAlignVertical: 'top', marginTop: 12 }}
+          />
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+            <TouchableOpacity onPress={() => { setQuestModal(false); setQuestTitle(''); setQuestDesc('') }}
+              style={{ flex: 1, borderRadius: 14, paddingVertical: 15, alignItems: 'center', backgroundColor: t.card }}>
+              <Text style={{ color: t.textSub, fontWeight: '700' }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={addCustomQuest} disabled={!questTitle.trim()}
+              style={{ flex: 2, borderRadius: 14, paddingVertical: 15, alignItems: 'center', backgroundColor: questTitle.trim() ? level.color : t.border }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Add challenge</Text>
             </TouchableOpacity>
           </View>
         </View>
