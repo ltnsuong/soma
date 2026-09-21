@@ -72,6 +72,33 @@ people — crashed `computeNotifs` on Home with `Cannot read properties of undef
 
 **Demo accounts stay.** They are not test data to clean up.
 
+**`EXPO_PUBLIC_*` is inlined into the shipped bundle.** Expo substitutes the literal value
+wherever the variable is referenced, at build time. `AI_KEY` was declared at App.tsx:75 and never
+used, but the reference alone was enough to carry the production Groq key inside any native
+binary, where anyone can unzip it out. Never reference a secret through `EXPO_PUBLIC_*` — even
+into a variable you do not use. Secrets live on the server; the client reaches them through
+`/ai/chat`, which is rate-limited by `backend/ratelimit.js`.
+
+**Account deletion already exists**, at `backend/server.js` under `app.delete('/auth/account')`.
+Apple guideline 5.1.1(v) requires it, so do not "add" it again — grep for `app.delete(`, not for
+`deleteAccount`, which is only the client-side caller. It works by deleting the `users` row and
+letting `ON DELETE CASCADE` take everything else; every referencing table declares it, and
+removing one silently orphans a user's data after they were told it was erased.
+
+**`expo-font` and `expo-asset` are required peers**, of `@expo/vector-icons` and `expo-audio`
+respectively. Without them the app builds for web and crashes on a device. `npx expo-doctor`
+catches this; run it before any native build.
+
+**Static pages need two edits, not one.** `vercel.json`'s SPA rewrite swallows every path, so a
+new page (privacy.html, terms.html) must be added to the rewrite's exclusion list *and* copied
+into `dist/` by `scripts/postbuild-web.sh` — `expo export` does not know it exists. Miss either
+and the URL quietly returns the app instead of the page, which App Store Connect treats as a
+missing privacy policy.
+
+**The App Store review account** is `appreview@mysoma.site`, verified and premium, with a seeded
+profile so the reviewer lands on a populated app rather than an empty first run. It is not a demo
+account and is not in the `@soma.demo` set; `isDemoAccount()` does not filter it.
+
 ## App.tsx layout
 
 One file, read by line number until it isn't:
