@@ -11,7 +11,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "site.mysoma.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "SOMA uses your microphone so you can talk to Soma instead of typing. Audio is sent for transcription and is not stored.",
+        "NSSpeechRecognitionUsageDescription": "SOMA turns what you say into text so Soma can understand and reply to you.",
+        "NSPhotoLibraryUsageDescription": "SOMA lets you choose a photo for your profile so the people you connect with can see you.",
+        "NSCameraUsageDescription": "SOMA uses the camera so you can take a profile photo and scan another person's Synergy code.",
+        "NSLocationWhenInUseUsageDescription": "SOMA uses your approximate location to suggest people near enough to actually meet. Your exact position is never shown to anyone.",
+        "NSUserTrackingUsageDescription": "SOMA does not track you across other apps or websites."
       },
       "buildNumber": "1",
       "usesAppleSignIn": true

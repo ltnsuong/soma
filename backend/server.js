@@ -720,6 +720,36 @@ app.get('/auth/me', auth, async (req, res) => {
   }
 })
 
+// DELETE /auth/account — erase the account and everything attached to it.
+//
+// Apple guideline 5.1.1(v): an app that lets people create an account must let
+// them delete it from inside the app. Without this the submission is rejected
+// automatically. The client has called this route for a while; it did not exist,
+// and the client swallowed the failure — so "delete everything" wiped local
+// storage and left the account intact on the server.
+//
+// Every table that references users(id) declares ON DELETE CASCADE, so removing
+// the one row takes profiles, memories, diary entries, dating profiles, likes,
+// matches and direct messages with it. That is deliberate and verified in
+// migrations.sql — do not remove those cascades without replacing this.
+app.delete('/auth/account', auth, async (req, res) => {
+  const userId = req.user.userId
+  try {
+    const { error } = await supabase.from('users').delete().eq('id', userId)
+    if (error) throw error
+    // Confirm it is actually gone rather than trusting the driver: a row left
+    // behind here means someone dropped a cascade, and the user was told their
+    // data was erased.
+    const { data: still } = await supabase.from('users').select('id').eq('id', userId).maybeSingle()
+    if (still) throw new Error('account row survived deletion')
+    console.log('[account] deleted', userId)
+    res.json({ deleted: true })
+  } catch (err) {
+    console.error('[account] delete failed for', userId, err.message)
+    res.status(500).json({ error: 'Could not delete the account' })
+  }
+})
+
 // ════════════════════════════════════════════════════════════
 // PROFILE SYNC — persist full UserProfile to Supabase
 // ════════════════════════════════════════════════════════════
