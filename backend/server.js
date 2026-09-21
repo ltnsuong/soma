@@ -203,17 +203,33 @@ app.post('/auth/verify-email', async (req, res) => {
 })
 
 // DELETE ACCOUNT — required for App Store (Apple mandates account deletion)
+// Apple guideline 5.1.1(v): an app that lets people create an account must let
+// them delete it from inside the app.
+//
+// Deleting the users row is the whole operation — every table that references
+// users(id) declares ON DELETE CASCADE, so profiles, memories, diary entries,
+// dating profiles, likes, matches and direct messages go with it. Do not remove
+// those cascades without replacing this.
+//
+// The three deletes that used to run first named tables that do not exist
+// ('likes' and 'messages' — they are dating_likes and direct_messages). Supabase
+// returns those as error objects rather than throwing, so they were swallowed
+// and the cascade did the real work regardless. Removed rather than corrected:
+// the cascade already covers them.
 app.delete('/auth/account', auth, async (req, res) => {
+  const userId = req.user.userId
   try {
-    const userId = req.user.userId
-    // Delete from all tables in order (likes → messages → users)
-    await supabase.from('likes').delete().or(`from_user.eq.${userId},to_user.eq.${userId}`)
-    await supabase.from('messages').delete().eq('user_id', userId)
-    await supabase.from('profiles').delete().eq('user_id', userId)
-    await supabase.from('users').delete().eq('id', userId)
+    const { error } = await supabase.from('users').delete().eq('id', userId)
+    if (error) throw error
+    // Read it back. A row surviving here means someone dropped a cascade, and
+    // the user has just been told their data was erased.
+    const { data: still } = await supabase.from('users').select('id').eq('id', userId).maybeSingle()
+    if (still) throw new Error('account row survived deletion')
+    console.log('[account] deleted', userId)
     res.json({ ok: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[account] delete failed for', userId, err.message)
+    res.status(500).json({ error: 'Could not delete the account' })
   }
 })
 
@@ -717,36 +733,6 @@ app.get('/auth/me', auth, async (req, res) => {
     res.json(user)
   } catch (err) {
     res.status(500).json({ error: err.message })
-  }
-})
-
-// DELETE /auth/account — erase the account and everything attached to it.
-//
-// Apple guideline 5.1.1(v): an app that lets people create an account must let
-// them delete it from inside the app. Without this the submission is rejected
-// automatically. The client has called this route for a while; it did not exist,
-// and the client swallowed the failure — so "delete everything" wiped local
-// storage and left the account intact on the server.
-//
-// Every table that references users(id) declares ON DELETE CASCADE, so removing
-// the one row takes profiles, memories, diary entries, dating profiles, likes,
-// matches and direct messages with it. That is deliberate and verified in
-// migrations.sql — do not remove those cascades without replacing this.
-app.delete('/auth/account', auth, async (req, res) => {
-  const userId = req.user.userId
-  try {
-    const { error } = await supabase.from('users').delete().eq('id', userId)
-    if (error) throw error
-    // Confirm it is actually gone rather than trusting the driver: a row left
-    // behind here means someone dropped a cascade, and the user was told their
-    // data was erased.
-    const { data: still } = await supabase.from('users').select('id').eq('id', userId).maybeSingle()
-    if (still) throw new Error('account row survived deletion')
-    console.log('[account] deleted', userId)
-    res.json({ deleted: true })
-  } catch (err) {
-    console.error('[account] delete failed for', userId, err.message)
-    res.status(500).json({ error: 'Could not delete the account' })
   }
 })
 
