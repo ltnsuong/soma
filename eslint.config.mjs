@@ -67,7 +67,7 @@ export default tseslint.config(
   },
   {
     // Node scripts and the standalone bot — plain Node, not TypeScript, not a browser.
-    files: ['backend/**/*.js', 'bot/**/*.js', 'scripts/**/*.mjs'],
+    files: ['backend/**/*.{js,mjs}', 'bot/**/*.{js,mjs}', 'scripts/**/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: {
@@ -78,6 +78,8 @@ export default tseslint.config(
         URL: 'readonly', Buffer: 'readonly', __dirname: 'readonly',
         require: 'readonly', module: 'writable', exports: 'writable',
         window: 'readonly', document: 'readonly', localStorage: 'readonly',
+        TextEncoder: 'readonly', TextDecoder: 'readonly',
+        AbortController: 'readonly', crypto: 'readonly',
       },
     },
     rules: {

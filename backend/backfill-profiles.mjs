@@ -26,19 +26,20 @@ for (const line of readFileSync(new URL('./.env', import.meta.url), 'utf8').spli
 const dry = process.argv.includes('--dry')
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
+const MODEL = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'
+
 // Same call the server makes, same model, same key.
 const callGroq = async (systemPrompt, userPrompt, maxTokens = 600) => {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
     body: JSON.stringify({
-      model: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
-      max_tokens: maxTokens, temperature: 0.7,
+      model: MODEL, max_tokens: maxTokens, temperature: 0.7,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
     }),
   })
   const d = await r.json()
-  if (!r.ok) throw new Error(d?.error?.message || `groq ${r.status}`)
+  if (!r.ok) throw new Error(`groq ${r.status}`)
   return d.choices?.[0]?.message?.content ?? ''
 }
 
