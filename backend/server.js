@@ -1596,6 +1596,11 @@ const discoverRow = (u, dp) => {
     name: u.name,
     isExample: isDemoAccount(u.email),
     photos: dp.photos || [],
+    // The four per-connection bios. Without these the client falls back to the
+    // single `bio` and all four categories show the same paragraph — which is
+    // exactly what happened: they were returned by /dating/nearby and
+    // /users/:id/profile but not here, and this is the route the browse list uses.
+    sectorBios: dp.sector_bios || {},
     interests: dp.interests || [],
     values: dp.values || [],
     connectionType: dp.connection_type || 'dating',
@@ -1622,7 +1627,7 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
     // Also fetch their dating profiles if available
     const ids = (users || []).map(u => u.id)
     const { data: profiles } = ids.length
-      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, interests, values, love_language, attachment, connection_type, work, city').in('user_id', ids)
+      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city').in('user_id', ids)
       : { data: [] }
     const profileMap = {}
     ;(profiles || []).forEach(p => { profileMap[p.user_id] = p })
