@@ -7,6 +7,7 @@ import crypto from 'crypto'
 import { pickNudge, NUDGE_VOICE } from './nudges.js'
 import { deriveDatingProfile } from './derive.js'
 import { verifyAppleToken, appleAudiences } from './apple-auth.js'
+import { createLimiter, checkAiRequest, retryAfterSeconds, clientIp } from './ratelimit.js'
 import { dirname, join } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -19,6 +20,8 @@ import WebSocket from 'ws'
 dotenv.config()
 
 const app = express()
+// Railway puts a proxy in front, so without this req.ip is the proxy for everyone.
+app.set('trust proxy', true)
 app.use(express.json())
 
 // CORS - localhost in dev; production origins via CORS_ORIGINS (comma-separated) or APP_URL.
@@ -1408,7 +1411,34 @@ app.get('/ai/models', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-app.post('/ai/chat', async (req, res) => {
+// ════════════════════════════════════════════════════════════
+// AI PROXY
+// ════════════════════════════════════════════════════════════
+//
+// These two routes spend the shared GROQ_API_KEY. They stay open to
+// unauthenticated callers on purpose — the First Conversation runs before an
+// account exists — so the budget, not a login, is what stops abuse. Signed-in
+// callers are counted by user id and get a much larger allowance.
+const aiLimiter = createLimiter()
+setInterval(() => aiLimiter.sweep(Date.now()), 10 * 60 * 1000).unref?.()
+
+const aiBudget = (req, res, next) => {
+  const verdict = checkAiRequest(aiLimiter, {
+    userId: req.user?.userId,
+    ip: clientIp(req.headers, req.ip),
+  })
+  if (verdict.ok) return next()
+  const seconds = retryAfterSeconds(verdict.retryAfterMs)
+  if (verdict.scope === 'global') console.warn('[ai] global budget exhausted')
+  res.set('Retry-After', String(seconds))
+  return res.status(429).json({
+    error: 'rate_limited',
+    scope: verdict.scope,
+    retryAfter: seconds,
+  })
+}
+
+app.post('/ai/chat', optionalAuth, aiBudget, async (req, res) => {
   const { messages, system, maxTokens = 200, temperature = 0.85 } = req.body
   if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages required' })
   try {
@@ -1433,7 +1463,7 @@ app.post('/ai/chat', async (req, res) => {
 
 // SPEECH → TEXT (Whisper). Body is the raw audio blob, not JSON — the global
 // express.json() 100kb cap can't carry audio, so this route parses its own body.
-app.post('/ai/transcribe', express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
+app.post('/ai/transcribe', optionalAuth, aiBudget, express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
   if (!req.body?.length) return res.status(400).json({ error: 'audio body required' })
   try {
     const contentType = req.get('content-type') || 'audio/webm'
