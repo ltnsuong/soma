@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Font from 'expo-font'
 import * as WebBrowser from 'expo-web-browser'
 import * as ImagePicker from 'expo-image-picker'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Google from 'expo-auth-session/providers/google'
 import * as Notifications from 'expo-notifications'
 import * as Location from 'expo-location'
@@ -2288,6 +2289,36 @@ function detectCrisis(text: string): boolean {
 // ════════════════════════════════════════════════════════════
 //  BACKEND AUTH API
 // ════════════════════════════════════════════════════════════
+// Sign in with Apple. Native iOS only — Apple's own button and flow, which is
+// what Guideline 4.8 requires wherever Google or Telegram sign-in is offered.
+//
+// Apple returns the full name ONLY on the very first authorisation. There is no
+// second chance: sign out, delete the app, sign in again, and it is gone. So it
+// is sent to the server on that first call and stored, or lost for good.
+const appleFullName = (n?: { givenName?: string | null; familyName?: string | null } | null): string =>
+  `${n?.givenName ?? ''} ${n?.familyName ?? ''}`.trim()
+
+async function signInWithApple(): Promise<{ accessToken: string; refreshToken: string; name: string } | null> {
+  const cred = await AppleAuthentication.signInAsync({
+    requestedScopes: [
+      AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+      AppleAuthentication.AppleAuthenticationScope.EMAIL,
+    ],
+  })
+  if (!cred.identityToken) throw new Error('Apple did not return an identity token')
+
+  const fullName = appleFullName(cred.fullName)
+
+  const res = await fetch(`${BACKEND_URL}/auth/apple`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identityToken: cred.identityToken, fullName }),
+  })
+  const data = await res.json()
+  if (!res.ok || !data.accessToken) throw new Error(data.error || 'Apple sign-in failed')
+  return { accessToken: data.accessToken, refreshToken: data.refreshToken, name: data.user?.name || fullName || 'Friend' }
+}
+
 const auth = {
   // Save tokens locally
   saveTokens: (accessToken: string, refreshToken: string) => {
@@ -5800,6 +5831,34 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
           <View style={g.dividerLine} />
         </View>
 
+        {/* Apple's own button, iOS only. Guideline 4.8 requires Sign in with
+            Apple wherever another social sign-in is offered, and requires it to
+            be at least as prominent — so it goes first. */}
+        {Platform.OS === 'ios' && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={theme.bg === '#FFFFFF'
+              ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={14}
+            style={{ width: '100%', height: 52, marginBottom: 10 }}
+            onPress={async () => {
+              try {
+                const r = await signInWithApple()
+                if (!r) return
+                await auth.saveTokens(r.accessToken, r.refreshToken)
+                const pulled = await cloudSync.pull()
+                if (!pulled) DB.register(r.name)
+                else cloudSync.push().catch(() => {})
+                onDone(r.name)
+              } catch (e: any) {
+                // The user cancelling is not an error worth shouting about.
+                if (e?.code !== 'ERR_REQUEST_CANCELED') alert(e?.message || 'Apple sign-in failed')
+              }
+            }}
+          />
+        )}
+
         {!isTgMiniApp && GOOGLE_ENABLED && (
           <TouchableOpacity style={[g.socialBtn, { backgroundColor: theme.card, borderColor: theme.border }, (!gRequest || loading) && { opacity: 0.7 }]} disabled={!gRequest || loading} onPress={() => handleSocial('Google')}>
             <View style={{ width: 28, alignItems: 'center' }}><GoogleIcon size={20} /></View>
@@ -6034,6 +6093,34 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
       <TouchableOpacity style={[g.primaryBtn, { marginTop: 24 }, loading && g.off]} disabled={loading} onPress={handleLogin}>
         <Text style={g.primaryBtnTxt}>{loading ? '⏳ Signing in...' : 'Sign In'}</Text>
       </TouchableOpacity>
+
+        {/* Apple's own button, iOS only. Guideline 4.8 requires Sign in with
+            Apple wherever another social sign-in is offered, and requires it to
+            be at least as prominent — so it goes first. */}
+        {Platform.OS === 'ios' && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={theme.bg === '#FFFFFF'
+              ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={14}
+            style={{ width: '100%', height: 52, marginBottom: 10 }}
+            onPress={async () => {
+              try {
+                const r = await signInWithApple()
+                if (!r) return
+                await auth.saveTokens(r.accessToken, r.refreshToken)
+                const pulled = await cloudSync.pull()
+                if (!pulled) DB.register(r.name)
+                else cloudSync.push().catch(() => {})
+                onDone(r.name)
+              } catch (e: any) {
+                // The user cancelling is not an error worth shouting about.
+                if (e?.code !== 'ERR_REQUEST_CANCELED') alert(e?.message || 'Apple sign-in failed')
+              }
+            }}
+          />
+        )}
 
       {/* Google — not available inside Telegram Mini App */}
       {!isTgMiniApp && GOOGLE_ENABLED && (

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import crypto from 'crypto'
 import { pickNudge, NUDGE_VOICE } from './nudges.js'
 import { deriveDatingProfile } from './derive.js'
+import { verifyAppleToken, appleAudiences } from './apple-auth.js'
 import { dirname, join } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -487,6 +488,60 @@ app.post('/auth/social', async (req, res) => {
 })
 
 // TELEGRAM MINI APP AUTH — verifies initData from window.Telegram.WebApp
+// Find the Apple account, link it to an existing one, or create it. Split out
+// of the route so the route stays inside the complexity budget.
+async function findOrCreateAppleUser(claims, fullName) {
+  const cols = 'id, email, name, premium'
+  const { data: byApple } = await supabase
+    .from('users').select(cols).eq('apple_id', claims.appleId).maybeSingle()
+  if (byApple) return { user: byApple, isNew: false }
+
+  if (claims.email) {
+    // Same person who signed up with email or Google before. Link, never duplicate.
+    const { data: byEmail } = await supabase
+      .from('users').select(cols).eq('email', claims.email).maybeSingle()
+    if (byEmail) {
+      await supabase.from('users').update({ apple_id: claims.appleId, verified: true }).eq('id', byEmail.id)
+      return { user: byEmail, isNew: false }
+    }
+  }
+
+  // A private-relay address is real and deliverable. Accounts that hide their
+  // email give us none at all, hence the placeholder.
+  const email = claims.email || `${claims.appleId}@privaterelay.appleid.com`
+  const name = String(fullName || '').trim().slice(0, 60) || email.split('@')[0]
+  const { data: created, error } = await supabase.from('users')
+    .insert({ email, name, apple_id: claims.appleId, verified: true, premium: false })
+    .select(cols).single()
+  if (error) throw new Error(error.message)
+  return { user: created, isNew: true }
+}
+
+// Sign in with Apple. Required by App Store Guideline 4.8 wherever Google or
+// Telegram sign-in is offered, which is both of ours.
+//
+// Apple gives the name and email ONCE, on first authorisation — and the name
+// arrives from the CLIENT, not inside the token, so it is only ever trusted as
+// a display name and only when creating the account.
+app.post('/auth/apple', async (req, res) => {
+  try {
+    const { identityToken, fullName } = req.body
+    const claims = await verifyAppleToken(identityToken, appleAudiences())
+
+    const { user, isNew } = await findOrCreateAppleUser(claims, fullName)
+    const { accessToken, refreshToken } = generateTokens(user.id, user.email)
+    res.json({
+      user: { id: user.id, email: user.email, name: user.name, premium: user.premium || false },
+      accessToken, refreshToken, isNew,
+    })
+  } catch (err) {
+    // Anything that fails verification is a 401, not a 500 — a bad token is the
+    // client's problem, and the message says which check rejected it.
+    console.warn('[Apple sign-in]', err.message)
+    res.status(401).json({ error: err.message })
+  }
+})
+
 app.post('/auth/telegram-webapp', async (req, res) => {
   try {
     const { initData } = req.body
