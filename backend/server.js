@@ -517,6 +517,17 @@ async function findOrCreateAppleUser(claims, fullName) {
   return { user: created, isNew: true }
 }
 
+// Seeded example people, so a brand-new visitor does not meet an empty app.
+// They all share the @soma.demo domain, which is the only reliable marker —
+// nothing else distinguishes them from a real profile.
+//
+// A SIGNED-IN user never sees them. Showing invented people to someone who
+// registered would be presenting fabrications as members, which is both
+// dishonest and an App Review problem (Guideline 4.2 / fake accounts). Guests
+// still see them, under the "Demo mode" banner that says exactly what they are.
+const DEMO_EMAIL_DOMAIN = '@soma.demo'
+const isDemoAccount = (email) => String(email || '').endsWith(DEMO_EMAIL_DOMAIN)
+
 // Sign in with Apple. Required by App Store Guideline 4.8 wherever Google or
 // Telegram sign-in is offered, which is both of ours.
 //
@@ -1026,6 +1037,7 @@ app.get('/dating/nearby', auth, async (req, res) => {
     const nearbyIds = (nearbyRows || []).map(r => r.user_id)
     const photosMap = {}
     const sectorBiosMap = {}
+    const demoIds = new Set()
     if (nearbyIds.length) {
       const { data: photoRows } = await supabase.from('dating_profiles')
         .select('user_id, photos, sector_bios').in('user_id', nearbyIds)
@@ -1033,10 +1045,14 @@ app.get('/dating/nearby', auth, async (req, res) => {
         photosMap[r.user_id] = r.photos || []
         sectorBiosMap[r.user_id] = r.sector_bios || {}
       })
+      // This route is always authenticated, so the seeded example people are
+      // never appropriate here — everyone reaching it has registered.
+      const { data: emailRows } = await supabase.from('users').select('id, email').in('id', nearbyIds)
+      ;(emailRows || []).forEach(u => { if (isDemoAccount(u.email)) demoIds.add(u.id) })
     }
 
     const results = (nearbyRows || [])
-      .filter(r => !likedIds.has(r.user_id))
+      .filter(r => !likedIds.has(r.user_id) && !demoIds.has(r.user_id))
       .map(r => ({
         userId: r.user_id, name: r.name, age: r.age, photo: r.photo,
         photos: photosMap[r.user_id] || (r.photo ? [r.photo] : []),
@@ -1565,14 +1581,43 @@ app.get('/friends/conversations', auth, async (req, res) => {
 // ════════════════════════════════════════════════════════════
 // DISCOVER — all registered SOMA users (for "For You" tab)
 // ════════════════════════════════════════════════════════════
+// Profile columns that pass through as-is, empty becoming null.
+// Listed rather than written out one per line: fifteen `|| null` expressions
+// is fifteen branches, which put this over the complexity budget on its own.
+const DISCOVER_PASSTHROUGH = [
+  ['age', 'age'], ['photo', 'photo'], ['bio', 'bio'],
+  ['loveLanguage', 'love_language'], ['attachment', 'attachment'],
+  ['work', 'work'], ['city', 'city'],
+]
+
+const discoverRow = (u, dp) => {
+  const row = {
+    userId: u.id,
+    name: u.name,
+    isExample: isDemoAccount(u.email),
+    photos: dp.photos || [],
+    interests: dp.interests || [],
+    values: dp.values || [],
+    connectionType: dp.connection_type || 'dating',
+    hasDatingProfile: !!dp.age,
+    distanceKm: null,
+    compatibility: 50,
+  }
+  for (const [out, col] of DISCOVER_PASSTHROUGH) row[out] = dp[col] || null
+  return row
+}
+
 app.get('/users/discover', optionalAuth, async (req, res) => {
   try {
     const me = req.user?.userId
     // Get all users (exclude self if authenticated), join dating_profiles if they have one
-    let query = supabase.from('users').select('id, name, created_at').order('created_at', { ascending: false }).limit(100)
+    let query = supabase.from('users').select('id, name, email, created_at').order('created_at', { ascending: false }).limit(100)
     if (me) query = query.neq('id', me)
-    const { data: users, error } = await query
+    const { data: allUsers, error } = await query
     if (error) throw error
+
+    // Signed in: real people only. Guest: examples included, clearly labelled.
+    const users = me ? (allUsers || []).filter(u => !isDemoAccount(u.email)) : (allUsers || [])
 
     // Also fetch their dating profiles if available
     const ids = (users || []).map(u => u.id)
@@ -1582,28 +1627,7 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
     const profileMap = {}
     ;(profiles || []).forEach(p => { profileMap[p.user_id] = p })
 
-    const results = (users || []).map(u => {
-      const dp = profileMap[u.id] || {}
-      return {
-        userId: u.id,
-        name: u.name,
-        age: dp.age || null,
-        photo: dp.photo || null,
-        photos: dp.photos || [],
-        bio: dp.bio || null,
-        interests: dp.interests || [],
-        values: dp.values || [],
-        loveLanguage: dp.love_language || null,
-        attachment: dp.attachment || null,
-        connectionType: dp.connection_type || 'dating',
-        work: dp.work || null,
-        city: dp.city || null,
-        hasDatingProfile: !!dp.age,
-        distanceKm: null,
-        compatibility: 50,
-      }
-    })
-    res.json({ results })
+    res.json({ results: (users || []).map(u => discoverRow(u, profileMap[u.id] || {})) })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

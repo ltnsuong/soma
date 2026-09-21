@@ -2474,6 +2474,7 @@ interface NearbyUser {
   interests: string[]; values: string[]; loveLanguage: string; attachment: string
   work: string; city: string; distanceKm: number; compatibility: number
   sectorBios?: Partial<Record<ConnectionType, string>>
+  isExample?: boolean
   connectionType?: 'dating' | 'friends' | 'professional' | 'support'
 }
 
@@ -2710,6 +2711,7 @@ function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string; con
     height: '', weight: '',
     bio: u.bio || (hasProfile ? '' : '✨ Just joined SOMA — profile coming soon.'),
     sectorBios: u.sectorBios || {},
+    isExample: u.isExample === true,
     values: u.values || [], interests: u.interests || [],
     agentName: 'their Soma', loveLanguage: u.loveLanguage || '', attachment: u.attachment || '',
     intimacy: '', work: u.work || '', children: '', pets: '',
@@ -12567,6 +12569,8 @@ interface Candidate {
   bio: string; values: string[]; interests: string[]; agentName: string
   /** One bio per connection type. Falls back to `bio` when a sector has none. */
   sectorBios?: Partial<Record<ConnectionType, string>>
+  /** A seeded example person, not a member. Must always be labelled as one. */
+  isExample?: boolean
   loveLanguage: string; attachment: string; intimacy: string
   work: string; children: string; pets: string
   tags: { icon: string; label: string }[]
@@ -13371,7 +13375,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
   }
 
   if (step === 'browse') {
-    const demoFallback = CANDIDATES
+    const demoFallback = CANDIDATES.map(c => ({ ...c, isExample: true }))
       .filter(c => !genderPref || genderPref === 'both' || c.gender === genderPref)
       .map(c => ({ c, ...alignmentScore(profile, c, asConnectionType(category)) }))
     const filteredRanked = browseTab === 'nearby'
@@ -13474,6 +13478,15 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                       ))}
                     </View>
                   </View>
+
+                  {/* Says what it is, on the photo, where it cannot be missed or
+                      scrolled past. A guest browsing before signup meets seeded
+                      people; presenting them as members would be a fabrication. */}
+                  {currentBrowse.isExample && (
+                    <View style={{ position: 'absolute', top: 14, right: 14, zIndex: 20, backgroundColor: 'rgba(0,0,0,0.72)', borderRadius: 12, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' }}>
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>EXAMPLE PROFILE</Text>
+                    </View>
+                  )}
 
                   {/* Name / info overlay */}
                   <View style={{ position: 'absolute', left: 18, right: 18, bottom: 16, zIndex: 10 }}>
