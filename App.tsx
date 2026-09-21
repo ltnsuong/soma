@@ -233,6 +233,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: "Thanks for sharing. Now tell me about your social world — what do you do for work, what are your relationships like? Family, friends, romantic life, the roles you play in people's lives.",
     ob_q3: "Last one — tell me about who you are on the inside. Your personality, what you love doing, your habits, what brings you joy, and what challenges you most.",
     ob_tap_mic: 'Tap the mic and speak', ob_listening: 'Listening…', ob_type_instead: 'Or type your answer here…',
+    find_aligned: 'Find people aligned with your values', synergy_short: 'Your AIs find your fit in seconds. Private.', picks_sub: 'Your AI agent scouted these matches for you', picks_short: 'Your AI agent scouted these matches', how_others_see: 'How Others See Me', sector_dating_sub: 'Goal-driven dating · AI-mediated', sector_friends_sub: 'New friends, activity buddies', professional_label: 'Professional', sector_pro_sub: 'Mentors, collaborators, peers', sector_support_sub: 'Coaches, accountability',
+    reading_convo: 'Reading the conversation…', what_did_you_do: 'What did you do?', what_talk_about: 'What did you talk about?', write_message: 'Write a message…', therapist_report: 'Therapist Report', therapist_email: 'Therapist\'s email', auto_send_report: 'Auto-send report to therapist before each session', day_of_week: 'Day of week', session_time: 'Session time', preparing_summary: 'Soma is preparing the summary…', preview: 'Preview', need_consent: 'Enable consent toggle above to send', need_email: 'Enter therapist\'s email to send', agents_connecting: 'The two agents are connecting…', convo_failed: 'Could not generate a conversation. Try again.', find_or_add: 'Find them on SOMA or add manually', search_by_code_sub: 'Search by their email or invite code — connect your SOMA AIs', search: 'Search', no_soma_yet: 'They don\'t have SOMA yet — add them to your circle', category: 'Category', context_label: 'Context', how_you_know: 'How you know them...', search_email_code: 'Search by email address or invite code', find_friend: 'Find friend', home_widget: 'Home Screen Widget', widget_sub: 'See their moments on your home screen', meet_people: 'Meet people', meet_people_sub: 'Find people aligned with your goals and values', in_relationship: 'You\'re in a relationship', serious_daters: 'Serious Daters', more_ways: 'MORE WAYS TO CONNECT', synergy_scan: 'Synergy Scan', synergy_sub: 'Your AIs check your fit in seconds. Private, instant.', interested_in: 'Who are you interested in?', interested_sub: 'We\'ll show you people that match your preference.', no_profiles_match: 'No profiles match', reset_filters: 'Reset Filters', example_profile: 'EXAMPLE PROFILE', about_them: 'About them', as_a_friend: 'As a friend', interests_caps: 'INTERESTS', professionally: 'Professionally', values_caps: 'VALUES', here_to_support: 'Here to support', style_caps: 'STYLE', strength_caps: 'STRENGTH', connection_style: 'Connection style', love_language_caps: 'LOVE LANGUAGE', attachment_caps: 'ATTACHMENT', more_info: 'More info', create_free_account: 'Create a free account', browse_as_guest: 'Keep browsing as guest', filters: 'Filters', max_distance: 'MAX DISTANCE', min_age: 'MIN AGE', max_age: 'MAX AGE', reset: 'Reset', apply_filters: 'Apply Filters', meet_new_people: 'Meet New People', meet_new_sub: 'Your AI meets their AI before you ever do.', match_excl: 'Match!', keep_browsing: 'Keep browsing', meet_more: 'Meet more people',
     score_start: 'Start tracking to see your score', score_thriving: 'Thriving — keep it up! ✨', score_momentum: 'Good momentum — stay consistent', score_room: 'Room to grow — Soma is with you', view_details: 'View details →', evening_checkin: 'Evening Check-in', morning_checkin: 'Morning Check-in', reflect_day: 'Reflect on your day', set_intention: 'Set your intention for today', mood_euphoric: 'Euphoric', mood_amazing: 'Amazing', mood_great: 'Great', mood_good: 'Good', mood_okay: 'Okay', mood_meh: 'Meh',
     circle_header: 'Circle', circle_tagline: 'Private moments with people you trust', add_first_person: 'Add your first person', add_someone_to_circle: 'Add someone to your Circle', video_ready: 'Video ready to share', photo_btn: 'Photo', video_btn: 'Video', share_btn: 'Share', message_btn: 'Message', rel_insights_sub: 'Soma\'s view of your connections', their_name: 'Their name', found_on_soma: 'Found on SOMA — they\'ll be connected to your circle', who_are_they: 'Who are they?', add_to_circle: 'Add to Circle', recording: 'Recording…', message_placeholder: 'Message…', no_conversations: 'No conversations yet', message_someone: 'Message someone', new_message: 'New message', wellness_score: 'Wellness Score', mood_logged: 'Mood logged today', change_btn: 'Change', your_streaks: 'Your Streaks', talk_anything: 'Talk about anything', getting_started: 'Getting started', circle_of_life: 'Circle of Life', health_hub: 'Health Hub', support_label: 'Support',
     dom_health: 'Health', dom_career: 'Career', dom_finance: 'Finance', dom_relationship: 'Love', dom_family: 'Family', dom_growth: 'Growth', dom_hobby: 'Fun', dom_purpose: 'Purpose', dom_mind: 'Mind', dom_environment: 'Home',
@@ -365,6 +367,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Спасибо, что поделился. Теперь расскажи о своём социальном мире — чем занимаешься, какие у тебя отношения? Семья, друзья, романтика, роли, которые ты играешь в жизни людей.',
     ob_q3: 'Последний вопрос — расскажи, кто ты внутри. Твоя личность, что ты любишь делать, твои привычки, что приносит радость и что больше всего испытывает тебя.',
     ob_tap_mic: 'Нажми на микрофон и говори', ob_listening: 'Слушаю…', ob_type_instead: 'Или напиши свой ответ здесь…',
+    find_aligned: 'Найди тех, кто близок по ценностям', synergy_short: 'Ваши ИИ найдут совместимость за секунды. Приватно.', picks_sub: 'Твой ИИ-агент нашёл для тебя эти совпадения', picks_short: 'Твой ИИ-агент нашёл эти совпадения', how_others_see: 'Каким меня видят', sector_dating_sub: 'Осознанные знакомства · при участии ИИ', sector_friends_sub: 'Новые друзья и компания для занятий', professional_label: 'Профессия', sector_pro_sub: 'Менторы, партнёры, коллеги', sector_support_sub: 'Коучи и поддержка в пути',
+    reading_convo: 'Читаю переписку…', what_did_you_do: 'Что вы делали?', what_talk_about: 'О чём вы говорили?', write_message: 'Напиши сообщение…', therapist_report: 'Отчёт для терапевта', therapist_email: 'Email терапевта', auto_send_report: 'Отправлять отчёт терапевту перед каждой сессией', day_of_week: 'День недели', session_time: 'Время сессии', preparing_summary: 'Soma готовит сводку…', preview: 'Предпросмотр', need_consent: 'Включи согласие выше, чтобы отправить', need_email: 'Укажи email терапевта, чтобы отправить', agents_connecting: 'Два агента связываются…', convo_failed: 'Не удалось создать разговор. Попробуй ещё раз.', find_or_add: 'Найди их в SOMA или добавь вручную', search_by_code_sub: 'Найди по email или коду приглашения — свяжи ваших SOMA', search: 'Найти', no_soma_yet: 'У них пока нет SOMA — добавь их в круг', category: 'Категория', context_label: 'Контекст', how_you_know: 'Откуда ты их знаешь…', search_email_code: 'Поиск по email или коду приглашения', find_friend: 'Найти друга', home_widget: 'Виджет на главном экране', widget_sub: 'Смотри их моменты прямо на главном экране', meet_people: 'Знакомства', meet_people_sub: 'Найди тех, кто близок по целям и ценностям', in_relationship: 'Ты в отношениях', serious_daters: 'Серьёзные отношения', more_ways: 'ДРУГИЕ СПОСОБЫ СВЯЗИ', synergy_scan: 'Проверка совместимости', synergy_sub: 'Ваши ИИ проверят совместимость за секунды. Приватно и сразу.', interested_in: 'Кто тебе интересен?', interested_sub: 'Покажем тех, кто подходит по твоим предпочтениям.', no_profiles_match: 'Никто не подошёл', reset_filters: 'Сбросить фильтры', example_profile: 'ПРИМЕР ПРОФИЛЯ', about_them: 'О них', as_a_friend: 'Как друг', interests_caps: 'ИНТЕРЕСЫ', professionally: 'В работе', values_caps: 'ЦЕННОСТИ', here_to_support: 'Готов поддержать', style_caps: 'СТИЛЬ', strength_caps: 'СИЛЬНАЯ СТОРОНА', connection_style: 'Стиль близости', love_language_caps: 'ЯЗЫК ЛЮБВИ', attachment_caps: 'ТИП ПРИВЯЗАННОСТИ', more_info: 'Подробнее', create_free_account: 'Создать бесплатный аккаунт', browse_as_guest: 'Продолжить как гость', filters: 'Фильтры', max_distance: 'МАКС. РАССТОЯНИЕ', min_age: 'МИН. ВОЗРАСТ', max_age: 'МАКС. ВОЗРАСТ', reset: 'Сбросить', apply_filters: 'Применить фильтры', meet_new_people: 'Новые знакомства', meet_new_sub: 'Ваши ИИ знакомятся раньше вас.', match_excl: 'Совпадение!', keep_browsing: 'Смотреть дальше', meet_more: 'Познакомиться ещё',
     score_start: 'Начни отмечать — и появится твой индекс', score_thriving: 'Всё цветёт — так держать ✨', score_momentum: 'Хороший темп — не сбавляй', score_room: 'Есть куда расти — Soma рядом', view_details: 'Подробнее →', evening_checkin: 'Вечерняя отметка', morning_checkin: 'Утренняя отметка', reflect_day: 'Оглянись на свой день', set_intention: 'Задай намерение на день', mood_euphoric: 'Восторг', mood_amazing: 'Прекрасно', mood_great: 'Отлично', mood_good: 'Хорошо', mood_okay: 'Нормально', mood_meh: 'Так себе',
     circle_header: 'Круг', circle_tagline: 'Личные моменты с теми, кому ты доверяешь', add_first_person: 'Добавь первого человека', add_someone_to_circle: 'Добавь кого-то в свой Круг', video_ready: 'Видео готово к отправке', photo_btn: 'Фото', video_btn: 'Видео', share_btn: 'Поделиться', message_btn: 'Написать', rel_insights_sub: 'Взгляд Сомы на твои связи', their_name: 'Как их зовут', found_on_soma: 'Найден в SOMA — он будет связан с твоим кругом', who_are_they: 'Кто это для тебя?', add_to_circle: 'Добавить в Круг', recording: 'Записываю…', message_placeholder: 'Сообщение…', no_conversations: 'Пока нет переписок', message_someone: 'Напиши кому-нибудь', new_message: 'Новое сообщение', wellness_score: 'Индекс благополучия', mood_logged: 'Настроение отмечено сегодня', change_btn: 'Изменить', your_streaks: 'Твои серии', talk_anything: 'Поговори о чём угодно', getting_started: 'С чего начать', circle_of_life: 'Колесо жизни', health_hub: 'Здоровье', support_label: 'Поддержка',
     dom_health: 'Здоровье', dom_career: 'Карьера', dom_finance: 'Финансы', dom_relationship: 'Любовь', dom_family: 'Семья', dom_growth: 'Рост', dom_hobby: 'Отдых', dom_purpose: 'Смысл', dom_mind: 'Разум', dom_environment: 'Дом',
@@ -497,6 +501,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Gracias por compartir. Ahora cuéntame sobre tu mundo social — ¿qué haces para trabajar, cómo son tus relaciones? Familia, amigos, vida romántica, los roles que juegas en la vida de las personas.',
     ob_q3: 'La última — cuéntame sobre quién eres por dentro. Tu personalidad, lo que te encanta hacer, tus hábitos, lo que te trae alegría y lo que más te desafía.',
     ob_tap_mic: 'Toca el micrófono y habla', ob_listening: 'Escuchando…', ob_type_instead: 'O escribe tu respuesta aquí…',
+    find_aligned: 'Encuentra personas afines a tus valores', synergy_short: 'Vuestras IA encuentran la sintonía en segundos. Privado.', picks_sub: 'Tu agente de IA encontró estas coincidencias para ti', picks_short: 'Tu agente de IA encontró estas coincidencias', how_others_see: 'Cómo me ven los demás', sector_dating_sub: 'Citas con propósito · con ayuda de la IA', sector_friends_sub: 'Nuevas amistades y compañeros de actividades', professional_label: 'Profesional', sector_pro_sub: 'Mentores, colaboradores, colegas', sector_support_sub: 'Coaches y compromiso mutuo',
+    reading_convo: 'Leyendo la conversación…', what_did_you_do: '¿Qué hicieron?', what_talk_about: '¿De qué hablaron?', write_message: 'Escribe un mensaje…', therapist_report: 'Informe para el terapeuta', therapist_email: 'Correo del terapeuta', auto_send_report: 'Enviar el informe al terapeuta antes de cada sesión', day_of_week: 'Día de la semana', session_time: 'Hora de la sesión', preparing_summary: 'Soma está preparando el resumen…', preview: 'Vista previa', need_consent: 'Activa el consentimiento arriba para enviar', need_email: 'Escribe el correo del terapeuta para enviar', agents_connecting: 'Los dos agentes se están conectando…', convo_failed: 'No se pudo generar la conversación. Inténtalo de nuevo.', find_or_add: 'Encuéntralos en SOMA o añádelos manualmente', search_by_code_sub: 'Busca por su correo o código de invitación — conecta vuestras SOMA', search: 'Buscar', no_soma_yet: 'Aún no tienen SOMA — añádelos a tu círculo', category: 'Categoría', context_label: 'Contexto', how_you_know: 'Cómo los conoces...', search_email_code: 'Busca por correo o código de invitación', find_friend: 'Buscar amigo', home_widget: 'Widget en la pantalla de inicio', widget_sub: 'Ve sus momentos en tu pantalla de inicio', meet_people: 'Conocer gente', meet_people_sub: 'Encuentra personas afines a tus metas y valores', in_relationship: 'Estás en una relación', serious_daters: 'Citas serias', more_ways: 'MÁS FORMAS DE CONECTAR', synergy_scan: 'Escaneo de sintonía', synergy_sub: 'Vuestras IA comprueban la sintonía en segundos. Privado e instantáneo.', interested_in: '¿Quién te interesa?', interested_sub: 'Te mostraremos personas según tu preferencia.', no_profiles_match: 'Ningún perfil coincide', reset_filters: 'Restablecer filtros', example_profile: 'PERFIL DE EJEMPLO', about_them: 'Sobre ellos', as_a_friend: 'Como amistad', interests_caps: 'INTERESES', professionally: 'En lo profesional', values_caps: 'VALORES', here_to_support: 'Aquí para apoyar', style_caps: 'ESTILO', strength_caps: 'FORTALEZA', connection_style: 'Estilo de conexión', love_language_caps: 'LENGUAJE DEL AMOR', attachment_caps: 'APEGO', more_info: 'Más información', create_free_account: 'Crear una cuenta gratis', browse_as_guest: 'Seguir como invitado', filters: 'Filtros', max_distance: 'DISTANCIA MÁX.', min_age: 'EDAD MÍN.', max_age: 'EDAD MÁX.', reset: 'Restablecer', apply_filters: 'Aplicar filtros', meet_new_people: 'Conocer gente nueva', meet_new_sub: 'Tu IA conoce a la suya antes que tú.', match_excl: '¡Match!', keep_browsing: 'Seguir mirando', meet_more: 'Conocer a más gente',
     score_start: 'Empieza a registrar para ver tu índice', score_thriving: 'Vas muy bien — sigue así ✨', score_momentum: 'Buen ritmo — mantén la constancia', score_room: 'Hay espacio para crecer — Soma está contigo', view_details: 'Ver detalles →', evening_checkin: 'Registro de la tarde', morning_checkin: 'Registro de la mañana', reflect_day: 'Reflexiona sobre tu día', set_intention: 'Define tu intención de hoy', mood_euphoric: 'Eufórico', mood_amazing: 'Increíble', mood_great: 'Muy bien', mood_good: 'Bien', mood_okay: 'Normal', mood_meh: 'Regular',
     circle_header: 'Círculo', circle_tagline: 'Momentos privados con quienes confías', add_first_person: 'Añade a tu primera persona', add_someone_to_circle: 'Añade a alguien a tu Círculo', video_ready: 'Vídeo listo para compartir', photo_btn: 'Foto', video_btn: 'Vídeo', share_btn: 'Compartir', message_btn: 'Mensaje', rel_insights_sub: 'La visión de Soma sobre tus vínculos', their_name: 'Su nombre', found_on_soma: 'Encontrado en SOMA — se conectará a tu círculo', who_are_they: '¿Quién es para ti?', add_to_circle: 'Añadir al Círculo', recording: 'Grabando…', message_placeholder: 'Mensaje…', no_conversations: 'Aún no hay conversaciones', message_someone: 'Escribe a alguien', new_message: 'Mensaje nuevo', wellness_score: 'Índice de bienestar', mood_logged: 'Ánimo registrado hoy', change_btn: 'Cambiar', your_streaks: 'Tus rachas', talk_anything: 'Habla de lo que quieras', getting_started: 'Primeros pasos', circle_of_life: 'Rueda de la vida', health_hub: 'Centro de salud', support_label: 'Apoyo',
     dom_health: 'Salud', dom_career: 'Carrera', dom_finance: 'Finanzas', dom_relationship: 'Amor', dom_family: 'Familia', dom_growth: 'Crecimiento', dom_hobby: 'Ocio', dom_purpose: 'Propósito', dom_mind: 'Mente', dom_environment: 'Hogar',
@@ -557,6 +563,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: "Merci de partager. Maintenant parle-moi de ton monde social — que fais-tu comme travail, comment sont tes relations ? Famille, amis, vie romantique, les rôles que tu joues dans la vie des gens.",
     ob_q3: "Dernière question — parle-moi de qui tu es à l'intérieur. Ta personnalité, ce que tu aimes faire, tes habitudes, ce qui te rend joyeux et ce qui te défie le plus.",
     ob_tap_mic: 'Appuie sur le micro et parle', ob_listening: "J'écoute…", ob_type_instead: 'Ou écris ta réponse ici…',
+    find_aligned: 'Trouve des gens qui partagent tes valeurs', synergy_short: 'Vos IA trouvent votre compatibilité en quelques secondes. Privé.', picks_sub: 'Ton agent IA a repéré ces profils pour toi', picks_short: 'Ton agent IA a repéré ces profils', how_others_see: 'Comment les autres me voient', sector_dating_sub: 'Rencontres sérieuses · via l\'IA', sector_friends_sub: 'De nouveaux amis, des partenaires d\'activités', professional_label: 'Professionnel', sector_pro_sub: 'Mentors, collaborateurs, pairs', sector_support_sub: 'Coachs, soutien et engagement',
+    reading_convo: 'Lecture de la conversation…', what_did_you_do: 'Qu\'avez-vous fait ?', what_talk_about: 'De quoi avez-vous parlé ?', write_message: 'Écris un message…', therapist_report: 'Rapport pour le thérapeute', therapist_email: 'E-mail du thérapeute', auto_send_report: 'Envoyer le rapport au thérapeute avant chaque séance', day_of_week: 'Jour de la semaine', session_time: 'Heure de la séance', preparing_summary: 'Soma prépare le résumé…', preview: 'Aperçu', need_consent: 'Active le consentement ci-dessus pour envoyer', need_email: 'Entre l\'e-mail du thérapeute pour envoyer', agents_connecting: 'Les deux agents se connectent…', convo_failed: 'Impossible de générer la conversation. Réessaie.', find_or_add: 'Trouve-les sur SOMA ou ajoute-les à la main', search_by_code_sub: 'Cherche par e-mail ou code d\'invitation — relie vos SOMA', search: 'Rechercher', no_soma_yet: 'Ils n\'ont pas encore SOMA — ajoute-les à ton cercle', category: 'Catégorie', context_label: 'Contexte', how_you_know: 'Comment tu les connais...', search_email_code: 'Recherche par e-mail ou code d\'invitation', find_friend: 'Trouver un ami', home_widget: 'Widget sur l\'écran d\'accueil', widget_sub: 'Vois leurs moments sur ton écran d\'accueil', meet_people: 'Rencontrer des gens', meet_people_sub: 'Trouve des gens en phase avec tes objectifs et tes valeurs', in_relationship: 'Tu es en couple', serious_daters: 'Relations sérieuses', more_ways: 'AUTRES FAÇONS DE SE LIER', synergy_scan: 'Scan de synergie', synergy_sub: 'Vos IA évaluent votre compatibilité en quelques secondes. Privé, instantané.', interested_in: 'Qui t\'intéresse ?', interested_sub: 'On te montrera des personnes selon ta préférence.', no_profiles_match: 'Aucun profil ne correspond', reset_filters: 'Réinitialiser les filtres', example_profile: 'PROFIL D\'EXEMPLE', about_them: 'À leur sujet', as_a_friend: 'En tant qu\'ami', interests_caps: 'CENTRES D\'INTÉRÊT', professionally: 'Côté pro', values_caps: 'VALEURS', here_to_support: 'Là pour soutenir', style_caps: 'STYLE', strength_caps: 'FORCE', connection_style: 'Style de lien', love_language_caps: 'LANGAGE DE L\'AMOUR', attachment_caps: 'ATTACHEMENT', more_info: 'Plus d\'infos', create_free_account: 'Créer un compte gratuit', browse_as_guest: 'Continuer en invité', filters: 'Filtres', max_distance: 'DISTANCE MAX', min_age: 'ÂGE MIN', max_age: 'ÂGE MAX', reset: 'Réinitialiser', apply_filters: 'Appliquer les filtres', meet_new_people: 'Rencontrer de nouvelles personnes', meet_new_sub: 'Ton IA rencontre la sienne avant toi.', match_excl: 'C\'est un match !', keep_browsing: 'Continuer à explorer', meet_more: 'Rencontrer d\'autres personnes',
     score_start: 'Commence à noter pour voir ton indice', score_thriving: 'Tu t\'épanouis — continue ✨', score_momentum: 'Bon rythme — reste régulier', score_room: 'Il y a de la marge — Soma est avec toi', view_details: 'Voir les détails →', evening_checkin: 'Bilan du soir', morning_checkin: 'Bilan du matin', reflect_day: 'Repense à ta journée', set_intention: 'Définis ton intention du jour', mood_euphoric: 'Euphorique', mood_amazing: 'Génial', mood_great: 'Super', mood_good: 'Bien', mood_okay: 'Ça va', mood_meh: 'Bof',
     circle_header: 'Cercle', circle_tagline: 'Des moments privés avec ceux en qui tu as confiance', add_first_person: 'Ajoute ta première personne', add_someone_to_circle: 'Ajoute quelqu\'un à ton Cercle', video_ready: 'Vidéo prête à partager', photo_btn: 'Photo', video_btn: 'Vidéo', share_btn: 'Partager', message_btn: 'Message', rel_insights_sub: 'Le regard de Soma sur tes liens', their_name: 'Leur prénom', found_on_soma: 'Trouvé sur SOMA — la personne sera reliée à ton cercle', who_are_they: 'Qui est-ce pour toi ?', add_to_circle: 'Ajouter au Cercle', recording: 'Enregistrement…', message_placeholder: 'Message…', no_conversations: 'Pas encore de conversations', message_someone: 'Écris à quelqu\'un', new_message: 'Nouveau message', wellness_score: 'Indice de bien-être', mood_logged: 'Humeur notée aujourd\'hui', change_btn: 'Modifier', your_streaks: 'Tes séries', talk_anything: 'Parle de ce que tu veux', getting_started: 'Pour commencer', circle_of_life: 'Roue de la vie', health_hub: 'Espace santé', support_label: 'Soutien',
     dom_health: 'Santé', dom_career: 'Carrière', dom_finance: 'Finances', dom_relationship: 'Amour', dom_family: 'Famille', dom_growth: 'Évolution', dom_hobby: 'Loisirs', dom_purpose: 'Sens', dom_mind: 'Esprit', dom_environment: 'Chez soi',
@@ -617,6 +625,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Danke fürs Teilen. Jetzt erzähl mir von deiner sozialen Welt — was machst du beruflich, wie sind deine Beziehungen? Familie, Freunde, Romantik, die Rollen die du im Leben der Menschen spielst.',
     ob_q3: 'Die letzte — erzähl mir wer du innen bist. Deine Persönlichkeit, was du gerne machst, deine Gewohnheiten, was dir Freude bringt und was dich am meisten herausfordert.',
     ob_tap_mic: 'Tippe auf das Mikrofon und sprich', ob_listening: 'Ich höre zu…', ob_type_instead: 'Oder schreib deine Antwort hier…',
+    find_aligned: 'Finde Menschen, die deine Werte teilen', synergy_short: 'Eure KIs finden die Passung in Sekunden. Privat.', picks_sub: 'Dein KI-Agent hat diese Treffer für dich gefunden', picks_short: 'Dein KI-Agent hat diese Treffer gefunden', how_others_see: 'Wie andere mich sehen', sector_dating_sub: 'Zielgerichtetes Dating · KI-vermittelt', sector_friends_sub: 'Neue Freunde, Begleitung für Aktivitäten', professional_label: 'Beruflich', sector_pro_sub: 'Mentoren, Mitstreiter, Kolleginnen', sector_support_sub: 'Coaches, gegenseitige Verbindlichkeit',
+    reading_convo: 'Lese das Gespräch…', what_did_you_do: 'Was habt ihr gemacht?', what_talk_about: 'Worüber habt ihr geredet?', write_message: 'Schreib eine Nachricht…', therapist_report: 'Bericht für die Therapeutin', therapist_email: 'E-Mail der Therapeutin', auto_send_report: 'Bericht vor jeder Sitzung automatisch senden', day_of_week: 'Wochentag', session_time: 'Uhrzeit der Sitzung', preparing_summary: 'Soma bereitet die Zusammenfassung vor…', preview: 'Vorschau', need_consent: 'Aktiviere oben die Zustimmung zum Senden', need_email: 'Gib die E-Mail der Therapeutin ein', agents_connecting: 'Die beiden Agenten verbinden sich…', convo_failed: 'Gespräch konnte nicht erzeugt werden. Versuch es nochmal.', find_or_add: 'Finde sie auf SOMA oder füge sie manuell hinzu', search_by_code_sub: 'Suche per E-Mail oder Einladungscode — verbinde eure SOMAs', search: 'Suchen', no_soma_yet: 'Sie haben noch kein SOMA — füge sie deinem Kreis hinzu', category: 'Kategorie', context_label: 'Kontext', how_you_know: 'Woher du sie kennst...', search_email_code: 'Suche per E-Mail oder Einladungscode', find_friend: 'Freund finden', home_widget: 'Widget auf dem Homescreen', widget_sub: 'Sieh ihre Momente auf dem Homescreen', meet_people: 'Leute treffen', meet_people_sub: 'Finde Menschen, die zu deinen Zielen und Werten passen', in_relationship: 'Du bist in einer Beziehung', serious_daters: 'Ernsthaft Datende', more_ways: 'WEITERE WEGE ZU VERBINDEN', synergy_scan: 'Synergie-Scan', synergy_sub: 'Eure KIs prüfen die Passung in Sekunden. Privat, sofort.', interested_in: 'Wer interessiert dich?', interested_sub: 'Wir zeigen dir passende Menschen.', no_profiles_match: 'Keine passenden Profile', reset_filters: 'Filter zurücksetzen', example_profile: 'BEISPIELPROFIL', about_them: 'Über sie', as_a_friend: 'Als Freund', interests_caps: 'INTERESSEN', professionally: 'Beruflich', values_caps: 'WERTE', here_to_support: 'Zum Unterstützen da', style_caps: 'STIL', strength_caps: 'STÄRKE', connection_style: 'Verbindungsstil', love_language_caps: 'SPRACHE DER LIEBE', attachment_caps: 'BINDUNGSSTIL', more_info: 'Mehr Infos', create_free_account: 'Kostenloses Konto erstellen', browse_as_guest: 'Als Gast weitersehen', filters: 'Filter', max_distance: 'MAX. ENTFERNUNG', min_age: 'MIN. ALTER', max_age: 'MAX. ALTER', reset: 'Zurücksetzen', apply_filters: 'Filter anwenden', meet_new_people: 'Neue Menschen treffen', meet_new_sub: 'Deine KI trifft ihre KI vor dir.', match_excl: 'Match!', keep_browsing: 'Weiterschauen', meet_more: 'Mehr Leute treffen',
     score_start: 'Fang an zu tracken, um deinen Score zu sehen', score_thriving: 'Es läuft — weiter so ✨', score_momentum: 'Guter Schwung — bleib dran', score_room: 'Da geht noch was — Soma ist bei dir', view_details: 'Details ansehen →', evening_checkin: 'Abend-Check-in', morning_checkin: 'Morgen-Check-in', reflect_day: 'Blick auf deinen Tag', set_intention: 'Setz dir ein Ziel für heute', mood_euphoric: 'Euphorisch', mood_amazing: 'Großartig', mood_great: 'Super', mood_good: 'Gut', mood_okay: 'Okay', mood_meh: 'Naja',
     circle_header: 'Kreis', circle_tagline: 'Private Momente mit Menschen, denen du vertraust', add_first_person: 'Füge die erste Person hinzu', add_someone_to_circle: 'Füge jemanden zu deinem Kreis hinzu', video_ready: 'Video bereit zum Teilen', photo_btn: 'Foto', video_btn: 'Video', share_btn: 'Teilen', message_btn: 'Nachricht', rel_insights_sub: 'Somas Blick auf deine Verbindungen', their_name: 'Ihr Name', found_on_soma: 'Auf SOMA gefunden — die Person wird mit deinem Kreis verbunden', who_are_they: 'Wer ist das für dich?', add_to_circle: 'Zum Kreis hinzufügen', recording: 'Aufnahme…', message_placeholder: 'Nachricht…', no_conversations: 'Noch keine Unterhaltungen', message_someone: 'Schreib jemandem', new_message: 'Neue Nachricht', wellness_score: 'Wohlbefinden-Score', mood_logged: 'Stimmung heute erfasst', change_btn: 'Ändern', your_streaks: 'Deine Serien', talk_anything: 'Sprich über alles', getting_started: 'Erste Schritte', circle_of_life: 'Lebensrad', health_hub: 'Gesundheit', support_label: 'Unterstützung',
     dom_health: 'Gesundheit', dom_career: 'Karriere', dom_finance: 'Finanzen', dom_relationship: 'Liebe', dom_family: 'Familie', dom_growth: 'Wachstum', dom_hobby: 'Freizeit', dom_purpose: 'Sinn', dom_mind: 'Geist', dom_environment: 'Zuhause',
@@ -677,6 +687,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Grazie per aver condiviso. Ora dimmi del tuo mondo sociale — cosa fai per lavoro, come sono le tue relazioni? Famiglia, amici, vita romantica, i ruoli che giochi nella vita delle persone.',
     ob_q3: 'Ultima — dimmi chi sei dentro. La tua personalità, cosa ami fare, le tue abitudini, cosa ti porta gioia e cosa ti sfida di più.',
     ob_tap_mic: 'Tocca il microfono e parla', ob_listening: 'Ascolto…', ob_type_instead: 'O scrivi la tua risposta qui…',
+    find_aligned: 'Trova persone in sintonia con i tuoi valori', synergy_short: 'Le vostre IA trovano l\'intesa in pochi secondi. Privato.', picks_sub: 'Il tuo agente IA ha trovato questi profili per te', picks_short: 'Il tuo agente IA ha trovato questi profili', how_others_see: 'Come mi vedono gli altri', sector_dating_sub: 'Appuntamenti con uno scopo · mediati dall\'IA', sector_friends_sub: 'Nuovi amici e compagni di attività', professional_label: 'Professionale', sector_pro_sub: 'Mentori, collaboratori, colleghi', sector_support_sub: 'Coach e sostegno reciproco',
+    reading_convo: 'Leggo la conversazione…', what_did_you_do: 'Cosa avete fatto?', what_talk_about: 'Di cosa avete parlato?', write_message: 'Scrivi un messaggio…', therapist_report: 'Rapporto per il terapeuta', therapist_email: 'Email del terapeuta', auto_send_report: 'Invia il rapporto prima di ogni seduta', day_of_week: 'Giorno della settimana', session_time: 'Orario della seduta', preparing_summary: 'Soma sta preparando il riepilogo…', preview: 'Anteprima', need_consent: 'Attiva il consenso qui sopra per inviare', need_email: 'Inserisci l\'email del terapeuta per inviare', agents_connecting: 'I due agenti si stanno collegando…', convo_failed: 'Impossibile generare la conversazione. Riprova.', find_or_add: 'Trovali su SOMA o aggiungili a mano', search_by_code_sub: 'Cerca per email o codice invito — collega le vostre SOMA', search: 'Cerca', no_soma_yet: 'Non hanno ancora SOMA — aggiungili alla cerchia', category: 'Categoria', context_label: 'Contesto', how_you_know: 'Come li conosci...', search_email_code: 'Cerca per email o codice invito', find_friend: 'Trova amico', home_widget: 'Widget nella schermata home', widget_sub: 'Vedi i loro momenti sulla schermata home', meet_people: 'Conosci persone', meet_people_sub: 'Trova persone in sintonia con i tuoi obiettivi e valori', in_relationship: 'Sei in una relazione', serious_daters: 'Appuntamenti seri', more_ways: 'ALTRI MODI DI CONNETTERSI', synergy_scan: 'Scansione di sintonia', synergy_sub: 'Le vostre IA verificano l\'intesa in pochi secondi. Privato e immediato.', interested_in: 'Chi ti interessa?', interested_sub: 'Ti mostreremo persone in linea con le tue preferenze.', no_profiles_match: 'Nessun profilo corrisponde', reset_filters: 'Reimposta i filtri', example_profile: 'PROFILO DI ESEMPIO', about_them: 'Su di loro', as_a_friend: 'Come amico', interests_caps: 'INTERESSI', professionally: 'Sul lavoro', values_caps: 'VALORI', here_to_support: 'Qui per sostenere', style_caps: 'STILE', strength_caps: 'PUNTO DI FORZA', connection_style: 'Stile di connessione', love_language_caps: 'LINGUAGGIO DELL\'AMORE', attachment_caps: 'STILE DI ATTACCAMENTO', more_info: 'Altre info', create_free_account: 'Crea un account gratuito', browse_as_guest: 'Continua come ospite', filters: 'Filtri', max_distance: 'DISTANZA MAX', min_age: 'ETÀ MIN', max_age: 'ETÀ MAX', reset: 'Reimposta', apply_filters: 'Applica filtri', meet_new_people: 'Conosci gente nuova', meet_new_sub: 'La tua IA incontra la loro prima di te.', match_excl: 'È un match!', keep_browsing: 'Continua a guardare', meet_more: 'Conosci altre persone',
     score_start: 'Inizia a registrare per vedere il tuo indice', score_thriving: 'Stai fiorendo — continua così ✨', score_momentum: 'Buon ritmo — resta costante', score_room: 'C\'è spazio per crescere — Soma è con te', view_details: 'Vedi dettagli →', evening_checkin: 'Check-in serale', morning_checkin: 'Check-in mattutino', reflect_day: 'Ripensa alla tua giornata', set_intention: 'Definisci la tua intenzione di oggi', mood_euphoric: 'Euforico', mood_amazing: 'Fantastico', mood_great: 'Benissimo', mood_good: 'Bene', mood_okay: 'Così così', mood_meh: 'Insomma',
     circle_header: 'Cerchia', circle_tagline: 'Momenti privati con le persone di cui ti fidi', add_first_person: 'Aggiungi la prima persona', add_someone_to_circle: 'Aggiungi qualcuno alla tua Cerchia', video_ready: 'Video pronto da condividere', photo_btn: 'Foto', video_btn: 'Video', share_btn: 'Condividi', message_btn: 'Messaggio', rel_insights_sub: 'Lo sguardo di Soma sui tuoi legami', their_name: 'Il loro nome', found_on_soma: 'Trovato su SOMA — sarà collegato alla tua cerchia', who_are_they: 'Chi è per te?', add_to_circle: 'Aggiungi alla Cerchia', recording: 'Registrazione…', message_placeholder: 'Messaggio…', no_conversations: 'Ancora nessuna conversazione', message_someone: 'Scrivi a qualcuno', new_message: 'Nuovo messaggio', wellness_score: 'Indice di benessere', mood_logged: 'Umore registrato oggi', change_btn: 'Cambia', your_streaks: 'Le tue serie', talk_anything: 'Parla di qualsiasi cosa', getting_started: 'Per iniziare', circle_of_life: 'Ruota della vita', health_hub: 'Centro salute', support_label: 'Supporto',
     dom_health: 'Salute', dom_career: 'Carriera', dom_finance: 'Finanze', dom_relationship: 'Amore', dom_family: 'Famiglia', dom_growth: 'Crescita', dom_hobby: 'Svago', dom_purpose: 'Scopo', dom_mind: 'Mente', dom_environment: 'Casa',
@@ -737,6 +749,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Obrigada por compartilhar. Agora me fale sobre seu mundo social — o que você faz no trabalho, como são seus relacionamentos? Família, amigos, vida romântica, os papéis que você desempenha na vida das pessoas.',
     ob_q3: 'Última — me fale sobre quem você é por dentro. Sua personalidade, o que você ama fazer, seus hábitos, o que te traz alegria e o que te desafia mais.',
     ob_tap_mic: 'Toque no microfone e fale', ob_listening: 'Ouvindo…', ob_type_instead: 'Ou escreva sua resposta aqui…',
+    find_aligned: 'Encontre pessoas alinhadas com seus valores', synergy_short: 'Suas IAs encontram a sintonia em segundos. Privado.', picks_sub: 'Seu agente de IA encontrou estes perfis para você', picks_short: 'Seu agente de IA encontrou estes perfis', how_others_see: 'Como os outros me veem', sector_dating_sub: 'Namoro com propósito · mediado por IA', sector_friends_sub: 'Novas amizades e parceiros de atividades', professional_label: 'Profissional', sector_pro_sub: 'Mentores, colaboradores, colegas', sector_support_sub: 'Coaches e apoio mútuo',
+    reading_convo: 'Lendo a conversa…', what_did_you_do: 'O que vocês fizeram?', what_talk_about: 'Sobre o que conversaram?', write_message: 'Escreva uma mensagem…', therapist_report: 'Relatório para o terapeuta', therapist_email: 'E-mail do terapeuta', auto_send_report: 'Enviar o relatório antes de cada sessão', day_of_week: 'Dia da semana', session_time: 'Horário da sessão', preparing_summary: 'Soma está preparando o resumo…', preview: 'Prévia', need_consent: 'Ative o consentimento acima para enviar', need_email: 'Informe o e-mail do terapeuta para enviar', agents_connecting: 'Os dois agentes estão se conectando…', convo_failed: 'Não foi possível gerar a conversa. Tente de novo.', find_or_add: 'Encontre no SOMA ou adicione manualmente', search_by_code_sub: 'Busque por e-mail ou código de convite — conecte suas SOMA', search: 'Buscar', no_soma_yet: 'Ainda não têm SOMA — adicione ao seu círculo', category: 'Categoria', context_label: 'Contexto', how_you_know: 'Como você os conhece...', search_email_code: 'Buscar por e-mail ou código de convite', find_friend: 'Encontrar amigo', home_widget: 'Widget na tela inicial', widget_sub: 'Veja os momentos deles na tela inicial', meet_people: 'Conhecer pessoas', meet_people_sub: 'Encontre pessoas alinhadas com seus objetivos e valores', in_relationship: 'Você está em um relacionamento', serious_daters: 'Namoro sério', more_ways: 'MAIS FORMAS DE CONECTAR', synergy_scan: 'Scan de sintonia', synergy_sub: 'Suas IAs verificam a sintonia em segundos. Privado e instantâneo.', interested_in: 'Por quem você se interessa?', interested_sub: 'Vamos mostrar pessoas de acordo com sua preferência.', no_profiles_match: 'Nenhum perfil corresponde', reset_filters: 'Redefinir filtros', example_profile: 'PERFIL DE EXEMPLO', about_them: 'Sobre eles', as_a_friend: 'Como amigo', interests_caps: 'INTERESSES', professionally: 'No trabalho', values_caps: 'VALORES', here_to_support: 'Aqui para apoiar', style_caps: 'ESTILO', strength_caps: 'FORÇA', connection_style: 'Estilo de conexão', love_language_caps: 'LINGUAGEM DO AMOR', attachment_caps: 'APEGO', more_info: 'Mais informações', create_free_account: 'Criar conta gratuita', browse_as_guest: 'Continuar como visitante', filters: 'Filtros', max_distance: 'DISTÂNCIA MÁX.', min_age: 'IDADE MÍN.', max_age: 'IDADE MÁX.', reset: 'Redefinir', apply_filters: 'Aplicar filtros', meet_new_people: 'Conhecer gente nova', meet_new_sub: 'Sua IA conhece a deles antes de você.', match_excl: 'Deu match!', keep_browsing: 'Continuar navegando', meet_more: 'Conhecer mais pessoas',
     score_start: 'Comece a registrar para ver seu índice', score_thriving: 'Florescendo — continue assim ✨', score_momentum: 'Bom ritmo — mantenha a constância', score_room: 'Há espaço para crescer — Soma está com você', view_details: 'Ver detalhes →', evening_checkin: 'Check-in da noite', morning_checkin: 'Check-in da manhã', reflect_day: 'Reflita sobre o seu dia', set_intention: 'Defina sua intenção para hoje', mood_euphoric: 'Eufórico', mood_amazing: 'Incrível', mood_great: 'Ótimo', mood_good: 'Bem', mood_okay: 'Ok', mood_meh: 'Mais ou menos',
     circle_header: 'Círculo', circle_tagline: 'Momentos privados com quem você confia', add_first_person: 'Adicione sua primeira pessoa', add_someone_to_circle: 'Adicione alguém ao seu Círculo', video_ready: 'Vídeo pronto para compartilhar', photo_btn: 'Foto', video_btn: 'Vídeo', share_btn: 'Compartilhar', message_btn: 'Mensagem', rel_insights_sub: 'A visão de Soma sobre suas conexões', their_name: 'O nome deles', found_on_soma: 'Encontrado no SOMA — será conectado ao seu círculo', who_are_they: 'Quem é essa pessoa?', add_to_circle: 'Adicionar ao Círculo', recording: 'Gravando…', message_placeholder: 'Mensagem…', no_conversations: 'Ainda sem conversas', message_someone: 'Escreva para alguém', new_message: 'Nova mensagem', wellness_score: 'Índice de bem-estar', mood_logged: 'Humor registrado hoje', change_btn: 'Alterar', your_streaks: 'Suas sequências', talk_anything: 'Fale sobre qualquer coisa', getting_started: 'Primeiros passos', circle_of_life: 'Roda da vida', health_hub: 'Central de saúde', support_label: 'Apoio',
     dom_health: 'Saúde', dom_career: 'Carreira', dom_finance: 'Finanças', dom_relationship: 'Amor', dom_family: 'Família', dom_growth: 'Crescimento', dom_hobby: 'Lazer', dom_purpose: 'Propósito', dom_mind: 'Mente', dom_environment: 'Casa',
@@ -930,6 +944,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Cảm ơn bạn đã chia sẻ. Bây giờ hãy cho tôi biết về thế giới xã hội — bạn làm gì cho công việc, các mối quan hệ như thế nào? Gia đình, bạn bè, cuộc sống tình cảm, các vai trò bạn đóng trong cuộc sống mọi người.',
     ob_q3: 'Câu cuối — hãy cho tôi biết bạn là ai bên trong. Tính cách, những gì bạn thích làm, thói quen, điều mang lại niềm vui và điều thách thức bạn nhất.',
     ob_tap_mic: 'Nhấn vào micro và nói', ob_listening: 'Đang nghe…', ob_type_instead: 'Hoặc gõ câu trả lời của bạn ở đây…',
+    find_aligned: 'Tìm những người hợp với giá trị của bạn', synergy_short: 'Hai Soma tìm độ hợp trong vài giây. Riêng tư.', picks_sub: 'Trợ lý AI của bạn đã tìm những người này cho bạn', picks_short: 'Trợ lý AI đã tìm ra những người này', how_others_see: 'Người khác thấy mình thế nào', sector_dating_sub: 'Hẹn hò có mục tiêu · qua AI', sector_friends_sub: 'Bạn mới, bạn đồng hành hoạt động', professional_label: 'Công việc', sector_pro_sub: 'Người hướng dẫn, cộng sự, đồng nghiệp', sector_support_sub: 'Người đồng hành, nhắc nhau giữ lời',
+    reading_convo: 'Đang đọc cuộc trò chuyện…', what_did_you_do: 'Hai bạn đã làm gì?', what_talk_about: 'Hai bạn đã nói về điều gì?', write_message: 'Viết tin nhắn…', therapist_report: 'Báo cáo cho chuyên viên trị liệu', therapist_email: 'Email của chuyên viên trị liệu', auto_send_report: 'Tự động gửi báo cáo trước mỗi buổi', day_of_week: 'Ngày trong tuần', session_time: 'Giờ của buổi', preparing_summary: 'Soma đang chuẩn bị bản tóm tắt…', preview: 'Xem trước', need_consent: 'Bật đồng ý ở trên để gửi', need_email: 'Nhập email chuyên viên trị liệu để gửi', agents_connecting: 'Hai trợ lý đang kết nối…', convo_failed: 'Không tạo được cuộc trò chuyện. Thử lại nhé.', find_or_add: 'Tìm họ trên SOMA hoặc thêm thủ công', search_by_code_sub: 'Tìm bằng email hoặc mã mời — kết nối hai Soma của các bạn', search: 'Tìm', no_soma_yet: 'Họ chưa có SOMA — thêm họ vào vòng tròn của bạn', category: 'Nhóm', context_label: 'Bối cảnh', how_you_know: 'Bạn quen họ thế nào...', search_email_code: 'Tìm bằng email hoặc mã mời', find_friend: 'Tìm bạn', home_widget: 'Widget trên màn hình chính', widget_sub: 'Xem khoảnh khắc của họ ngay trên màn hình chính', meet_people: 'Gặp gỡ mọi người', meet_people_sub: 'Tìm những người hợp với mục tiêu và giá trị của bạn', in_relationship: 'Bạn đang trong một mối quan hệ', serious_daters: 'Hẹn hò nghiêm túc', more_ways: 'NHỮNG CÁCH KẾT NỐI KHÁC', synergy_scan: 'Quét độ hợp', synergy_sub: 'Hai Soma kiểm tra độ hợp trong vài giây. Riêng tư, tức thì.', interested_in: 'Bạn quan tâm đến ai?', interested_sub: 'Chúng mình sẽ hiện những người hợp với lựa chọn của bạn.', no_profiles_match: 'Không có hồ sơ nào phù hợp', reset_filters: 'Đặt lại bộ lọc', example_profile: 'HỒ SƠ MẪU', about_them: 'Về họ', as_a_friend: 'Với tư cách bạn bè', interests_caps: 'SỞ THÍCH', professionally: 'Trong công việc', values_caps: 'GIÁ TRỊ SỐNG', here_to_support: 'Ở đây để đồng hành', style_caps: 'PHONG CÁCH', strength_caps: 'ĐIỂM MẠNH', connection_style: 'Phong cách kết nối', love_language_caps: 'NGÔN NGỮ YÊU THƯƠNG', attachment_caps: 'KIỂU GẮN BÓ', more_info: 'Thêm thông tin', create_free_account: 'Tạo tài khoản miễn phí', browse_as_guest: 'Tiếp tục xem với tư cách khách', filters: 'Bộ lọc', max_distance: 'KHOẢNG CÁCH TỐI ĐA', min_age: 'TUỔI TỐI THIỂU', max_age: 'TUỔI TỐI ĐA', reset: 'Đặt lại', apply_filters: 'Áp dụng bộ lọc', meet_new_people: 'Gặp gỡ người mới', meet_new_sub: 'Soma của bạn gặp Soma của họ trước cả bạn.', match_excl: 'Hợp rồi!', keep_browsing: 'Xem tiếp', meet_more: 'Gặp thêm nhiều người',
     score_start: 'Bắt đầu ghi nhận để thấy chỉ số của bạn', score_thriving: 'Đang rất tốt — cứ tiếp tục nhé ✨', score_momentum: 'Đà tốt — giữ đều nhé', score_room: 'Còn chỗ để lớn lên — Soma ở bên bạn', view_details: 'Xem chi tiết →', evening_checkin: 'Ghi nhận buổi tối', morning_checkin: 'Ghi nhận buổi sáng', reflect_day: 'Nhìn lại ngày hôm nay', set_intention: 'Đặt dự định cho hôm nay', mood_euphoric: 'Hân hoan', mood_amazing: 'Tuyệt vời', mood_great: 'Rất tốt', mood_good: 'Ổn', mood_okay: 'Tạm ổn', mood_meh: 'Chán chán',
     circle_header: 'Vòng tròn', circle_tagline: 'Khoảnh khắc riêng tư với những người bạn tin tưởng', add_first_person: 'Thêm người đầu tiên', add_someone_to_circle: 'Thêm ai đó vào Vòng tròn của bạn', video_ready: 'Video đã sẵn sàng để chia sẻ', photo_btn: 'Ảnh', video_btn: 'Video', share_btn: 'Chia sẻ', message_btn: 'Nhắn tin', rel_insights_sub: 'Góc nhìn của Soma về các mối quan hệ của bạn', their_name: 'Tên của họ', found_on_soma: 'Đã tìm thấy trên SOMA — họ sẽ được kết nối với vòng tròn của bạn', who_are_they: 'Họ là ai với bạn?', add_to_circle: 'Thêm vào Vòng tròn', recording: 'Đang ghi âm…', message_placeholder: 'Tin nhắn…', no_conversations: 'Chưa có cuộc trò chuyện nào', message_someone: 'Nhắn tin cho ai đó', new_message: 'Tin nhắn mới', wellness_score: 'Chỉ số an lành', mood_logged: 'Đã ghi tâm trạng hôm nay', change_btn: 'Đổi', your_streaks: 'Chuỗi ngày của bạn', talk_anything: 'Nói về bất cứ điều gì', getting_started: 'Bắt đầu', circle_of_life: 'Vòng tròn cuộc sống', health_hub: 'Trung tâm sức khoẻ', support_label: 'Đồng hành',
     dom_health: 'Sức khoẻ', dom_career: 'Sự nghiệp', dom_finance: 'Tài chính', dom_relationship: 'Tình yêu', dom_family: 'Gia đình', dom_growth: 'Phát triển', dom_hobby: 'Vui chơi', dom_purpose: 'Lẽ sống', dom_mind: 'Tâm trí', dom_environment: 'Tổ ấm',
@@ -990,6 +1006,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: '感谢分享。现在告诉我你的社交世界——你做什么工作，你的关系如何？家庭、朋友、恋爱生活，你在人们生活中扮演的角色。',
     ob_q3: '最后一个——告诉我你内心是谁。你的个性，你喜欢做什么，你的习惯，什么给你带来快乐，什么最挑战你。',
     ob_tap_mic: '点击麦克风并说话', ob_listening: '正在听…', ob_type_instead: '或者在这里输入你的回答…',
+    find_aligned: '找到与你价值观相合的人', synergy_short: '你们的 AI 几秒内找到契合度。私密。', picks_sub: '你的 AI 助手为你物色了这些人', picks_short: '你的 AI 助手物色了这些人', how_others_see: '别人眼中的我', sector_dating_sub: '有目标的交往 · AI 牵线', sector_friends_sub: '新朋友、活动搭子', professional_label: '职业', sector_pro_sub: '导师、合作者、同行', sector_support_sub: '教练、互相督促',
+    reading_convo: '正在读取对话…', what_did_you_do: '你们做了什么？', what_talk_about: '你们聊了什么？', write_message: '写条消息…', therapist_report: '给治疗师的报告', therapist_email: '治疗师的邮箱', auto_send_report: '每次会谈前自动发送报告', day_of_week: '星期', session_time: '会谈时间', preparing_summary: 'Soma 正在准备摘要…', preview: '预览', need_consent: '请先在上方开启同意才能发送', need_email: '请输入治疗师邮箱以发送', agents_connecting: '两个助手正在连接…', convo_failed: '无法生成对话，请重试。', find_or_add: '在 SOMA 上查找，或手动添加', search_by_code_sub: '按邮箱或邀请码查找 — 连接你们的 SOMA', search: '搜索', no_soma_yet: '他们还没有 SOMA — 把他们加入你的圈子', category: '类别', context_label: '背景', how_you_know: '你们是怎么认识的...', search_email_code: '按邮箱或邀请码搜索', find_friend: '查找好友', home_widget: '主屏幕小组件', widget_sub: '在主屏幕上查看他们的动态', meet_people: '认识新的人', meet_people_sub: '找到与你目标和价值观相合的人', in_relationship: '你正在一段关系中', serious_daters: '认真交往', more_ways: '更多连接方式', synergy_scan: '契合度扫描', synergy_sub: '你们的 AI 几秒内查看契合度。私密、即时。', interested_in: '你对谁感兴趣？', interested_sub: '我们会按你的偏好展示合适的人。', no_profiles_match: '没有匹配的资料', reset_filters: '重置筛选', example_profile: '示例资料', about_them: '关于他们', as_a_friend: '作为朋友', interests_caps: '兴趣', professionally: '在工作上', values_caps: '价值观', here_to_support: '在这里给予支持', style_caps: '风格', strength_caps: '优势', connection_style: '连接风格', love_language_caps: '爱的语言', attachment_caps: '依恋类型', more_info: '更多信息', create_free_account: '创建免费账户', browse_as_guest: '以访客身份继续浏览', filters: '筛选', max_distance: '最大距离', min_age: '最小年龄', max_age: '最大年龄', reset: '重置', apply_filters: '应用筛选', meet_new_people: '认识新朋友', meet_new_sub: '你的 AI 会先于你认识对方的 AI。', match_excl: '配对成功！', keep_browsing: '继续浏览', meet_more: '认识更多人',
     score_start: '开始记录以查看你的指数', score_thriving: '状态很好 — 继续保持 ✨', score_momentum: '势头不错 — 保持下去', score_room: '还有成长空间 — Soma 陪着你', view_details: '查看详情 →', evening_checkin: '晚间记录', morning_checkin: '早间记录', reflect_day: '回顾你的一天', set_intention: '为今天定一个意图', mood_euphoric: '狂喜', mood_amazing: '超棒', mood_great: '很好', mood_good: '不错', mood_okay: '还行', mood_meh: '一般般',
     circle_header: '圈子', circle_tagline: '与你信任的人分享私密时刻', add_first_person: '添加第一个人', add_someone_to_circle: '把某人加入你的圈子', video_ready: '视频已准备好分享', photo_btn: '照片', video_btn: '视频', share_btn: '分享', message_btn: '发消息', rel_insights_sub: 'Soma 对你人际关系的观察', their_name: '他们的名字', found_on_soma: '在 SOMA 上找到了 — 他们将连接到你的圈子', who_are_they: '他们是谁？', add_to_circle: '加入圈子', recording: '正在录制…', message_placeholder: '消息…', no_conversations: '还没有对话', message_someone: '给某人发消息', new_message: '新消息', wellness_score: '健康指数', mood_logged: '今天已记录心情', change_btn: '更改', your_streaks: '你的连续记录', talk_anything: '聊聊任何事', getting_started: '开始使用', circle_of_life: '生命之轮', health_hub: '健康中心', support_label: '支持',
     dom_health: '健康', dom_career: '事业', dom_finance: '财务', dom_relationship: '爱', dom_family: '家人', dom_growth: '成长', dom_hobby: '乐趣', dom_purpose: '意义', dom_mind: '心智', dom_environment: '家',
@@ -1050,6 +1068,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'シェアしてくれてありがとう。次に社会的な世界について教えてください — 仕事は何をしていますか、人間関係はどうですか？家族、友人、恋愛、人々の生活で果たしている役割など。',
     ob_q3: '最後 — 内面の自分を教えてください。あなたの性格、好きなこと、習慣、喜びをもたらすもの、そして最も挑戦的なことを。',
     ob_tap_mic: 'マイクをタップして話す', ob_listening: '聞いています…', ob_type_instead: 'またはここに回答を入力してください…',
+    find_aligned: 'あなたの価値観に合う人を見つける', synergy_short: 'AI同士が数秒で相性を見つけます。プライベート。', picks_sub: 'あなたのAIがこれらの相手を見つけました', picks_short: 'あなたのAIが見つけた相手', how_others_see: '他人から見た自分', sector_dating_sub: '目的のある出会い · AIが仲介', sector_friends_sub: '新しい友達、一緒に何かする仲間', professional_label: '仕事関係', sector_pro_sub: 'メンター、協力者、仲間', sector_support_sub: 'コーチ、伴走者',
+    reading_convo: '会話を読んでいます…', what_did_you_do: '何をしましたか？', what_talk_about: '何について話しましたか？', write_message: 'メッセージを書く…', therapist_report: 'セラピストへのレポート', therapist_email: 'セラピストのメール', auto_send_report: '毎回のセッション前に自動送信', day_of_week: '曜日', session_time: 'セッションの時間', preparing_summary: 'Somaが要約を準備しています…', preview: 'プレビュー', need_consent: '送信するには上の同意をオンに', need_email: '送信にはセラピストのメールが必要です', agents_connecting: '2つのエージェントが接続しています…', convo_failed: '会話を生成できませんでした。もう一度お試しください。', find_or_add: 'SOMAで探すか、手動で追加', search_by_code_sub: 'メールか招待コードで検索 — SOMA同士をつなぐ', search: '検索', no_soma_yet: 'まだSOMAを使っていません — サークルに追加', category: 'カテゴリ', context_label: '背景', how_you_know: 'どういう知り合いですか...', search_email_code: 'メールか招待コードで検索', find_friend: '友達を探す', home_widget: 'ホーム画面ウィジェット', widget_sub: 'ホーム画面で彼らの瞬間を見る', meet_people: '人と出会う', meet_people_sub: 'あなたの目標と価値観に合う人を見つける', in_relationship: 'あなたは交際中です', serious_daters: '真剣な出会い', more_ways: '他のつながり方', synergy_scan: '相性スキャン', synergy_sub: 'AI同士が数秒で相性を確認。プライベートで即座に。', interested_in: 'どんな人に興味がありますか？', interested_sub: 'ご希望に合う人を表示します。', no_profiles_match: '一致するプロフィールがありません', reset_filters: 'フィルターをリセット', example_profile: 'サンプルのプロフィール', about_them: 'その人について', as_a_friend: '友達として', interests_caps: '興味', professionally: '仕事では', values_caps: '価値観', here_to_support: '支えるためにここに', style_caps: 'スタイル', strength_caps: '強み', connection_style: 'つながり方', love_language_caps: '愛の言語', attachment_caps: '愛着スタイル', more_info: 'もっと見る', create_free_account: '無料アカウントを作成', browse_as_guest: 'ゲストのまま見る', filters: 'フィルター', max_distance: '最大距離', min_age: '最低年齢', max_age: '最高年齢', reset: 'リセット', apply_filters: 'フィルターを適用', meet_new_people: '新しい人と出会う', meet_new_sub: 'あなたのAIが先に相手のAIと出会います。', match_excl: 'マッチ！', keep_browsing: '見続ける', meet_more: 'もっと出会う',
     score_start: '記録を始めるとスコアが表示されます', score_thriving: '順調です — この調子で ✨', score_momentum: 'いい流れです — 続けましょう', score_room: '伸びしろがあります — Somaがそばにいます', view_details: '詳細を見る →', evening_checkin: '夜のチェックイン', morning_checkin: '朝のチェックイン', reflect_day: '今日を振り返る', set_intention: '今日の意図を決める', mood_euphoric: '最高', mood_amazing: 'すごくいい', mood_great: 'いい感じ', mood_good: 'まあまあ', mood_okay: '普通', mood_meh: 'いまいち',
     circle_header: 'サークル', circle_tagline: '信頼できる人とのプライベートな時間', add_first_person: '最初の人を追加', add_someone_to_circle: 'サークルに誰かを追加', video_ready: '共有する動画の準備ができました', photo_btn: '写真', video_btn: '動画', share_btn: 'シェア', message_btn: 'メッセージ', rel_insights_sub: 'あなたのつながりについてのSomaの見方', their_name: 'その人の名前', found_on_soma: 'SOMAで見つかりました — あなたのサークルにつながります', who_are_they: 'その人は誰ですか？', add_to_circle: 'サークルに追加', recording: '録音中…', message_placeholder: 'メッセージ…', no_conversations: 'まだ会話がありません', message_someone: '誰かにメッセージを送る', new_message: '新しいメッセージ', wellness_score: 'ウェルネススコア', mood_logged: '今日の気分を記録しました', change_btn: '変更', your_streaks: 'あなたの連続記録', talk_anything: 'なんでも話そう', getting_started: 'はじめに', circle_of_life: '人生の輪', health_hub: '健康ハブ', support_label: 'サポート',
     dom_health: '健康', dom_career: '仕事', dom_finance: 'お金', dom_relationship: '愛', dom_family: '家族', dom_growth: '成長', dom_hobby: '楽しみ', dom_purpose: '目的', dom_mind: '心', dom_environment: '住まい',
@@ -1110,6 +1130,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'شكراً للمشاركة. الآن أخبرني عن عالمك الاجتماعي — ماذا تعمل، كيف هي علاقاتك؟ العائلة والأصدقاء والحياة العاطفية والأدوار التي تلعبها في حياة الناس.',
     ob_q3: 'السؤال الأخير — أخبرني من أنت في الداخل. شخصيتك وما تحب فعله وعاداتك وما يجلب لك الفرح وما يتحداك أكثر.',
     ob_tap_mic: 'اضغط على الميكروفون وتحدث', ob_listening: 'أستمع…', ob_type_instead: 'أو اكتب إجابتك هنا…',
+    find_aligned: 'اعثر على من يشاركونك قيمك', synergy_short: 'يجد الذكاءان توافقكما في ثوانٍ. بخصوصية.', picks_sub: 'وكيلك الذكي وجد لك هذه التطابقات', picks_short: 'وكيلك الذكي وجد هذه التطابقات', how_others_see: 'كيف يراني الآخرون', sector_dating_sub: 'مواعدة هادفة · بوساطة الذكاء', sector_friends_sub: 'أصدقاء جدد ورفاق أنشطة', professional_label: 'مهني', sector_pro_sub: 'موجّهون، متعاونون، أقران', sector_support_sub: 'مدربون ومساءلة',
+    reading_convo: 'جارٍ قراءة المحادثة…', what_did_you_do: 'ماذا فعلتما؟', what_talk_about: 'عمّ تحدثتما؟', write_message: 'اكتب رسالة…', therapist_report: 'تقرير للمعالج', therapist_email: 'بريد المعالج', auto_send_report: 'إرسال التقرير تلقائيًا قبل كل جلسة', day_of_week: 'يوم الأسبوع', session_time: 'وقت الجلسة', preparing_summary: 'Soma يُعد الملخص…', preview: 'معاينة', need_consent: 'فعّل الموافقة أعلاه للإرسال', need_email: 'أدخل بريد المعالج للإرسال', agents_connecting: 'الوكيلان يتصلان…', convo_failed: 'تعذّر إنشاء المحادثة. حاول مرة أخرى.', find_or_add: 'اعثر عليهم على SOMA أو أضفهم يدويًا', search_by_code_sub: 'ابحث بالبريد أو رمز الدعوة — اربط SOMA لديكما', search: 'بحث', no_soma_yet: 'ليس لديهم SOMA بعد — أضفهم إلى دائرتك', category: 'الفئة', context_label: 'السياق', how_you_know: 'كيف تعرفهم...', search_email_code: 'ابحث بالبريد أو رمز الدعوة', find_friend: 'ابحث عن صديق', home_widget: 'أداة الشاشة الرئيسية', widget_sub: 'شاهد لحظاتهم على شاشتك الرئيسية', meet_people: 'تعرّف على أشخاص', meet_people_sub: 'اعثر على من يشاركونك أهدافك وقيمك', in_relationship: 'أنت في علاقة', serious_daters: 'مواعدة جادة', more_ways: 'طرق أخرى للتواصل', synergy_scan: 'فحص التوافق', synergy_sub: 'يتحقق الذكاءان من توافقكما في ثوانٍ. خاص وفوري.', interested_in: 'بمن تهتم؟', interested_sub: 'سنعرض لك أشخاصًا يوافقون تفضيلك.', no_profiles_match: 'لا توجد ملفات مطابقة', reset_filters: 'إعادة ضبط المرشحات', example_profile: 'ملف تعريفي تجريبي', about_them: 'عنهم', as_a_friend: 'كصديق', interests_caps: 'الاهتمامات', professionally: 'مهنيًا', values_caps: 'القيم', here_to_support: 'هنا للدعم', style_caps: 'الأسلوب', strength_caps: 'القوة', connection_style: 'أسلوب التواصل', love_language_caps: 'لغة الحب', attachment_caps: 'نمط التعلّق', more_info: 'مزيد من المعلومات', create_free_account: 'أنشئ حسابًا مجانيًا', browse_as_guest: 'تابع كضيف', filters: 'المرشحات', max_distance: 'أقصى مسافة', min_age: 'أدنى عمر', max_age: 'أقصى عمر', reset: 'إعادة ضبط', apply_filters: 'تطبيق المرشحات', meet_new_people: 'تعرّف على أشخاص جدد', meet_new_sub: 'ذكاؤك يلتقي بذكائهم قبلك.', match_excl: 'تطابق!', keep_browsing: 'تابع التصفح', meet_more: 'تعرّف على المزيد',
     score_start: 'ابدأ التسجيل لترى مؤشرك', score_thriving: 'أنت مزدهر — واصل ✨', score_momentum: 'إيقاع جيد — حافظ على استمرارك', score_room: 'هناك مجال للنمو — Soma معك', view_details: 'عرض التفاصيل →', evening_checkin: 'تسجيل المساء', morning_checkin: 'تسجيل الصباح', reflect_day: 'تأمّل يومك', set_intention: 'حدّد نيتك لليوم', mood_euphoric: 'نشوة', mood_amazing: 'رائع', mood_great: 'ممتاز', mood_good: 'جيد', mood_okay: 'لا بأس', mood_meh: 'عادي',
     circle_header: 'الدائرة', circle_tagline: 'لحظات خاصة مع من تثق بهم', add_first_person: 'أضف أول شخص', add_someone_to_circle: 'أضف شخصًا إلى دائرتك', video_ready: 'الفيديو جاهز للمشاركة', photo_btn: 'صورة', video_btn: 'فيديو', share_btn: 'مشاركة', message_btn: 'رسالة', rel_insights_sub: 'نظرة Soma إلى علاقاتك', their_name: 'اسمه', found_on_soma: 'وُجد على SOMA — سيتم ربطه بدائرتك', who_are_they: 'من هو بالنسبة لك؟', add_to_circle: 'أضف إلى الدائرة', recording: 'جارٍ التسجيل…', message_placeholder: 'رسالة…', no_conversations: 'لا توجد محادثات بعد', message_someone: 'راسل شخصًا', new_message: 'رسالة جديدة', wellness_score: 'مؤشر العافية', mood_logged: 'تم تسجيل مزاجك اليوم', change_btn: 'تغيير', your_streaks: 'سلاسلك', talk_anything: 'تحدّث عن أي شيء', getting_started: 'البداية', circle_of_life: 'دائرة الحياة', health_hub: 'مركز الصحة', support_label: 'الدعم',
     dom_health: 'الصحة', dom_career: 'المسيرة المهنية', dom_finance: 'المال', dom_relationship: 'الحب', dom_family: 'العائلة', dom_growth: 'النمو', dom_hobby: 'المتعة', dom_purpose: 'المعنى', dom_mind: 'العقل', dom_environment: 'البيت',
@@ -8468,7 +8490,7 @@ function HowOthersSeeMe({ profile, onEdit, onClose }: { profile: UserProfile; on
           <Ionicons name="arrow-back" size={20} color={t.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>How Others See Me</Text>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>{tr('how_others_see')}</Text>
           <Text style={{ fontSize: 12, color: t.textSub }}>
             {generating ? 'SOMA is building your profiles…' : 'Tap any profile to adjust'}
           </Text>
@@ -8531,7 +8553,7 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 22, fontWeight: '800', color: t.text }}>✦ {tr('soma_picks')}</Text>
-          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Your AI agent scouted these matches</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>{tr('picks_short')}</Text>
         </View>
       </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100, gap: 12 }}>
@@ -8583,7 +8605,7 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 100, gap: 14 }}>
       <View style={{ marginBottom: 8 }}>
         <Text style={[g.greeting, { fontSize: 28, color: t.text }]}>{tr('outer_world')}</Text>
-        <Text style={[g.auraSub, { marginTop: 4, color: t.textSub }]}>Find people aligned with your values</Text>
+        <Text style={[g.auraSub, { marginTop: 4, color: t.textSub }]}>{tr('find_aligned')}</Text>
       </View>
 
       {/* Synergy Scan — always featured */}
@@ -8592,8 +8614,8 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
           <Ionicons name="flash-outline" size={26} color={t.accent} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>Synergy Scan</Text>
-          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Your AIs find your fit in seconds. Private.</Text>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>{tr('synergy_scan')}</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>{tr('synergy_short')}</Text>
         </View>
         <Text style={{ color: t.accent, fontSize: 22 }}>›</Text>
       </TouchableOpacity>
@@ -8605,7 +8627,7 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>{tr('soma_picks')}</Text>
-          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Your AI agent scouted these matches for you</Text>
+          <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>{tr('picks_sub')}</Text>
         </View>
         <Text style={{ color: t.accent, fontSize: 22 }}>›</Text>
       </TouchableOpacity>
@@ -8614,10 +8636,10 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
       {([
         isInRelationship
           ? { id: 'romantic', icon: 'heart-outline' as keyof typeof Ionicons.glyphMap, label: "You're in a relationship", sub: 'Dating is hidden while committed.', color: '#EC4899', disabled: true }
-          : { id: 'romantic', icon: 'heart-outline' as keyof typeof Ionicons.glyphMap, label: 'Serious Daters', sub: 'Goal-driven dating · AI-mediated', color: '#F6379B', disabled: false },
-        { id: 'friends', icon: 'people-outline' as keyof typeof Ionicons.glyphMap, label: 'Friends', sub: 'New friends, activity buddies', color: '#1D9E75', disabled: false },
-        { id: 'professional', icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap, label: 'Professional', sub: 'Mentors, collaborators, peers', color: '#378ADD', disabled: false },
-        { id: 'support', icon: 'headset-outline' as keyof typeof Ionicons.glyphMap, label: 'Support', sub: 'Coaches, accountability', color: '#D85A30', disabled: false },
+          : { id: 'romantic', icon: 'heart-outline' as keyof typeof Ionicons.glyphMap, label: tr('serious_daters'), sub: tr('sector_dating_sub'), color: '#F6379B', disabled: false },
+        { id: 'friends', icon: 'people-outline' as keyof typeof Ionicons.glyphMap, label: tr('type_friends'), sub: tr('sector_friends_sub'), color: '#1D9E75', disabled: false },
+        { id: 'professional', icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap, label: tr('professional_label'), sub: tr('sector_pro_sub'), color: '#378ADD', disabled: false },
+        { id: 'support', icon: 'headset-outline' as keyof typeof Ionicons.glyphMap, label: tr('support_label'), sub: tr('sector_support_sub'), color: '#D85A30', disabled: false },
       ]).map(cat => (
         <TouchableOpacity key={cat.id} onPress={() => !cat.disabled && onMeetPeople(cat.id as any)} activeOpacity={cat.disabled ? 1 : 0.7} style={{ borderRadius: 18, padding: 16, backgroundColor: t.card, borderWidth: 0.5, borderColor: t.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: cat.color + '18', alignItems: 'center', justifyContent: 'center' }}>
@@ -8642,7 +8664,7 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
               <Text style={{ fontSize: 22 }}>🪞</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>How Others See Me</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{tr('how_others_see')}</Text>
               <Text style={{ fontSize: 13, color: t.textSub }}>
                 {setCount > 0 ? `${setCount}/4 profiles set · tap to adjust` : '4 profiles · SOMA writes, you refine'}
               </Text>
@@ -11815,7 +11837,7 @@ Be specific and human. Under 120 words total.`
               <TouchableOpacity onPress={() => setSomaPanel(false)}><Text style={{ color: '#A89BFA', fontSize: 18 }}>×</Text></TouchableOpacity>
             </View>
             {somaAdviceLoading
-              ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><ActivityIndicator color="#7B6EF6" size="small" /><Text style={{ color: '#A89BFA', fontSize: 13 }}>Reading the conversation…</Text></View>
+              ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><ActivityIndicator color="#7B6EF6" size="small" /><Text style={{ color: '#A89BFA', fontSize: 13 }}>{tr('reading_convo')}</Text></View>
               : <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 21 }}>{somaAdvice}</Text>
             }
             {!somaAdviceLoading && (
@@ -12090,7 +12112,7 @@ Be specific and human. Under 120 words total.`
             style={{ backgroundColor: t.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: t.border, marginBottom: 20, fontSize: 15, color: t.text, minHeight: 80, textAlignVertical: 'top' }}
             value={logNote}
             onChangeText={setLogNote}
-            placeholder="What did you talk about?"
+            placeholder={tr('what_talk_about')}
             placeholderTextColor={t.textTertiary}
             multiline
           />
@@ -12141,7 +12163,7 @@ Be specific and human. Under 120 words total.`
               value={nudgeText}
               onChangeText={setNudgeText}
               multiline
-              placeholder="Write a message…"
+              placeholder={tr('write_message')}
               placeholderTextColor={t.textTertiary}
             />
           )}
@@ -12186,7 +12208,7 @@ Be specific and human. Under 120 words total.`
             <TouchableOpacity onPress={() => setReportModal(null)}>
               <Text style={{ fontSize: 16, color: '#7B6EF6' }}>✕ Close</Text>
             </TouchableOpacity>
-            <Text style={[g.logo, { flex: 1, textAlign: 'center', fontSize: 20, marginBottom: 0 }]}>Therapist Report</Text>
+            <Text style={[g.logo, { flex: 1, textAlign: 'center', fontSize: 20, marginBottom: 0 }]}>{tr('therapist_report')}</Text>
           </View>
 
           <Text style={[g.secLabel, { marginBottom: 6 }]}>Therapist: {reportModal?.person.name}</Text>
@@ -12194,7 +12216,7 @@ Be specific and human. Under 120 words total.`
             Soma will analyze your recent moods, memories, and diary entries to generate a concise clinical summary.
           </Text>
 
-          <Text style={[g.fieldLabel, { marginBottom: 6 }]}>Therapist's email</Text>
+          <Text style={[g.fieldLabel, { marginBottom: 6 }]}>{tr('therapist_email')}</Text>
           <TextInput
             style={[g.settingsInput, { marginBottom: 16 }]}
             value={therapistEmail}
@@ -12207,14 +12229,14 @@ Be specific and human. Under 120 words total.`
 
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
             <Switch value={consentOn} onValueChange={v => { setConsentOn(v); DB.updateCirclePerson(reportModal!.person.id, { shareReports: v }); syncTherapyNotifications(DB.get().circle) }} trackColor={{ true: '#7B6EF6', false: '#E0DFF6' }} thumbColor="#fff" />
-            <Text style={{ marginLeft: 12, fontSize: 14, color: '#3A3D56', flex: 1 }}>Auto-send report to therapist before each session</Text>
+            <Text style={{ marginLeft: 12, fontSize: 14, color: '#3A3D56', flex: 1 }}>{tr('auto_send_report')}</Text>
           </View>
 
           {consentOn && (
             <View style={{ backgroundColor: '#F3F1FE', borderRadius: 14, padding: 16, marginBottom: 20 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#7B6EF6', marginBottom: 10 }}>📅 Session schedule (for auto-send)</Text>
               <Text style={{ fontSize: 12, color: '#9A9DB2', marginBottom: 8 }}>Soma will auto-send the report 2 hours before your session.</Text>
-              <Text style={{ fontSize: 13, color: '#3A3D56', marginBottom: 6 }}>Day of week</Text>
+              <Text style={{ fontSize: 13, color: '#3A3D56', marginBottom: 6 }}>{tr('day_of_week')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
                 {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => (
                   <TouchableOpacity key={d} onPress={() => { setSessionDay(i + 1); DB.updateCirclePerson(reportModal!.person.id, { sessionDay: i + 1, sessionHour }); syncTherapyNotifications(DB.get().circle) }}
@@ -12223,7 +12245,7 @@ Be specific and human. Under 120 words total.`
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={{ fontSize: 13, color: '#3A3D56', marginBottom: 6 }}>Session time</Text>
+              <Text style={{ fontSize: 13, color: '#3A3D56', marginBottom: 6 }}>{tr('session_time')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                 {[8,9,10,11,12,13,14,15,16,17,18,19,20].map(h => (
                   <TouchableOpacity key={h} onPress={() => { setSessionHour(h); if (sessionDay) { DB.updateCirclePerson(reportModal!.person.id, { sessionDay, sessionHour: h }); syncTherapyNotifications(DB.get().circle) } }}
@@ -12249,13 +12271,13 @@ Be specific and human. Under 120 words total.`
           {reportLoading && (
             <View style={{ alignItems: 'center', paddingVertical: 30 }}>
               <ActivityIndicator color="#7B6EF6" />
-              <Text style={{ marginTop: 12, color: '#9A9DB2', fontSize: 14 }}>Soma is preparing the summary…</Text>
+              <Text style={{ marginTop: 12, color: '#9A9DB2', fontSize: 14 }}>{tr('preparing_summary')}</Text>
             </View>
           )}
 
           {!!reportText && !reportLoading && (
             <View>
-              <Text style={[g.secLabel, { marginBottom: 10 }]}>Preview</Text>
+              <Text style={[g.secLabel, { marginBottom: 10 }]}>{tr('preview')}</Text>
               <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E5E3F5', marginBottom: 16 }}>
                 <Text style={{ fontSize: 13, color: '#3A3D56', lineHeight: 20 }}>{reportText}</Text>
               </View>
@@ -12265,8 +12287,8 @@ Be specific and human. Under 120 words total.`
                   ? <ActivityIndicator color="#fff" />
                   : <Text style={g.primaryBtnTxt}>{reportSent ? '✓ Sent!' : `Send to ${reportModal?.person.name}`}</Text>}
               </TouchableOpacity>
-              {!consentOn && <Text style={{ fontSize: 12, color: '#E57373', textAlign: 'center' }}>Enable consent toggle above to send</Text>}
-              {!therapistEmail && <Text style={{ fontSize: 12, color: '#E57373', textAlign: 'center', marginTop: 4 }}>Enter therapist's email to send</Text>}
+              {!consentOn && <Text style={{ fontSize: 12, color: '#E57373', textAlign: 'center' }}>{tr('need_consent')}</Text>}
+              {!therapistEmail && <Text style={{ fontSize: 12, color: '#E57373', textAlign: 'center', marginTop: 4 }}>{tr('need_email')}</Text>}
               <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => { setReportText(''); generateReport() }}>
                 <Text style={{ color: '#7B6EF6', fontSize: 13 }}>↺ Regenerate</Text>
               </TouchableOpacity>
@@ -12297,10 +12319,10 @@ Be specific and human. Under 120 words total.`
             {agentLoading ? (
               <View style={{ alignItems: 'center', paddingVertical: 48 }}>
                 <ActivityIndicator color="#7B6EF6" size="large" />
-                <Text style={{ color: t.textTertiary, marginTop: 16, fontSize: 14 }}>The two agents are connecting…</Text>
+                <Text style={{ color: t.textTertiary, marginTop: 16, fontSize: 14 }}>{tr('agents_connecting')}</Text>
               </View>
             ) : agentLines.length === 0 ? (
-              <Text style={{ color: t.textSub, textAlign: 'center', paddingVertical: 40 }}>Could not generate a conversation. Try again.</Text>
+              <Text style={{ color: t.textSub, textAlign: 'center', paddingVertical: 40 }}>{tr('convo_failed')}</Text>
             ) : (
               agentLines.map((line, i) => {
                 const isA = line.speaker === 'A'
@@ -12338,12 +12360,12 @@ Be specific and human. Under 120 words total.`
             <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Close</Text>
           </TouchableOpacity>
           <Text style={[g.logo, { fontSize: 22, marginBottom: 4 }]}>➕ Add someone</Text>
-          <Text style={[g.logoSub, { marginBottom: 24 }]}>Find them on SOMA or add manually</Text>
+          <Text style={[g.logoSub, { marginBottom: 24 }]}>{tr('find_or_add')}</Text>
 
           {/* ── Find on SOMA ── */}
           <View style={{ backgroundColor: '#10B98110', borderRadius: 18, borderWidth: 1, borderColor: '#10B98130', padding: 18, marginBottom: 24 }}>
             <Text style={{ fontSize: 14, fontWeight: '800', color: '#10B981', marginBottom: 4 }}>🔍 Find on SOMA</Text>
-            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 12 }}>Search by their email or invite code — connect your SOMA AIs</Text>
+            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 12 }}>{tr('search_by_code_sub')}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
               {([
                 { type: 'friend' as const, icon: '🤝' },
@@ -12378,7 +12400,7 @@ Be specific and human. Under 120 words total.`
               onPress={lookupCode}
               disabled={findLoading || !findCode.trim()}
               style={{ backgroundColor: findLoading || !findCode.trim() ? '#4A4870' : '#10B981', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: findResults.length > 0 ? 14 : 0 }}>
-              {findLoading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Search</Text>}
+              {findLoading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>{tr('search')}</Text>}
             </TouchableOpacity>
             {findResults.map((user, i) => (
               <View key={i} style={{ backgroundColor: t.card, borderRadius: 14, borderWidth: 1, borderColor: '#10B98140', padding: 14, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -12401,19 +12423,19 @@ Be specific and human. Under 120 words total.`
           {/* ── Add manually ── */}
           <View style={{ backgroundColor: t.card, borderRadius: 18, borderWidth: 1, borderColor: t.border, padding: 18 }}>
             <Text style={{ fontSize: 14, fontWeight: '800', color: t.accent, marginBottom: 4 }}>✏️ Add manually</Text>
-            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 16 }}>They don't have SOMA yet — add them to your circle</Text>
+            <Text style={{ fontSize: 12, color: t.textSub, marginBottom: 16 }}>{tr('no_soma_yet')}</Text>
 
             <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 6 }}>Name</Text>
             <TextInput
               value={addName}
               onChangeText={setAddName}
-              placeholder="Their name"
+              placeholder={tr('their_name')}
               placeholderTextColor={t.textTertiary}
               autoCorrect={false}
               style={{ backgroundColor: t.bg, borderRadius: 12, borderWidth: 1, borderColor: t.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: t.text, marginBottom: 16 }}
             />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>Category</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 10 }}>{tr('category')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               {([
                 { type: 'family' as const, icon: '👨‍👩‍👧', label: 'Family', defaultRole: 'Dad' },
@@ -12458,7 +12480,7 @@ Be specific and human. Under 120 words total.`
             <TextInput
               value={addContext}
               onChangeText={setAddContext}
-              placeholder="How you know them..."
+              placeholder={tr('how_you_know')}
               placeholderTextColor={t.textTertiary}
               multiline
               numberOfLines={2}
@@ -12490,7 +12512,7 @@ Be specific and human. Under 120 words total.`
             <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Close</Text>
           </TouchableOpacity>
           <Text style={[g.logo, { fontSize: 22, marginBottom: 4 }]}>🔍 Find a friend</Text>
-          <Text style={[g.logoSub, { marginBottom: 24 }]}>Search by email address or invite code</Text>
+          <Text style={[g.logoSub, { marginBottom: 24 }]}>{tr('search_email_code')}</Text>
 
           <TextInput
             value={findCode}
@@ -12511,7 +12533,7 @@ Be specific and human. Under 120 words total.`
             style={{ backgroundColor: findLoading || !findCode.trim() ? '#4A4870' : '#7B6EF6', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 20 }}>
             {findLoading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Find friend</Text>}
+              : <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{tr('find_friend')}</Text>}
           </TouchableOpacity>
 
           {findResults.map((user, i) => (
@@ -12536,7 +12558,7 @@ Be specific and human. Under 120 words total.`
       <View style={{ marginTop: 24, marginBottom: 8, backgroundColor: t.card, borderRadius: 22, borderWidth: 1, borderColor: t.border, overflow: 'hidden' }}>
         {/* Widget mockup */}
         <View style={{ backgroundColor: '#1A1A2E', padding: 16, alignItems: 'center' }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' }}>Home Screen Widget</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' }}>{tr('home_widget')}</Text>
           <View style={{ width: 156, height: 156, borderRadius: 28, backgroundColor: '#12122A', borderWidth: 1, borderColor: 'rgba(123,110,246,0.4)', padding: 12, justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
@@ -12555,7 +12577,7 @@ Be specific and human. Under 120 words total.`
         </View>
         {/* CTA */}
         <View style={{ padding: 16 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: t.text, marginBottom: 4 }}>See their moments on your home screen</Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: t.text, marginBottom: 4 }}>{tr('widget_sub')}</Text>
           <Text style={{ fontSize: 13, color: t.textSub, marginBottom: 14 }}>Add the SOMA widget to see circle moments without opening the app. Available on iOS and Android.</Text>
           <TouchableOpacity
             onPress={() => {
@@ -12775,8 +12797,8 @@ function MyProfile({ profile, onBack }: { profile: UserProfile; onBack: () => vo
         <View style={g.dSection}>
           <Text style={g.dH}>Your connection style</Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={g.styleCard}><Text style={g.styleLbl}>LOVE LANGUAGE</Text><Text style={g.styleVal}>💝 {d.loveLanguage}</Text></View>
-            <View style={g.styleCard}><Text style={g.styleLbl}>ATTACHMENT</Text><Text style={g.styleVal}>🔗 {d.attachment}</Text></View>
+            <View style={g.styleCard}><Text style={g.styleLbl}>{tr('love_language_caps')}</Text><Text style={g.styleVal}>💝 {d.loveLanguage}</Text></View>
+            <View style={g.styleCard}><Text style={g.styleLbl}>{tr('attachment_caps')}</Text><Text style={g.styleVal}>🔗 {d.attachment}</Text></View>
           </View>
         </View>
 
@@ -13785,8 +13807,8 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           <TouchableOpacity onPress={onBack} style={{ marginBottom: 16 }}>
             <Text style={g.backLink}>← Back</Text>
           </TouchableOpacity>
-          <Text style={[g.greeting, { marginBottom: 4, color: t.text }]}>Meet people</Text>
-          <Text style={{ fontSize: 15, color: t.textSub, lineHeight: 22 }}>Find people aligned with your goals and values</Text>
+          <Text style={[g.greeting, { marginBottom: 4, color: t.text }]}>{tr('meet_people')}</Text>
+          <Text style={{ fontSize: 15, color: t.textSub, lineHeight: 22 }}>{tr('meet_people_sub')}</Text>
         </View>
 
         {/* Relationship status banner or Dating featured card */}
@@ -13796,7 +13818,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               <Ionicons name="heart" size={22} color="#F6379B" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#EC4899' }}>You're in a relationship</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#EC4899' }}>{tr('in_relationship')}</Text>
               <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>Dating is hidden. Explore friends, career & more below.</Text>
             </View>
           </View>
@@ -13816,7 +13838,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                   <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(246,55,155,0.35)', alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="heart" size={17} color="#fff" />
                   </View>
-                  <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff' }}>Serious Daters</Text>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff' }}>{tr('serious_daters')}</Text>
                   <View style={{ marginLeft: 'auto' as any, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 3 }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>6.3K</Text>
                   </View>
@@ -13828,7 +13850,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
         )}
 
         {/* Other Categories */}
-        <Text style={[g.secLabel, { marginBottom: 14, marginTop: 4 }]}>MORE WAYS TO CONNECT</Text>
+        <Text style={[g.secLabel, { marginBottom: 14, marginTop: 4 }]}>{tr('more_ways')}</Text>
 
         <View style={{ gap: 10 }}>
           {MEET_CATEGORIES.slice(1).map(cat => (
@@ -13868,8 +13890,8 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             <Ionicons name="flash-outline" size={22} color="#7B6EF6" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.1 }}>Synergy Scan</Text>
-            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 3, lineHeight: 18 }}>Your AIs check your fit in seconds. Private, instant.</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.1 }}>{tr('synergy_scan')}</Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 3, lineHeight: 18 }}>{tr('synergy_sub')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#7B6EF6" />
         </TouchableOpacity>
@@ -13886,8 +13908,8 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>‹ Back</Text>
         </TouchableOpacity>
         <Text style={{ fontSize: 32, marginBottom: 16 }}>💜</Text>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 8 }}>Who are you interested in?</Text>
-        <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>We'll show you people that match your preference.</Text>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 8 }}>{tr('interested_in')}</Text>
+        <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>{tr('interested_sub')}</Text>
         {([
           { label: 'Women', value: 'female' as const, emoji: '👩' },
           { label: 'Men', value: 'male' as const, emoji: '👨' },
@@ -13931,7 +13953,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
         {filteredRanked.length === 0 && (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 80 }}>
             <Text style={{ fontSize: 48, marginBottom: 16 }}>🔍</Text>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: t.text, marginBottom: 8, textAlign: 'center' }}>No profiles match</Text>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: t.text, marginBottom: 8, textAlign: 'center' }}>{tr('no_profiles_match')}</Text>
             <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', lineHeight: 22, marginBottom: 24 }}>
               Try widening your age range or increasing the distance filter.
             </Text>
@@ -13939,7 +13961,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               onPress={() => { setMaxDistKm(50); setAgeMin(18); setAgeMax(60) }}
               style={{ paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: '#7B6EF6' }}
             >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Reset Filters</Text>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{tr('reset_filters')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -14022,7 +14044,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                       people; presenting them as members would be a fabrication. */}
                   {currentBrowse.isExample && (
                     <View style={{ position: 'absolute', top: 14, right: 14, zIndex: 20, backgroundColor: 'rgba(0,0,0,0.72)', borderRadius: 12, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' }}>
-                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>EXAMPLE PROFILE</Text>
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>{tr('example_profile')}</Text>
                     </View>
                   )}
 
@@ -14081,7 +14103,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               children and pets are only asked about for a romantic connection. */}
           {lifeFacts(currentBrowse).length > 0 && shows(asConnectionType(category), 'age') && (
           <View style={g.dSection}>
-            <Text style={g.dH}>About them</Text>
+            <Text style={g.dH}>{tr('about_them')}</Text>
             <View style={g.dTags}>
               {lifeFacts(currentBrowse).map(f => (
                 <View key={f.icon} style={g.dTag}>
@@ -14141,7 +14163,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               const ct = asConnectionType(category)
               if (ct === 'friends') return (
                 <>
-                  <Text style={g.dH}>As a friend</Text>
+                  <Text style={g.dH}>{tr('as_a_friend')}</Text>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
@@ -14153,7 +14175,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                         <Ionicons name="people-outline" size={13} color="#10B981" />
-                        <Text style={[g.styleLbl, { color: '#10B981' }]}>INTERESTS</Text>
+                        <Text style={[g.styleLbl, { color: '#10B981' }]}>{tr('interests_caps')}</Text>
                       </View>
                       <Text style={g.styleVal}>{currentBrowse.interests.slice(0, 2).join(', ') || 'Exploring life'}</Text>
                     </View>
@@ -14162,7 +14184,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               )
               if (ct === 'professional') return (
                 <>
-                  <Text style={g.dH}>Professionally</Text>
+                  <Text style={g.dH}>{tr('professionally')}</Text>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
@@ -14174,7 +14196,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                         <Ionicons name="bulb-outline" size={13} color="#378ADD" />
-                        <Text style={[g.styleLbl, { color: '#378ADD' }]}>VALUES</Text>
+                        <Text style={[g.styleLbl, { color: '#378ADD' }]}>{tr('values_caps')}</Text>
                       </View>
                       <Text style={g.styleVal}>{currentBrowse.values.slice(0, 1).join(', ') || 'Growth & impact'}</Text>
                     </View>
@@ -14183,19 +14205,19 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               )
               if (ct === 'support') return (
                 <>
-                  <Text style={g.dH}>Here to support</Text>
+                  <Text style={g.dH}>{tr('here_to_support')}</Text>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                         <Ionicons name="hand-left-outline" size={13} color="#F59E0B" />
-                        <Text style={[g.styleLbl, { color: '#F59E0B' }]}>STYLE</Text>
+                        <Text style={[g.styleLbl, { color: '#F59E0B' }]}>{tr('style_caps')}</Text>
                       </View>
                       <Text style={g.styleVal}>{currentBrowse.attachment || 'Empathetic listener'}</Text>
                     </View>
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                         <Ionicons name="heart-circle-outline" size={13} color="#F59E0B" />
-                        <Text style={[g.styleLbl, { color: '#F59E0B' }]}>STRENGTH</Text>
+                        <Text style={[g.styleLbl, { color: '#F59E0B' }]}>{tr('strength_caps')}</Text>
                       </View>
                       <Text style={g.styleVal}>{currentBrowse.loveLanguage || 'Words of affirmation'}</Text>
                     </View>
@@ -14205,19 +14227,19 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
               // Default: dating
               return (
                 <>
-                  <Text style={g.dH}>Connection style</Text>
+                  <Text style={g.dH}>{tr('connection_style')}</Text>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                         <Ionicons name="heart-outline" size={13} color="#7B6EF6" />
-                        <Text style={g.styleLbl}>LOVE LANGUAGE</Text>
+                        <Text style={g.styleLbl}>{tr('love_language_caps')}</Text>
                       </View>
                       <Text style={g.styleVal}>{currentBrowse.loveLanguage}</Text>
                     </View>
                     <View style={g.styleCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                         <Ionicons name="link-outline" size={13} color="#7B6EF6" />
-                        <Text style={g.styleLbl}>ATTACHMENT</Text>
+                        <Text style={g.styleLbl}>{tr('attachment_caps')}</Text>
                       </View>
                       <Text style={g.styleVal}>{currentBrowse.attachment}</Text>
                     </View>
@@ -14229,7 +14251,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
 
           {/* More info tags */}
           <View style={g.dSection}>
-            <Text style={g.dH}>More info</Text>
+            <Text style={g.dH}>{tr('more_info')}</Text>
             <View style={g.dTags}>
               {currentBrowse.tags.map(tag => (
                 <View key={tag.label} style={g.dTag}><Text style={g.dTagTxt}>{tag.label}</Text></View>
@@ -14313,7 +14335,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={{ backgroundColor: t.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 28, paddingBottom: 44, alignItems: 'center' }}>
                 <Text style={{ fontSize: 32, marginBottom: 12 }}>💜</Text>
-                <Text style={{ fontSize: 22, fontWeight: '900', color: t.text, textAlign: 'center', marginBottom: 8 }}>Create a free account</Text>
+                <Text style={{ fontSize: 22, fontWeight: '900', color: t.text, textAlign: 'center', marginBottom: 8 }}>{tr('create_free_account')}</Text>
                 <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
                   Register to like real people, match, and start real conversations.
                 </Text>
@@ -14321,7 +14343,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                   <Text style={g.primaryBtnTxt}>Create free account →</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowRegisterPrompt(false)} style={{ paddingVertical: 8 }}>
-                  <Text style={{ color: t.textSub, fontSize: 14 }}>Keep browsing as guest</Text>
+                  <Text style={{ color: t.textSub, fontSize: 14 }}>{tr('browse_as_guest')}</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -14338,10 +14360,10 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
               <View style={{ backgroundColor: t.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 }}>
                 <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: t.border2, alignSelf: 'center', marginBottom: 20 }} />
-                <Text style={{ fontSize: 18, fontWeight: '800', color: t.text, marginBottom: 20 }}>Filters</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: t.text, marginBottom: 20 }}>{tr('filters')}</Text>
 
                 {/* Distance */}
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, letterSpacing: 0.5, marginBottom: 10 }}>MAX DISTANCE</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, letterSpacing: 0.5, marginBottom: 10 }}>{tr('max_distance')}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
                   {[5, 10, 25, 50, 100].map(km => (
                     <TouchableOpacity
@@ -14359,7 +14381,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                 </View>
 
                 {/* Min age */}
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, letterSpacing: 0.5, marginBottom: 10 }}>MIN AGE</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, letterSpacing: 0.5, marginBottom: 10 }}>{tr('min_age')}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
                   {[18, 21, 25, 30, 35, 40].map(age => (
                     <TouchableOpacity
@@ -14377,7 +14399,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                 </View>
 
                 {/* Max age */}
-                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, letterSpacing: 0.5, marginBottom: 10 }}>MAX AGE</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.textSub, letterSpacing: 0.5, marginBottom: 10 }}>{tr('max_age')}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 28 }}>
                   {[25, 30, 35, 40, 50, 60].map(age => (
                     <TouchableOpacity
@@ -14399,13 +14421,13 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                     onPress={() => { setMaxDistKm(50); setAgeMin(18); setAgeMax(60) }}
                     style={{ flex: 1, height: 48, borderRadius: 24, borderWidth: 1.5, borderColor: '#E0DEFF', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#7B6EF6' }}>Reset</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#7B6EF6' }}>{tr('reset')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setShowFilters(false)}
                     style={{ flex: 2, height: 48, borderRadius: 24, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Apply Filters</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>{tr('apply_filters')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -14479,8 +14501,8 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
   return (
     <ScrollView ref={scrollRef} style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={g.homePad}>
       <View style={g.homeHeader}><TouchableOpacity onPress={() => setStep('browse')}><Text style={g.backLink}>← Back</Text></TouchableOpacity></View>
-      <Text style={g.logo}>Meet New People</Text>
-      <Text style={g.logoSub}>Your AI meets their AI before you ever do.</Text>
+      <Text style={g.logo}>{tr('meet_new_people')}</Text>
+      <Text style={g.logoSub}>{tr('meet_new_sub')}</Text>
       <View style={{ height: 20 }} />
 
       {/* MATCHED */}
@@ -14508,7 +14530,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                 <Ionicons name="heart" size={26} color="#F6379B" />
               </View>
             </View>
-            <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -1, marginBottom: 8 }}>Match!</Text>
+            <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -1, marginBottom: 8 }}>{tr('match_excl')}</Text>
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, textAlign: 'center', lineHeight: 22 }}>You and {candidate.name} liked each other.</Text>
           </View>
 
@@ -14548,7 +14570,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             <Text style={g.matchBio}>{candidate.bio}</Text>
             <View style={g.valuesRow}>{candidate.values.map(v => <View key={v} style={g.valueChip}><Text style={g.valueChipTxt}>{v}</Text></View>)}</View>
           </View>
-          <TouchableOpacity onPress={() => setStep('browse')}><Text style={g.ghostTxt}>Keep browsing</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setStep('browse')}><Text style={g.ghostTxt}>{tr('keep_browsing')}</Text></TouchableOpacity>
         </>
       )}
 
@@ -14607,7 +14629,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             </View>
           ) : null}
           <TouchableOpacity style={g.primaryBtn} onPress={() => { startInstantChat(); setReport(null); setTurns([]); setVisibleCount(0) }}><Text style={g.primaryBtnTxt}>💜  Send {candidate.name} a hello</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => { setStep('browse'); setReport(null); setTurns([]); setVisibleCount(0) }}><Text style={g.ghostTxt}>Meet more people</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { setStep('browse'); setReport(null); setTurns([]); setVisibleCount(0) }}><Text style={g.ghostTxt}>{tr('meet_more')}</Text></TouchableOpacity>
         </>
       )}
       <View style={{ height: 60 }} />
