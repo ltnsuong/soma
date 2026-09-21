@@ -282,7 +282,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     memories_count: 'things Soma knows about you',
     bonds_label: 'Bonds', memories_label: 'Memories',
     soma_memories: "Soma's memories", remembered: 'remembered',
-    love_yourself: 'Love Yourself', medications: 'Medications', gratitude: 'Gratitude',
+    love_yourself: 'Love Yourself', medications: 'Medications',
     mood: 'Mood', open: 'Open →', timeline: 'Timeline',
     my_soma_code: 'My SOMA Code', share_friends: 'Share with friends',
     generate_insight: '✦ Generate my insight', insights_btn: 'Generate insights',
@@ -409,7 +409,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     memories_count: 'вещей, которые помнит Сома',
     bonds_label: 'Связи', memories_label: 'Воспоминания',
     soma_memories: 'Воспоминания Сомы', remembered: 'запомнено',
-    love_yourself: 'Люби себя', medications: 'Лекарства', gratitude: 'Благодарность',
+    love_yourself: 'Люби себя', medications: 'Лекарства',
     mood: 'Настроение', open: 'Открыть →', timeline: 'Хронология',
     my_soma_code: 'Мой код SOMA', share_friends: 'Поделиться с друзьями',
     generate_insight: '✦ Сгенерировать инсайт', insights_btn: 'Сгенерировать инсайты',
@@ -5599,6 +5599,10 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [verifyToken, setVerifyToken] = useState('')
+  // The Telegram button below reads tgPending. It was never declared here — only
+  // in RegisterFallback and LoginScreen — so rendering this screen threw
+  // "tgPending is not defined" the moment the button was reached.
+  const [tgPending, setTgPending] = useState(false)
   const isTgMiniApp = typeof window !== 'undefined' && !!(window as any).Telegram?.WebApp?.initData
 
   // ── Real Google OAuth (expo-auth-session) ──
@@ -6398,7 +6402,7 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
               )}
             </ScrollView>
             <View style={g.inputBar}>
-              <TextInput style={g.input} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#9A9DB2" multiline
+              <TextInput style={g.chatInput} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#9A9DB2" multiline
                 {...enterToSend(() => { if (input.trim() && !loading) send(input) })} />
               <TouchableOpacity style={[g.iconBtn, { backgroundColor: t.card, borderColor: t.border }, listening && g.iconOn]} onPress={onMic} disabled={loading}><Text style={{ fontSize: 20 }}>{listening ? '⏹' : '🎙'}</Text></TouchableOpacity>
               <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
@@ -11174,7 +11178,7 @@ Be specific and human. Under 120 words total.`
           {loading && <Typing />}
         </ScrollView>
         <View style={[g.inputBar, { borderTopColor: t.border, backgroundColor: t.bg }]}>
-          <TextInput style={[g.input, { backgroundColor: t.card, color: t.text, borderColor: t.border }]} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
+          <TextInput style={[g.chatInput, { backgroundColor: t.card, color: t.text, borderColor: t.border }]} value={input} onChangeText={setInput} placeholder={`Message ${p.name}...`} placeholderTextColor={t.textTertiary} multiline />
           <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -13777,7 +13781,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           {chatLoading && <Typing />}
         </ScrollView>
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={chatInput} onChangeText={setChatInput} placeholder={`Message ${candidate.name}...`} placeholderTextColor="#9A9DB2" multiline />
+          <TextInput style={g.chatInput} value={chatInput} onChangeText={setChatInput} placeholder={`Message ${candidate.name}...`} placeholderTextColor="#9A9DB2" multiline />
           <TouchableOpacity style={[g.sendBtn, (!chatInput.trim() || chatLoading) && g.off]} onPress={() => sendChat(chatInput)} disabled={!chatInput.trim() || chatLoading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -14629,7 +14633,7 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
           </View>}
         </ScrollView>
         <View style={g.inputBar}>
-          <TextInput style={g.input} value={input} onChangeText={setInput} placeholder={`Message ${conn.name}...`} placeholderTextColor="#9A9DB2" multiline />
+          <TextInput style={g.chatInput} value={input} onChangeText={setInput} placeholder={`Message ${conn.name}...`} placeholderTextColor="#9A9DB2" multiline />
           <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
         </View>
         {showDatePlan && (
@@ -18466,7 +18470,7 @@ function MoodAnalytics({ profile, onBack }: { profile: UserProfile; onBack: () =
                     return (
                       <View key={day} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
                         <View style={{ width: '100%', height: barH, borderRadius: 5, backgroundColor: barColor, opacity: avg ? 1 : 0.25 }} />
-                        <Text style={{ fontSize: 10, color: t.textTertiary, marginTop: 4, fontWeight: i === bestDay ? '800' : '500', color: i === bestDay ? '#10B981' : t.textTertiary } as any}>{day.slice(0,1)}</Text>
+                        <Text style={{ fontSize: 10, marginTop: 4, fontWeight: i === bestDay ? '800' : '500', color: i === bestDay ? '#10B981' : t.textTertiary } as any}>{day.slice(0,1)}</Text>
                       </View>
                     )
                   })}
@@ -18720,18 +18724,6 @@ const g = StyleSheet.create({
     borderColor: '#9B8FFE' // Subtle highlight for depth
   },
   primaryBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-  secondaryBtn: {
-    backgroundColor: '#FFFFFF',
-    width: '100%',
-    height: 54,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: '#7B6EF640'
-  },
-  secondaryBtnTxt: { color: '#7B6EF6', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
   ghostTxt: { color: '#9A9DB2', fontSize: 14, textAlign: 'center' },
   off: { opacity: 0.35 },
   nameInput: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, color: '#222540', fontSize: 16, fontWeight: '500', borderWidth: 1.5, borderColor: '#E9E6F2', marginBottom: 18, textAlign: 'center', ...shadowSm },
@@ -18750,7 +18742,9 @@ const g = StyleSheet.create({
   joinBtn: { backgroundColor: '#7B6EF6', borderRadius: 12, padding: 12, alignItems: 'center' },
   joinBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, paddingBottom: 30, borderTopWidth: 1, borderTopColor: '#EFEDF6' },
-  input: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', maxHeight: 100, ...shadowSm },
+  // The chat composer. Named separately because the form input below shares
+  // the object and, being later, silently won every one of these properties.
+  chatInput: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, color: '#222540', fontSize: 15, borderWidth: 1.5, borderColor: '#E9E6F2', maxHeight: 100, ...shadowSm },
   iconBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9E6F2', alignItems: 'center', justifyContent: 'center' },
   iconOn: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
   sendBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
