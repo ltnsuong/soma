@@ -233,6 +233,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: "Thanks for sharing. Now tell me about your social world — what do you do for work, what are your relationships like? Family, friends, romantic life, the roles you play in people's lives.",
     ob_q3: "Last one — tell me about who you are on the inside. Your personality, what you love doing, your habits, what brings you joy, and what challenges you most.",
     ob_tap_mic: 'Tap the mic and speak', ob_listening: 'Listening…', ob_type_instead: 'Or type your answer here…',
+    score_start: 'Start tracking to see your score', score_thriving: 'Thriving — keep it up! ✨', score_momentum: 'Good momentum — stay consistent', score_room: 'Room to grow — Soma is with you', view_details: 'View details →', evening_checkin: 'Evening Check-in', morning_checkin: 'Morning Check-in', reflect_day: 'Reflect on your day', set_intention: 'Set your intention for today', mood_euphoric: 'Euphoric', mood_amazing: 'Amazing', mood_great: 'Great', mood_good: 'Good', mood_okay: 'Okay', mood_meh: 'Meh',
+    circle_header: 'Circle', circle_tagline: 'Private moments with people you trust', add_first_person: 'Add your first person', add_someone_to_circle: 'Add someone to your Circle', video_ready: 'Video ready to share', photo_btn: 'Photo', video_btn: 'Video', share_btn: 'Share', message_btn: 'Message', rel_insights_sub: 'Soma\'s view of your connections', their_name: 'Their name', found_on_soma: 'Found on SOMA — they\'ll be connected to your circle', who_are_they: 'Who are they?', add_to_circle: 'Add to Circle', recording: 'Recording…', message_placeholder: 'Message…', no_conversations: 'No conversations yet', message_someone: 'Message someone', new_message: 'New message', wellness_score: 'Wellness Score', mood_logged: 'Mood logged today', change_btn: 'Change', your_streaks: 'Your Streaks', talk_anything: 'Talk about anything', getting_started: 'Getting started', circle_of_life: 'Circle of Life', health_hub: 'Health Hub', support_label: 'Support',
     dom_health: 'Health', dom_career: 'Career', dom_finance: 'Finance', dom_relationship: 'Love', dom_family: 'Family', dom_growth: 'Growth', dom_hobby: 'Fun', dom_purpose: 'Purpose', dom_mind: 'Mind', dom_environment: 'Home',
     tab_bond: 'Bond', no_photo_yet: 'No photo yet', nearby: 'Nearby',
     ob_all_done: 'All done — build your profile above', ob_getting_to_know: 'getting to know you', ob_typing: 'typing…',
@@ -363,6 +365,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Спасибо, что поделился. Теперь расскажи о своём социальном мире — чем занимаешься, какие у тебя отношения? Семья, друзья, романтика, роли, которые ты играешь в жизни людей.',
     ob_q3: 'Последний вопрос — расскажи, кто ты внутри. Твоя личность, что ты любишь делать, твои привычки, что приносит радость и что больше всего испытывает тебя.',
     ob_tap_mic: 'Нажми на микрофон и говори', ob_listening: 'Слушаю…', ob_type_instead: 'Или напиши свой ответ здесь…',
+    score_start: 'Начни отмечать — и появится твой индекс', score_thriving: 'Всё цветёт — так держать ✨', score_momentum: 'Хороший темп — не сбавляй', score_room: 'Есть куда расти — Soma рядом', view_details: 'Подробнее →', evening_checkin: 'Вечерняя отметка', morning_checkin: 'Утренняя отметка', reflect_day: 'Оглянись на свой день', set_intention: 'Задай намерение на день', mood_euphoric: 'Восторг', mood_amazing: 'Прекрасно', mood_great: 'Отлично', mood_good: 'Хорошо', mood_okay: 'Нормально', mood_meh: 'Так себе',
+    circle_header: 'Круг', circle_tagline: 'Личные моменты с теми, кому ты доверяешь', add_first_person: 'Добавь первого человека', add_someone_to_circle: 'Добавь кого-то в свой Круг', video_ready: 'Видео готово к отправке', photo_btn: 'Фото', video_btn: 'Видео', share_btn: 'Поделиться', message_btn: 'Написать', rel_insights_sub: 'Взгляд Сомы на твои связи', their_name: 'Как их зовут', found_on_soma: 'Найден в SOMA — он будет связан с твоим кругом', who_are_they: 'Кто это для тебя?', add_to_circle: 'Добавить в Круг', recording: 'Записываю…', message_placeholder: 'Сообщение…', no_conversations: 'Пока нет переписок', message_someone: 'Напиши кому-нибудь', new_message: 'Новое сообщение', wellness_score: 'Индекс благополучия', mood_logged: 'Настроение отмечено сегодня', change_btn: 'Изменить', your_streaks: 'Твои серии', talk_anything: 'Поговори о чём угодно', getting_started: 'С чего начать', circle_of_life: 'Колесо жизни', health_hub: 'Здоровье', support_label: 'Поддержка',
     dom_health: 'Здоровье', dom_career: 'Карьера', dom_finance: 'Финансы', dom_relationship: 'Любовь', dom_family: 'Семья', dom_growth: 'Рост', dom_hobby: 'Отдых', dom_purpose: 'Смысл', dom_mind: 'Разум', dom_environment: 'Дом',
     tab_bond: 'Связь', no_photo_yet: 'Пока без фото', nearby: 'Рядом',
     ob_all_done: 'Готово — собери профиль выше', ob_getting_to_know: 'знакомлюсь с тобой', ob_typing: 'печатает…',
@@ -493,6 +497,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Gracias por compartir. Ahora cuéntame sobre tu mundo social — ¿qué haces para trabajar, cómo son tus relaciones? Familia, amigos, vida romántica, los roles que juegas en la vida de las personas.',
     ob_q3: 'La última — cuéntame sobre quién eres por dentro. Tu personalidad, lo que te encanta hacer, tus hábitos, lo que te trae alegría y lo que más te desafía.',
     ob_tap_mic: 'Toca el micrófono y habla', ob_listening: 'Escuchando…', ob_type_instead: 'O escribe tu respuesta aquí…',
+    score_start: 'Empieza a registrar para ver tu índice', score_thriving: 'Vas muy bien — sigue así ✨', score_momentum: 'Buen ritmo — mantén la constancia', score_room: 'Hay espacio para crecer — Soma está contigo', view_details: 'Ver detalles →', evening_checkin: 'Registro de la tarde', morning_checkin: 'Registro de la mañana', reflect_day: 'Reflexiona sobre tu día', set_intention: 'Define tu intención de hoy', mood_euphoric: 'Eufórico', mood_amazing: 'Increíble', mood_great: 'Muy bien', mood_good: 'Bien', mood_okay: 'Normal', mood_meh: 'Regular',
+    circle_header: 'Círculo', circle_tagline: 'Momentos privados con quienes confías', add_first_person: 'Añade a tu primera persona', add_someone_to_circle: 'Añade a alguien a tu Círculo', video_ready: 'Vídeo listo para compartir', photo_btn: 'Foto', video_btn: 'Vídeo', share_btn: 'Compartir', message_btn: 'Mensaje', rel_insights_sub: 'La visión de Soma sobre tus vínculos', their_name: 'Su nombre', found_on_soma: 'Encontrado en SOMA — se conectará a tu círculo', who_are_they: '¿Quién es para ti?', add_to_circle: 'Añadir al Círculo', recording: 'Grabando…', message_placeholder: 'Mensaje…', no_conversations: 'Aún no hay conversaciones', message_someone: 'Escribe a alguien', new_message: 'Mensaje nuevo', wellness_score: 'Índice de bienestar', mood_logged: 'Ánimo registrado hoy', change_btn: 'Cambiar', your_streaks: 'Tus rachas', talk_anything: 'Habla de lo que quieras', getting_started: 'Primeros pasos', circle_of_life: 'Rueda de la vida', health_hub: 'Centro de salud', support_label: 'Apoyo',
     dom_health: 'Salud', dom_career: 'Carrera', dom_finance: 'Finanzas', dom_relationship: 'Amor', dom_family: 'Familia', dom_growth: 'Crecimiento', dom_hobby: 'Ocio', dom_purpose: 'Propósito', dom_mind: 'Mente', dom_environment: 'Hogar',
     tab_bond: 'Vínculo', no_photo_yet: 'Aún sin foto', nearby: 'Cerca',
     ob_all_done: 'Listo — crea tu perfil arriba', ob_getting_to_know: 'conociéndote', ob_typing: 'escribiendo…',
@@ -551,6 +557,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: "Merci de partager. Maintenant parle-moi de ton monde social — que fais-tu comme travail, comment sont tes relations ? Famille, amis, vie romantique, les rôles que tu joues dans la vie des gens.",
     ob_q3: "Dernière question — parle-moi de qui tu es à l'intérieur. Ta personnalité, ce que tu aimes faire, tes habitudes, ce qui te rend joyeux et ce qui te défie le plus.",
     ob_tap_mic: 'Appuie sur le micro et parle', ob_listening: "J'écoute…", ob_type_instead: 'Ou écris ta réponse ici…',
+    score_start: 'Commence à noter pour voir ton indice', score_thriving: 'Tu t\'épanouis — continue ✨', score_momentum: 'Bon rythme — reste régulier', score_room: 'Il y a de la marge — Soma est avec toi', view_details: 'Voir les détails →', evening_checkin: 'Bilan du soir', morning_checkin: 'Bilan du matin', reflect_day: 'Repense à ta journée', set_intention: 'Définis ton intention du jour', mood_euphoric: 'Euphorique', mood_amazing: 'Génial', mood_great: 'Super', mood_good: 'Bien', mood_okay: 'Ça va', mood_meh: 'Bof',
+    circle_header: 'Cercle', circle_tagline: 'Des moments privés avec ceux en qui tu as confiance', add_first_person: 'Ajoute ta première personne', add_someone_to_circle: 'Ajoute quelqu\'un à ton Cercle', video_ready: 'Vidéo prête à partager', photo_btn: 'Photo', video_btn: 'Vidéo', share_btn: 'Partager', message_btn: 'Message', rel_insights_sub: 'Le regard de Soma sur tes liens', their_name: 'Leur prénom', found_on_soma: 'Trouvé sur SOMA — la personne sera reliée à ton cercle', who_are_they: 'Qui est-ce pour toi ?', add_to_circle: 'Ajouter au Cercle', recording: 'Enregistrement…', message_placeholder: 'Message…', no_conversations: 'Pas encore de conversations', message_someone: 'Écris à quelqu\'un', new_message: 'Nouveau message', wellness_score: 'Indice de bien-être', mood_logged: 'Humeur notée aujourd\'hui', change_btn: 'Modifier', your_streaks: 'Tes séries', talk_anything: 'Parle de ce que tu veux', getting_started: 'Pour commencer', circle_of_life: 'Roue de la vie', health_hub: 'Espace santé', support_label: 'Soutien',
     dom_health: 'Santé', dom_career: 'Carrière', dom_finance: 'Finances', dom_relationship: 'Amour', dom_family: 'Famille', dom_growth: 'Évolution', dom_hobby: 'Loisirs', dom_purpose: 'Sens', dom_mind: 'Esprit', dom_environment: 'Chez soi',
     tab_bond: 'Lien', no_photo_yet: 'Pas encore de photo', nearby: 'À proximité',
     ob_all_done: 'C\'est tout — crée ton profil ci-dessus', ob_getting_to_know: 'je fais connaissance', ob_typing: 'écrit…',
@@ -609,6 +617,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Danke fürs Teilen. Jetzt erzähl mir von deiner sozialen Welt — was machst du beruflich, wie sind deine Beziehungen? Familie, Freunde, Romantik, die Rollen die du im Leben der Menschen spielst.',
     ob_q3: 'Die letzte — erzähl mir wer du innen bist. Deine Persönlichkeit, was du gerne machst, deine Gewohnheiten, was dir Freude bringt und was dich am meisten herausfordert.',
     ob_tap_mic: 'Tippe auf das Mikrofon und sprich', ob_listening: 'Ich höre zu…', ob_type_instead: 'Oder schreib deine Antwort hier…',
+    score_start: 'Fang an zu tracken, um deinen Score zu sehen', score_thriving: 'Es läuft — weiter so ✨', score_momentum: 'Guter Schwung — bleib dran', score_room: 'Da geht noch was — Soma ist bei dir', view_details: 'Details ansehen →', evening_checkin: 'Abend-Check-in', morning_checkin: 'Morgen-Check-in', reflect_day: 'Blick auf deinen Tag', set_intention: 'Setz dir ein Ziel für heute', mood_euphoric: 'Euphorisch', mood_amazing: 'Großartig', mood_great: 'Super', mood_good: 'Gut', mood_okay: 'Okay', mood_meh: 'Naja',
+    circle_header: 'Kreis', circle_tagline: 'Private Momente mit Menschen, denen du vertraust', add_first_person: 'Füge die erste Person hinzu', add_someone_to_circle: 'Füge jemanden zu deinem Kreis hinzu', video_ready: 'Video bereit zum Teilen', photo_btn: 'Foto', video_btn: 'Video', share_btn: 'Teilen', message_btn: 'Nachricht', rel_insights_sub: 'Somas Blick auf deine Verbindungen', their_name: 'Ihr Name', found_on_soma: 'Auf SOMA gefunden — die Person wird mit deinem Kreis verbunden', who_are_they: 'Wer ist das für dich?', add_to_circle: 'Zum Kreis hinzufügen', recording: 'Aufnahme…', message_placeholder: 'Nachricht…', no_conversations: 'Noch keine Unterhaltungen', message_someone: 'Schreib jemandem', new_message: 'Neue Nachricht', wellness_score: 'Wohlbefinden-Score', mood_logged: 'Stimmung heute erfasst', change_btn: 'Ändern', your_streaks: 'Deine Serien', talk_anything: 'Sprich über alles', getting_started: 'Erste Schritte', circle_of_life: 'Lebensrad', health_hub: 'Gesundheit', support_label: 'Unterstützung',
     dom_health: 'Gesundheit', dom_career: 'Karriere', dom_finance: 'Finanzen', dom_relationship: 'Liebe', dom_family: 'Familie', dom_growth: 'Wachstum', dom_hobby: 'Freizeit', dom_purpose: 'Sinn', dom_mind: 'Geist', dom_environment: 'Zuhause',
     tab_bond: 'Bindung', no_photo_yet: 'Noch kein Foto', nearby: 'In der Nähe',
     ob_all_done: 'Fertig — erstelle oben dein Profil', ob_getting_to_know: 'lerne dich kennen', ob_typing: 'schreibt…',
@@ -667,6 +677,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Grazie per aver condiviso. Ora dimmi del tuo mondo sociale — cosa fai per lavoro, come sono le tue relazioni? Famiglia, amici, vita romantica, i ruoli che giochi nella vita delle persone.',
     ob_q3: 'Ultima — dimmi chi sei dentro. La tua personalità, cosa ami fare, le tue abitudini, cosa ti porta gioia e cosa ti sfida di più.',
     ob_tap_mic: 'Tocca il microfono e parla', ob_listening: 'Ascolto…', ob_type_instead: 'O scrivi la tua risposta qui…',
+    score_start: 'Inizia a registrare per vedere il tuo indice', score_thriving: 'Stai fiorendo — continua così ✨', score_momentum: 'Buon ritmo — resta costante', score_room: 'C\'è spazio per crescere — Soma è con te', view_details: 'Vedi dettagli →', evening_checkin: 'Check-in serale', morning_checkin: 'Check-in mattutino', reflect_day: 'Ripensa alla tua giornata', set_intention: 'Definisci la tua intenzione di oggi', mood_euphoric: 'Euforico', mood_amazing: 'Fantastico', mood_great: 'Benissimo', mood_good: 'Bene', mood_okay: 'Così così', mood_meh: 'Insomma',
+    circle_header: 'Cerchia', circle_tagline: 'Momenti privati con le persone di cui ti fidi', add_first_person: 'Aggiungi la prima persona', add_someone_to_circle: 'Aggiungi qualcuno alla tua Cerchia', video_ready: 'Video pronto da condividere', photo_btn: 'Foto', video_btn: 'Video', share_btn: 'Condividi', message_btn: 'Messaggio', rel_insights_sub: 'Lo sguardo di Soma sui tuoi legami', their_name: 'Il loro nome', found_on_soma: 'Trovato su SOMA — sarà collegato alla tua cerchia', who_are_they: 'Chi è per te?', add_to_circle: 'Aggiungi alla Cerchia', recording: 'Registrazione…', message_placeholder: 'Messaggio…', no_conversations: 'Ancora nessuna conversazione', message_someone: 'Scrivi a qualcuno', new_message: 'Nuovo messaggio', wellness_score: 'Indice di benessere', mood_logged: 'Umore registrato oggi', change_btn: 'Cambia', your_streaks: 'Le tue serie', talk_anything: 'Parla di qualsiasi cosa', getting_started: 'Per iniziare', circle_of_life: 'Ruota della vita', health_hub: 'Centro salute', support_label: 'Supporto',
     dom_health: 'Salute', dom_career: 'Carriera', dom_finance: 'Finanze', dom_relationship: 'Amore', dom_family: 'Famiglia', dom_growth: 'Crescita', dom_hobby: 'Svago', dom_purpose: 'Scopo', dom_mind: 'Mente', dom_environment: 'Casa',
     tab_bond: 'Legame', no_photo_yet: 'Ancora nessuna foto', nearby: 'Vicino',
     ob_all_done: 'Fatto — crea il tuo profilo qui sopra', ob_getting_to_know: 'ti sto conoscendo', ob_typing: 'sta scrivendo…',
@@ -725,6 +737,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Obrigada por compartilhar. Agora me fale sobre seu mundo social — o que você faz no trabalho, como são seus relacionamentos? Família, amigos, vida romântica, os papéis que você desempenha na vida das pessoas.',
     ob_q3: 'Última — me fale sobre quem você é por dentro. Sua personalidade, o que você ama fazer, seus hábitos, o que te traz alegria e o que te desafia mais.',
     ob_tap_mic: 'Toque no microfone e fale', ob_listening: 'Ouvindo…', ob_type_instead: 'Ou escreva sua resposta aqui…',
+    score_start: 'Comece a registrar para ver seu índice', score_thriving: 'Florescendo — continue assim ✨', score_momentum: 'Bom ritmo — mantenha a constância', score_room: 'Há espaço para crescer — Soma está com você', view_details: 'Ver detalhes →', evening_checkin: 'Check-in da noite', morning_checkin: 'Check-in da manhã', reflect_day: 'Reflita sobre o seu dia', set_intention: 'Defina sua intenção para hoje', mood_euphoric: 'Eufórico', mood_amazing: 'Incrível', mood_great: 'Ótimo', mood_good: 'Bem', mood_okay: 'Ok', mood_meh: 'Mais ou menos',
+    circle_header: 'Círculo', circle_tagline: 'Momentos privados com quem você confia', add_first_person: 'Adicione sua primeira pessoa', add_someone_to_circle: 'Adicione alguém ao seu Círculo', video_ready: 'Vídeo pronto para compartilhar', photo_btn: 'Foto', video_btn: 'Vídeo', share_btn: 'Compartilhar', message_btn: 'Mensagem', rel_insights_sub: 'A visão de Soma sobre suas conexões', their_name: 'O nome deles', found_on_soma: 'Encontrado no SOMA — será conectado ao seu círculo', who_are_they: 'Quem é essa pessoa?', add_to_circle: 'Adicionar ao Círculo', recording: 'Gravando…', message_placeholder: 'Mensagem…', no_conversations: 'Ainda sem conversas', message_someone: 'Escreva para alguém', new_message: 'Nova mensagem', wellness_score: 'Índice de bem-estar', mood_logged: 'Humor registrado hoje', change_btn: 'Alterar', your_streaks: 'Suas sequências', talk_anything: 'Fale sobre qualquer coisa', getting_started: 'Primeiros passos', circle_of_life: 'Roda da vida', health_hub: 'Central de saúde', support_label: 'Apoio',
     dom_health: 'Saúde', dom_career: 'Carreira', dom_finance: 'Finanças', dom_relationship: 'Amor', dom_family: 'Família', dom_growth: 'Crescimento', dom_hobby: 'Lazer', dom_purpose: 'Propósito', dom_mind: 'Mente', dom_environment: 'Casa',
     tab_bond: 'Vínculo', no_photo_yet: 'Ainda sem foto', nearby: 'Por perto',
     ob_all_done: 'Pronto — crie seu perfil acima', ob_getting_to_know: 'te conhecendo', ob_typing: 'digitando…',
@@ -916,6 +930,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Cảm ơn bạn đã chia sẻ. Bây giờ hãy cho tôi biết về thế giới xã hội — bạn làm gì cho công việc, các mối quan hệ như thế nào? Gia đình, bạn bè, cuộc sống tình cảm, các vai trò bạn đóng trong cuộc sống mọi người.',
     ob_q3: 'Câu cuối — hãy cho tôi biết bạn là ai bên trong. Tính cách, những gì bạn thích làm, thói quen, điều mang lại niềm vui và điều thách thức bạn nhất.',
     ob_tap_mic: 'Nhấn vào micro và nói', ob_listening: 'Đang nghe…', ob_type_instead: 'Hoặc gõ câu trả lời của bạn ở đây…',
+    score_start: 'Bắt đầu ghi nhận để thấy chỉ số của bạn', score_thriving: 'Đang rất tốt — cứ tiếp tục nhé ✨', score_momentum: 'Đà tốt — giữ đều nhé', score_room: 'Còn chỗ để lớn lên — Soma ở bên bạn', view_details: 'Xem chi tiết →', evening_checkin: 'Ghi nhận buổi tối', morning_checkin: 'Ghi nhận buổi sáng', reflect_day: 'Nhìn lại ngày hôm nay', set_intention: 'Đặt dự định cho hôm nay', mood_euphoric: 'Hân hoan', mood_amazing: 'Tuyệt vời', mood_great: 'Rất tốt', mood_good: 'Ổn', mood_okay: 'Tạm ổn', mood_meh: 'Chán chán',
+    circle_header: 'Vòng tròn', circle_tagline: 'Khoảnh khắc riêng tư với những người bạn tin tưởng', add_first_person: 'Thêm người đầu tiên', add_someone_to_circle: 'Thêm ai đó vào Vòng tròn của bạn', video_ready: 'Video đã sẵn sàng để chia sẻ', photo_btn: 'Ảnh', video_btn: 'Video', share_btn: 'Chia sẻ', message_btn: 'Nhắn tin', rel_insights_sub: 'Góc nhìn của Soma về các mối quan hệ của bạn', their_name: 'Tên của họ', found_on_soma: 'Đã tìm thấy trên SOMA — họ sẽ được kết nối với vòng tròn của bạn', who_are_they: 'Họ là ai với bạn?', add_to_circle: 'Thêm vào Vòng tròn', recording: 'Đang ghi âm…', message_placeholder: 'Tin nhắn…', no_conversations: 'Chưa có cuộc trò chuyện nào', message_someone: 'Nhắn tin cho ai đó', new_message: 'Tin nhắn mới', wellness_score: 'Chỉ số an lành', mood_logged: 'Đã ghi tâm trạng hôm nay', change_btn: 'Đổi', your_streaks: 'Chuỗi ngày của bạn', talk_anything: 'Nói về bất cứ điều gì', getting_started: 'Bắt đầu', circle_of_life: 'Vòng tròn cuộc sống', health_hub: 'Trung tâm sức khoẻ', support_label: 'Đồng hành',
     dom_health: 'Sức khoẻ', dom_career: 'Sự nghiệp', dom_finance: 'Tài chính', dom_relationship: 'Tình yêu', dom_family: 'Gia đình', dom_growth: 'Phát triển', dom_hobby: 'Vui chơi', dom_purpose: 'Lẽ sống', dom_mind: 'Tâm trí', dom_environment: 'Tổ ấm',
     tab_bond: 'Gắn kết', no_photo_yet: 'Chưa có ảnh', nearby: 'Gần đây',
     ob_all_done: 'Xong rồi — tạo hồ sơ của bạn ở trên', ob_getting_to_know: 'đang làm quen với bạn', ob_typing: 'đang nhập…',
@@ -974,6 +990,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: '感谢分享。现在告诉我你的社交世界——你做什么工作，你的关系如何？家庭、朋友、恋爱生活，你在人们生活中扮演的角色。',
     ob_q3: '最后一个——告诉我你内心是谁。你的个性，你喜欢做什么，你的习惯，什么给你带来快乐，什么最挑战你。',
     ob_tap_mic: '点击麦克风并说话', ob_listening: '正在听…', ob_type_instead: '或者在这里输入你的回答…',
+    score_start: '开始记录以查看你的指数', score_thriving: '状态很好 — 继续保持 ✨', score_momentum: '势头不错 — 保持下去', score_room: '还有成长空间 — Soma 陪着你', view_details: '查看详情 →', evening_checkin: '晚间记录', morning_checkin: '早间记录', reflect_day: '回顾你的一天', set_intention: '为今天定一个意图', mood_euphoric: '狂喜', mood_amazing: '超棒', mood_great: '很好', mood_good: '不错', mood_okay: '还行', mood_meh: '一般般',
+    circle_header: '圈子', circle_tagline: '与你信任的人分享私密时刻', add_first_person: '添加第一个人', add_someone_to_circle: '把某人加入你的圈子', video_ready: '视频已准备好分享', photo_btn: '照片', video_btn: '视频', share_btn: '分享', message_btn: '发消息', rel_insights_sub: 'Soma 对你人际关系的观察', their_name: '他们的名字', found_on_soma: '在 SOMA 上找到了 — 他们将连接到你的圈子', who_are_they: '他们是谁？', add_to_circle: '加入圈子', recording: '正在录制…', message_placeholder: '消息…', no_conversations: '还没有对话', message_someone: '给某人发消息', new_message: '新消息', wellness_score: '健康指数', mood_logged: '今天已记录心情', change_btn: '更改', your_streaks: '你的连续记录', talk_anything: '聊聊任何事', getting_started: '开始使用', circle_of_life: '生命之轮', health_hub: '健康中心', support_label: '支持',
     dom_health: '健康', dom_career: '事业', dom_finance: '财务', dom_relationship: '爱', dom_family: '家人', dom_growth: '成长', dom_hobby: '乐趣', dom_purpose: '意义', dom_mind: '心智', dom_environment: '家',
     tab_bond: '羁绊', no_photo_yet: '还没有照片', nearby: '附近',
     ob_all_done: '完成了 — 在上面创建你的资料', ob_getting_to_know: '正在了解你', ob_typing: '正在输入…',
@@ -1032,6 +1050,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'シェアしてくれてありがとう。次に社会的な世界について教えてください — 仕事は何をしていますか、人間関係はどうですか？家族、友人、恋愛、人々の生活で果たしている役割など。',
     ob_q3: '最後 — 内面の自分を教えてください。あなたの性格、好きなこと、習慣、喜びをもたらすもの、そして最も挑戦的なことを。',
     ob_tap_mic: 'マイクをタップして話す', ob_listening: '聞いています…', ob_type_instead: 'またはここに回答を入力してください…',
+    score_start: '記録を始めるとスコアが表示されます', score_thriving: '順調です — この調子で ✨', score_momentum: 'いい流れです — 続けましょう', score_room: '伸びしろがあります — Somaがそばにいます', view_details: '詳細を見る →', evening_checkin: '夜のチェックイン', morning_checkin: '朝のチェックイン', reflect_day: '今日を振り返る', set_intention: '今日の意図を決める', mood_euphoric: '最高', mood_amazing: 'すごくいい', mood_great: 'いい感じ', mood_good: 'まあまあ', mood_okay: '普通', mood_meh: 'いまいち',
+    circle_header: 'サークル', circle_tagline: '信頼できる人とのプライベートな時間', add_first_person: '最初の人を追加', add_someone_to_circle: 'サークルに誰かを追加', video_ready: '共有する動画の準備ができました', photo_btn: '写真', video_btn: '動画', share_btn: 'シェア', message_btn: 'メッセージ', rel_insights_sub: 'あなたのつながりについてのSomaの見方', their_name: 'その人の名前', found_on_soma: 'SOMAで見つかりました — あなたのサークルにつながります', who_are_they: 'その人は誰ですか？', add_to_circle: 'サークルに追加', recording: '録音中…', message_placeholder: 'メッセージ…', no_conversations: 'まだ会話がありません', message_someone: '誰かにメッセージを送る', new_message: '新しいメッセージ', wellness_score: 'ウェルネススコア', mood_logged: '今日の気分を記録しました', change_btn: '変更', your_streaks: 'あなたの連続記録', talk_anything: 'なんでも話そう', getting_started: 'はじめに', circle_of_life: '人生の輪', health_hub: '健康ハブ', support_label: 'サポート',
     dom_health: '健康', dom_career: '仕事', dom_finance: 'お金', dom_relationship: '愛', dom_family: '家族', dom_growth: '成長', dom_hobby: '楽しみ', dom_purpose: '目的', dom_mind: '心', dom_environment: '住まい',
     tab_bond: '絆', no_photo_yet: '写真はまだありません', nearby: '近く',
     ob_all_done: '完了 — 上でプロフィールを作成', ob_getting_to_know: 'あなたを知っているところ', ob_typing: '入力中…',
@@ -1090,6 +1110,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'شكراً للمشاركة. الآن أخبرني عن عالمك الاجتماعي — ماذا تعمل، كيف هي علاقاتك؟ العائلة والأصدقاء والحياة العاطفية والأدوار التي تلعبها في حياة الناس.',
     ob_q3: 'السؤال الأخير — أخبرني من أنت في الداخل. شخصيتك وما تحب فعله وعاداتك وما يجلب لك الفرح وما يتحداك أكثر.',
     ob_tap_mic: 'اضغط على الميكروفون وتحدث', ob_listening: 'أستمع…', ob_type_instead: 'أو اكتب إجابتك هنا…',
+    score_start: 'ابدأ التسجيل لترى مؤشرك', score_thriving: 'أنت مزدهر — واصل ✨', score_momentum: 'إيقاع جيد — حافظ على استمرارك', score_room: 'هناك مجال للنمو — Soma معك', view_details: 'عرض التفاصيل →', evening_checkin: 'تسجيل المساء', morning_checkin: 'تسجيل الصباح', reflect_day: 'تأمّل يومك', set_intention: 'حدّد نيتك لليوم', mood_euphoric: 'نشوة', mood_amazing: 'رائع', mood_great: 'ممتاز', mood_good: 'جيد', mood_okay: 'لا بأس', mood_meh: 'عادي',
+    circle_header: 'الدائرة', circle_tagline: 'لحظات خاصة مع من تثق بهم', add_first_person: 'أضف أول شخص', add_someone_to_circle: 'أضف شخصًا إلى دائرتك', video_ready: 'الفيديو جاهز للمشاركة', photo_btn: 'صورة', video_btn: 'فيديو', share_btn: 'مشاركة', message_btn: 'رسالة', rel_insights_sub: 'نظرة Soma إلى علاقاتك', their_name: 'اسمه', found_on_soma: 'وُجد على SOMA — سيتم ربطه بدائرتك', who_are_they: 'من هو بالنسبة لك؟', add_to_circle: 'أضف إلى الدائرة', recording: 'جارٍ التسجيل…', message_placeholder: 'رسالة…', no_conversations: 'لا توجد محادثات بعد', message_someone: 'راسل شخصًا', new_message: 'رسالة جديدة', wellness_score: 'مؤشر العافية', mood_logged: 'تم تسجيل مزاجك اليوم', change_btn: 'تغيير', your_streaks: 'سلاسلك', talk_anything: 'تحدّث عن أي شيء', getting_started: 'البداية', circle_of_life: 'دائرة الحياة', health_hub: 'مركز الصحة', support_label: 'الدعم',
     dom_health: 'الصحة', dom_career: 'المسيرة المهنية', dom_finance: 'المال', dom_relationship: 'الحب', dom_family: 'العائلة', dom_growth: 'النمو', dom_hobby: 'المتعة', dom_purpose: 'المعنى', dom_mind: 'العقل', dom_environment: 'البيت',
     tab_bond: 'رابط', no_photo_yet: 'لا توجد صورة بعد', nearby: 'قريب',
     ob_all_done: 'انتهينا — أنشئ ملفك أعلاه', ob_getting_to_know: 'أتعرّف عليك', ob_typing: 'يكتب…',
@@ -2345,7 +2367,7 @@ async function generateSomaDailyMessage(profile: UserProfile): Promise<string> {
     streak > 1 && `${streak}-day streak`,
   ].filter(Boolean).join('. ')
   const prompt = `Write a warm, personal ${timeOfDay} message to ${name} as ${aiName}, their AI companion. Be specific, caring, under 40 words. Reference their life if you know it. End with one gentle open question or encouragement. No quotes, no "Good ${timeOfDay}" opener — jump straight in. Context: ${ctx || 'new user'}`
-  const reply = await groq([{ role: 'user', content: prompt }], `You are ${aiName}, a warm AI life companion. Write in first person as ${aiName}.`, 80, 0.9)
+  const reply = await groq([{ role: 'user', content: prompt }], `You are ${aiName}, a warm AI life companion. Write in first person as ${aiName}.${langDirective()}`, 80, 0.9)
   return reply || `Thinking of you today, ${name}. What's one thing on your mind right now?`
 }
 
@@ -7123,8 +7145,8 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
         {/* Header */}
         <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
-            <Text style={[g.greeting, { fontSize: 28, color: theme.text }]}>Circle</Text>
-            <Text style={[g.auraSub, { marginTop: 2, color: theme.textSub }]}>Private moments with people you trust</Text>
+            <Text style={[g.greeting, { fontSize: 28, color: theme.text }]}>{tr('circle_header')}</Text>
+            <Text style={[g.auraSub, { marginTop: 2, color: theme.textSub }]}>{tr('circle_tagline')}</Text>
           </View>
           <TouchableOpacity
             onPress={() => setAddModal(true)}
@@ -7145,10 +7167,10 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
           <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
             <TouchableOpacity onPress={() => setAddModal(true)} style={{ borderRadius: 20, padding: 28, backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border, borderStyle: 'dashed', alignItems: 'center', gap: 12 }}>
               <Ionicons name="people-outline" size={40} color={theme.textSub} />
-              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>Add your first person</Text>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>{tr('add_first_person')}</Text>
               <Text style={{ fontSize: 13, color: theme.textSub, textAlign: 'center', lineHeight: 20 }}>Your Circle is a private space where the people you trust most can share moments with each other.</Text>
               <View style={{ paddingHorizontal: 28, paddingVertical: 12, backgroundColor: '#7B6EF6', borderRadius: 22, marginTop: 4 }}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Add someone to your Circle</Text>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr('add_someone_to_circle')}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -7179,7 +7201,7 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
                     ? <Image source={{ uri: mediaDraft }} style={{ width: '100%', height: 200, borderRadius: 14 }} resizeMode="cover" />
                     : <View style={{ width: '100%', height: 160, backgroundColor: '#0F0A2E', borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                         <Text style={{ fontSize: 40 }}>🎥</Text>
-                        <Text style={{ color: '#A89BFA', fontSize: 13, fontWeight: '600' }}>Video ready to share</Text>
+                        <Text style={{ color: '#A89BFA', fontSize: 13, fontWeight: '600' }}>{tr('video_ready')}</Text>
                       </View>
                   }
                   <TouchableOpacity onPress={() => { setMediaDraft(null); setMediaTypeDraft(null) }}
@@ -7298,8 +7320,8 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
             <TouchableOpacity onPress={() => go('relinsights')} style={{ borderRadius: 16, padding: 16, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 }}>
               <Ionicons name="analytics-outline" size={24} color={theme.accent} />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>Relationship Insights</Text>
-                <Text style={{ fontSize: 12, color: theme.textSub }}>Soma's view of your connections</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>{tr('rel_insights')}</Text>
+                <Text style={{ fontSize: 12, color: theme.textSub }}>{tr('rel_insights_sub')}</Text>
               </View>
               <Text style={{ color: theme.textSub, fontSize: 18 }}>›</Text>
             </TouchableOpacity>
@@ -7320,7 +7342,7 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
               <Text style={{ fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: 4 }}>Add someone</Text>
               <Text style={{ fontSize: 14, color: theme.textSub, marginBottom: 24 }}>Add a person to your circle of 20</Text>
 
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 8 }}>Their name</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 8 }}>{tr('their_name')}</Text>
               <TextInput
                 value={addName}
                 onChangeText={setAddName}
@@ -7357,12 +7379,12 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
                 {addSomaFound && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 4 }}>
                     <Text style={{ fontSize: 14 }}>✅</Text>
-                    <Text style={{ fontSize: 13, color: '#10B981', fontWeight: '600' }}>Found on SOMA — they'll be connected to your circle</Text>
+                    <Text style={{ fontSize: 13, color: '#10B981', fontWeight: '600' }}>{tr('found_on_soma')}</Text>
                   </View>
                 )}
               </View>
 
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>Who are they?</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSub, marginBottom: 10 }}>{tr('who_are_they')}</Text>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
                 {([
                   { type: 'family' as const, icon: '👨‍👩‍👧', label: 'Family', defaultRole: 'Mom' },
@@ -7406,7 +7428,7 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
                 onPress={submitAdd}
                 disabled={!addName.trim()}
                 style={{ backgroundColor: addName.trim() ? '#7B6EF6' : '#C4B9F8', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 }}>
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Add to Circle</Text>
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{tr('add_to_circle')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -7758,7 +7780,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
               <Text style={{ color: '#FF4444', fontSize: 14, fontWeight: '600' }}>
                 {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
               </Text>
-              <Text style={{ color: theme.textSub, fontSize: 13, flex: 1 }}>Recording…</Text>
+              <Text style={{ color: theme.textSub, fontSize: 13, flex: 1 }}>{tr('recording')}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -7790,7 +7812,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
             <TextInput
               value={input}
               onChangeText={setInput}
-              placeholder="Message…"
+              placeholder={tr('message_placeholder')}
               placeholderTextColor={theme.textSub}
               multiline
               style={{ flex: 1, backgroundColor: theme.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: theme.text, maxHeight: 120, borderWidth: 1, borderColor: theme.border }}
@@ -8006,7 +8028,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
               <Text style={{ color: '#FF4444', fontSize: 14, fontWeight: '600' }}>
                 {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
               </Text>
-              <Text style={{ color: theme.textSub, fontSize: 13, flex: 1 }}>Recording…</Text>
+              <Text style={{ color: theme.textSub, fontSize: 13, flex: 1 }}>{tr('recording')}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -8057,7 +8079,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
           <TextInput
             value={demoInput}
             onChangeText={setDemoInput}
-            placeholder="Message…"
+            placeholder={tr('message_placeholder')}
             placeholderTextColor={theme.textSub}
             multiline
             style={{ flex: 1, backgroundColor: theme.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: theme.text, maxHeight: 120, borderWidth: 1, borderColor: theme.border }}
@@ -8118,14 +8140,14 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
       {!loading && listConvos.length === 0 && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}>
           <Text style={{ fontSize: 40, marginBottom: 16 }}>💬</Text>
-          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 8 }}>No conversations yet</Text>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 8 }}>{tr('no_conversations')}</Text>
           <Text style={{ fontSize: 14, color: theme.textSub, textAlign: 'center', paddingHorizontal: 40, marginBottom: 24 }}>
             {profile.circle.length > 0 ? 'Message someone from your Circle or match on Explore' : 'Match with someone on Explore or add people to your Circle'}
           </Text>
           {profile.circle.length > 0 && (
             <TouchableOpacity onPress={() => setShowCompose(true)}
               style={{ paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: '#7B6EF6' }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Message someone</Text>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{tr('message_someone')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -8174,7 +8196,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
           <View style={{ backgroundColor: theme.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '72%' }}>
             <View style={{ width: 40, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text, flex: 1 }}>New message</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text, flex: 1 }}>{tr('new_message')}</Text>
               <TouchableOpacity onPress={() => setShowCompose(false)}>
                 <Ionicons name="close" size={22} color={theme.textSub} />
               </TouchableOpacity>
@@ -8931,12 +8953,12 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
   })()
 
   const MOODS: { emoji: string; label: string; val: 1|2|3|4|5|6|7 }[] = [
-    { emoji: '🤩', label: 'Euphoric', val: 7 },
-    { emoji: '🥰', label: 'Amazing',  val: 6 },
-    { emoji: '😊', label: 'Great',    val: 5 },
-    { emoji: '🙂', label: 'Good',     val: 4 },
-    { emoji: '😐', label: 'Okay',     val: 3 },
-    { emoji: '😕', label: 'Meh',      val: 2 },
+    { emoji: '🤩', label: tr('mood_euphoric'), val: 7 },
+    { emoji: '🥰', label: tr('mood_amazing'),  val: 6 },
+    { emoji: '😊', label: tr('mood_great'),    val: 5 },
+    { emoji: '🙂', label: tr('mood_good'),     val: 4 },
+    { emoji: '😐', label: tr('mood_okay'),     val: 3 },
+    { emoji: '😕', label: tr('mood_meh'),      val: 2 },
   ]
   const saveMood = (val: 1|2|3|4|5|6|7) => {
     haptic.light()
@@ -9022,11 +9044,13 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
     return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
   })()
 
+  // Labels come from domLabel, not literals: these four tiles sit at the top of
+  // Home and were the most visible English left in a translated app.
   const domainTiles = [
-    { key: 'mind' as DomainKey,         label: 'Mind',     icon: '🧘', color: '#A89BFA' },
-    { key: 'health' as DomainKey,       label: 'Health',   icon: '❤️', color: '#F66E8E' },
-    { key: 'growth' as DomainKey,       label: 'Growth',   icon: '🌱', color: '#10B981' },
-    { key: 'relationship' as DomainKey, label: 'Love',     icon: '💞', color: '#7B6EF6' },
+    { key: 'mind' as DomainKey,         label: domLabel('mind'),         icon: '🧘', color: '#A89BFA' },
+    { key: 'health' as DomainKey,       label: domLabel('health'),       icon: '❤️', color: '#F66E8E' },
+    { key: 'growth' as DomainKey,       label: domLabel('growth'),       icon: '🌱', color: '#10B981' },
+    { key: 'relationship' as DomainKey, label: domLabel('relationship'), icon: '💞', color: '#7B6EF6' },
   ]
 
   return (
@@ -9068,7 +9092,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
         <View style={{ position: 'absolute', bottom: -20, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.06)' }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>Wellness Score</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>{tr('wellness_score')}</Text>
             {wellnessScore != null && (
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
                 <Text style={{ fontSize: 56, fontWeight: '900', color: '#fff', lineHeight: 60 }}>{wellnessScore}</Text>
@@ -9076,10 +9100,10 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
               </View>
             )}
             <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
-              {wellnessScore == null ? 'Start tracking to see your score'
-                : wellnessScore >= 75 ? 'Thriving — keep it up! ✨'
-                : wellnessScore >= 55 ? 'Good momentum — stay consistent'
-                : 'Room to grow — Soma is with you'}
+              {wellnessScore == null ? tr('score_start')
+                : wellnessScore >= 75 ? tr('score_thriving')
+                : wellnessScore >= 55 ? tr('score_momentum')
+                : tr('score_room')}
             </Text>
           </View>
           <View style={{ alignItems: 'center', justifyContent: 'center', width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.15)' }}>
@@ -9096,7 +9120,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
               <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>0</Text>
-              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>View details →</Text>
+              <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{tr('view_details')}</Text>
               <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>100</Text>
             </View>
           </View>
@@ -9156,7 +9180,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>{MOODS.find(m => m.val === moodPicked)?.label}</Text>
-              <Text style={{ fontSize: 12, color: t.textSub }}>Mood logged today</Text>
+              <Text style={{ fontSize: 12, color: t.textSub }}>{tr('mood_logged')}</Text>
             </View>
             <TouchableOpacity onPress={() => { setMoodPicked(null); DB.addMoodLog(3) }}>
               <Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '600' }}>Change</Text>
@@ -9189,10 +9213,10 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B6EF6', marginBottom: 1 }}>
-                {hour >= 17 ? 'Evening Check-in' : 'Morning Check-in'}
+                {hour >= 17 ? tr('evening_checkin') : tr('morning_checkin')}
               </Text>
               <Text style={{ fontSize: 13, color: t.text, fontWeight: '500' }}>
-                {hour >= 17 ? 'Reflect on your day' : 'Set your intention for today'}
+                {hour >= 17 ? tr('reflect_day') : tr('set_intention')}
               </Text>
             </View>
             <Ionicons name="chevron-forward-outline" size={16} color="#7B6EF6" />
@@ -9205,7 +9229,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       {streak > 0 && (
         <FadeIn delay={180}>
         <View style={{ backgroundColor: t.card, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: t.border }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Your Streaks</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr('your_streaks')}</Text>
           <View style={{ flexDirection: 'row', gap: 0 }}>
             {[
               { icon: '🔥', label: tr('activity'), days: streak },
@@ -9339,7 +9363,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
         <View style={g.orbSm}><Text style={{ color: '#fff', fontSize: 13 }}>✦</Text></View>
         <View style={{ flex: 1 }}>
           <Text style={g.cardTag}>SOMA · AI partner</Text>
-          <Text style={[g.auraMainTitle, { color: t.text }]}>Talk about anything</Text>
+          <Text style={[g.auraMainTitle, { color: t.text }]}>{tr('talk_anything')}</Text>
           <Text style={g.auraMainSub}>{totalMem > 0 ? `${totalMem} memories · ${profile.circle.length} people` : 'Start building your story'}</Text>
         </View>
         <Text style={g.arrow}>→</Text>
@@ -9381,7 +9405,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
           {/* Header row */}
           <TouchableOpacity onPress={() => setChecklistOpen(o => !o)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: checklistOpen ? 10 : 0 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: t.text }}>Getting started</Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: t.text }}>{tr('getting_started')}</Text>
               <View style={{ backgroundColor: '#7B6EF6' + '20', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B6EF6' }}>{completedSteps}/{profileSteps.length}</Text>
               </View>
@@ -9419,7 +9443,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
       <FadeIn delay={380}>
       <View style={{ marginBottom: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>Circle of Life</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{tr('circle_of_life')}</Text>
           <TouchableOpacity onPress={() => go('lifebalance')}>
             <Text style={{ fontSize: 12, color: '#7B6EF6', fontWeight: '600' }}>Details →</Text>
           </TouchableOpacity>
@@ -9437,7 +9461,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
           <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#FBEAF0', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
             <Ionicons name="fitness-outline" size={20} color="#993556" />
           </View>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: t.text, marginBottom: 3 }}>Health Hub</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: t.text, marginBottom: 3 }}>{tr('health_hub')}</Text>
           <Text style={{ fontSize: 12, color: t.textSub }}>{(() => {
             const todayLog = (profile.healthLogs || []).find(l => l.date === new Date().toISOString().slice(0,10))
             if (todayLog?.steps) return `${todayLog.steps.toLocaleString()} steps`
@@ -10850,12 +10874,12 @@ function DailyCheckinScreen({ profile, onDone, onBack }: {
   const name = profile.name || 'friend'
 
   const MOODS: { emoji: string; label: string; val: 1|2|3|4|5|6|7 }[] = [
-    { emoji: '🤩', label: 'Euphoric', val: 7 },
-    { emoji: '🥰', label: 'Amazing',  val: 6 },
-    { emoji: '😊', label: 'Great',    val: 5 },
-    { emoji: '🙂', label: 'Good',     val: 4 },
-    { emoji: '😐', label: 'Okay',     val: 3 },
-    { emoji: '😕', label: 'Meh',      val: 2 },
+    { emoji: '🤩', label: tr('mood_euphoric'), val: 7 },
+    { emoji: '🥰', label: tr('mood_amazing'),  val: 6 },
+    { emoji: '😊', label: tr('mood_great'),    val: 5 },
+    { emoji: '🙂', label: tr('mood_good'),     val: 4 },
+    { emoji: '😐', label: tr('mood_okay'),     val: 3 },
+    { emoji: '😕', label: tr('mood_meh'),      val: 2 },
   ]
 
   const INTENTION_CHIPS = isEvening
@@ -12455,7 +12479,7 @@ Be specific and human. Under 120 words total.`
               onPress={submitAddPerson}
               disabled={!addName.trim()}
               style={{ backgroundColor: addName.trim() ? '#7B6EF6' : '#4A4870', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Add to Circle</Text>
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{tr('add_to_circle')}</Text>
             </TouchableOpacity>
           </View>
       </InFrameSheet>
@@ -18338,7 +18362,7 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
       </View>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border, padding: 20, marginTop: 20 }]}>
         <Text style={g.settingsHelpTxt}>If you ever have a really hard moment, {profile.aiName} can help you reach this person in one tap.</Text>
-        <Text style={g.settingsInputLabel}>Their name</Text>
+        <Text style={g.settingsInputLabel}>{tr('their_name')}</Text>
         <TextInput style={g.settingsInput} value={tcName} onChangeText={setTcName}
           placeholder="e.g. Mom, best friend" placeholderTextColor="#B0B3C8" />
         <Text style={g.settingsInputLabel}>Their phone number</Text>
