@@ -274,7 +274,8 @@ bot.onText(/\/add_soma_to_chat/, async (msg) => {
 async function analyzeAndReport(chatId, userProfile, userTelegramId) {
   try {
     // Get recent messages from this chat
-    const { data: messages, error: msgError } = await supabase
+    // eslint-disable-next-line prefer-const -- reassigned below when the fetch fails
+    let { data: messages, error: msgError } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('chat_id', chatId)
@@ -483,7 +484,7 @@ Return ONLY valid JSON:
     console.log('Parsed analysis:', analysis);
 
     // Send formatted report
-    const report = `🎯 COMPATIBILITY ANALYSIS WITH @${targetUser}
+    let report = `🎯 COMPATIBILITY ANALYSIS WITH @${targetUser}
 
 ✨ Match Score: ${analysis.compatibility_score}%
 

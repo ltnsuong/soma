@@ -2229,7 +2229,7 @@ Write exactly 7 lines:`
     const raw = await groq([{ role: 'user', content: prompt }],
       `You are ${aiName}, a warm but slightly passive-aggressive AI companion — think Duolingo's owl energy. You write short, punchy push notification copy that makes people feel guilty for not opening the app, while also feeling genuinely cared for. Max 85 chars per message. Heavy emoji use. Direct, personal, never generic.`, 500, 0.95)
     const lines = raw.split('\n')
-      .map(l => l.replace(/^\d+[\.\)]\s*/, '').replace(/^["']|["']$/g, '').trim())
+      .map(l => l.replace(/^\d+[.)]\s*/, '').replace(/^["']|["']$/g, '').trim())
       .filter(l => l.length > 8 && l.length < 130)
     if (lines.length >= 5) return lines.slice(0, 7)
   } catch {}
@@ -3817,7 +3817,11 @@ export default function App() {
     if (screen === 'try')         return <SomaChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" autoStart={fromOnboarding} />
     if (screen === 'register')    return (
       <RegisterBoundary fallback={<RegisterFallback onDone={(name) => { go(DB.onboardingDone() ? 'home' : 'onboarding') }} onSignIn={() => go('login')} />}>
-        <Register onDone={(name) => { auth.getToken() ? go('login') : go(DB.onboardingDone() ? 'home' : 'onboarding') }} onSignIn={() => go('login')} />
+        {/* Having a token here means Google or Telegram just succeeded — signup()
+            deliberately saves none until the email is verified. So this sent every
+            social sign-up straight back to "Welcome back, sign in", which looks
+            exactly like the auth having failed. Same destination as the fallback. */}
+        <Register onDone={() => go(DB.onboardingDone() ? 'home' : 'onboarding')} onSignIn={() => go('login')} />
       </RegisterBoundary>
     )
     // Signing IN means the account already exists — always go home. Routing a returning
@@ -10304,7 +10308,7 @@ function DailyCheckinScreen({ profile, onDone, onBack }: {
                 <Text style={{ fontSize: 11, fontWeight: '700', color: t.textTertiary, letterSpacing: 0.7, marginBottom: 10 }}>QUICK PICKS</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {(step === 1 ? INTENTION_CHIPS : GRATITUDE_CHIPS).map(chip => (
-                    <TouchableOpacity key={chip} onPress={() => { haptic.light(); step === 1 ? setIntention(chip) : setGratitude(chip) }}
+                    <TouchableOpacity key={chip} onPress={() => { haptic.light(); if (step === 1) setIntention(chip); else setGratitude(chip) }}
                       style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
                         backgroundColor: (step === 1 ? intention : gratitude) === chip ? t.accent : (dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)') }}>
                       <Text style={{ fontSize: 13, fontWeight: '600', color: (step === 1 ? intention : gratitude) === chip ? '#fff' : t.textSub }}>{chip}</Text>
