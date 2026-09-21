@@ -2884,12 +2884,12 @@ Core beliefs you live by:
 - If someone sounds hopeless or mentions not wanting to live, you stay warm, take it seriously, never minimize, and always steer them toward a real human and crisis support.
 ${SOMA_VOICE}${langDirective()}`
   const ob = p.onboarding
-  const obContext = ob && (ob.goals.length || ob.focusDomains.length) ? `
+  const obContext = ob && (ob.goals?.length || ob.focusDomains?.length) ? `
 WHY THEY CAME (from onboarding — weave this in naturally, don't list it back at them):
-${ob.goals.length ? `- Goals: ${ob.goals.join(', ')}` : ''}
-${ob.focusDomains.length ? `- Life areas they want to work on: ${ob.focusDomains.join(', ')}` : ''}` : ''
+${ob.goals?.length ? `- Goals: ${ob.goals.join(', ')}` : ''}
+${ob.focusDomains?.length ? `- Life areas they want to work on: ${ob.focusDomains.join(', ')}` : ''}` : ''
   if (mode === 'try') return `${base}${obContext}
-This person is trying SOMA for the first time. Make them feel deeply heard. Be their friend right now. ${ob?.goals.length ? 'Open by gently acknowledging what brought them here.' : ''} Keep it to 2-3 sentences. After 3-4 exchanges, mention they can keep this by joining SOMA — say it once, lightly, and drop it.`
+This person is trying SOMA for the first time. Make them feel deeply heard. Be their friend right now. ${ob?.goals?.length ? 'Open by gently acknowledging what brought them here.' : ''} Keep it to 2-3 sentences. After 3-4 exchanges, mention they can keep this by joining SOMA — say it once, lightly, and drop it.`
   if (mode === 'diary') return `${base}
 This is their daily diary check-in. Help them reflect on their day. 2-3 sentences.
 WHAT YOU KNOW:\n${mem || 'Just getting to know them'}`
@@ -6432,6 +6432,96 @@ function ResetPasswordScreen({ token, onDone }: { token: string; onDone: () => v
 }
 
 // ── AURA CHAT (try / full / diary) ─────────────────────────
+// The composer, voice first.
+//
+// SOMA is meant to be talked to, not typed at. A text box with a small mic
+// beside it says the opposite — it makes typing the default and speaking the
+// afterthought. So the microphone is the thing in the middle, and the keyboard
+// is one tap away for anyone who would rather write, or cannot speak right now.
+// What the button says it is doing. Extracted so the component stays inside the
+// complexity budget — a chain of ternaries in JSX is a chain of branches.
+const composerStatus = (listening: boolean, loading: boolean, heard: string): string => {
+  if (loading) return 'Soma is thinking…'
+  if (!listening) return 'Tap to talk'
+  return heard || 'Listening…'
+}
+
+// The expanding ring while it is listening. Its own component so the animation
+// lives with the thing it animates.
+function ListeningRing() {
+  const ring = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(ring, { toValue: 1, duration: 1100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(ring, { toValue: 0, duration: 0, useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [])
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', width: 84, height: 84, borderRadius: 42,
+        borderWidth: 2, borderColor: '#7B6EF6',
+        opacity: ring.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
+        transform: [{ scale: ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }],
+      }}
+    />
+  )
+}
+
+function VoiceComposer({ listening, heard, loading, onMic, onType }: {
+  listening: boolean; heard: string; loading: boolean
+  onMic: () => void; onType: () => void
+}) {
+  const { t } = useT()
+  const accent = listening ? '#F6379B' : '#7B6EF6'
+  const hearing = listening && !!heard
+
+  return (
+    <View style={{ paddingTop: 14, paddingBottom: 26, borderTopWidth: 1, borderTopColor: t.border, alignItems: 'center' }}>
+      {/* What it heard, so speaking never feels like shouting into nothing. */}
+      <Text
+        numberOfLines={2}
+        style={{
+          fontSize: 13.5, lineHeight: 19, textAlign: 'center', minHeight: 38,
+          paddingHorizontal: 32, marginBottom: 6,
+          color: hearing ? t.text : t.textSub,
+          fontWeight: hearing ? '600' : '500',
+        }}>
+        {composerStatus(listening, loading, heard)}
+      </Text>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+        {/* Keyboard sits off to the side: available, not competing. */}
+        <TouchableOpacity
+          onPress={onType}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={{ position: 'absolute', right: 26, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.border }}>
+          <Ionicons name="keypad-outline" size={19} color={t.textSub} />
+        </TouchableOpacity>
+
+        <View style={{ width: 84, height: 84, alignItems: 'center', justifyContent: 'center' }}>
+          {listening && <ListeningRing />}
+          <TouchableOpacity
+            onPress={onMic}
+            disabled={loading}
+            activeOpacity={0.85}
+            style={{
+              width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: accent, opacity: loading ? 0.45 : 1,
+              shadowColor: accent, shadowOpacity: 0.4, shadowRadius: 18,
+              shadowOffset: { width: 0, height: 8 }, elevation: 8,
+            }}>
+            <Ionicons name={listening ? 'stop' : 'mic'} size={30} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  )
+}
+
 function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart }: {
   mode: 'try' | 'full' | 'diary'; profile: UserProfile; onRefresh: () => void; onDone: () => void; title: string; isDiary?: boolean; autoStart?: boolean
 }) {
@@ -6441,6 +6531,8 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
   const [loading, setLoading] = useState(false)
   const [started, setStarted] = useState(false)
   const [listening, setListening] = useState(false)
+  const [heard, setHeard] = useState('')
+  const [typing, setTyping] = useState(false)
   const [speaking, setSpeaking] = useState(false)
   const [crisis, setCrisis] = useState(false)
   const stopMicRef = useRef<(() => void) | null>(null)
@@ -6543,10 +6635,14 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
 
   const onMic = () => {
     if (listening) { stopMicRef.current?.(); return }
+    setHeard('')
     setListening(true)
     const stop = listen(
-      (txt) => { setListening(false); if (txt.trim()) send(txt) },
-      () => setListening(false),
+      (txt) => { setListening(false); setHeard(''); if (txt.trim()) send(txt) },
+      () => { setListening(false); setHeard('') },
+      // Third argument the old bar never used: without it, talking to Soma gave
+      // no sign anything was being heard until the whole reply came back.
+      (partial) => setHeard(partial),
     )
     stopMicRef.current = stop
   }
@@ -6609,12 +6705,28 @@ function SomaChat({ mode, profile, onRefresh, onDone, title, isDiary, autoStart 
                 </View>
               )}
             </ScrollView>
-            <View style={g.inputBar}>
-              <TextInput style={g.chatInput} value={input} onChangeText={setInput} placeholder="Type or speak..." placeholderTextColor="#9A9DB2" multiline
-                {...enterToSend(() => { if (input.trim() && !loading) send(input) })} />
-              <TouchableOpacity style={[g.iconBtn, { backgroundColor: t.card, borderColor: t.border }, listening && g.iconOn]} onPress={onMic} disabled={loading}><Text style={{ fontSize: 20 }}>{listening ? '⏹' : '🎙'}</Text></TouchableOpacity>
-              <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}><Text style={g.sendIcon}>→</Text></TouchableOpacity>
-            </View>
+            {typing ? (
+              <View style={g.inputBar}>
+                {/* Back to the microphone, which is where this screen wants you. */}
+                <TouchableOpacity style={[g.iconBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                  onPress={() => { setTyping(false); setInput('') }}>
+                  <Ionicons name="mic" size={19} color="#7B6EF6" />
+                </TouchableOpacity>
+                <TextInput style={g.chatInput} value={input} onChangeText={setInput} placeholder="Type to Soma…" placeholderTextColor="#9A9DB2" multiline autoFocus
+                  {...enterToSend(() => { if (input.trim() && !loading) send(input) })} />
+                <TouchableOpacity style={[g.sendBtn, (!input.trim() || loading) && g.off]} onPress={() => send(input)} disabled={!input.trim() || loading}>
+                  <Text style={g.sendIcon}>→</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <VoiceComposer
+                listening={listening}
+                heard={heard}
+                loading={loading}
+                onMic={onMic}
+                onType={() => { haptic.light(); setTyping(true) }}
+              />
+            )}
           </>
         )}
       </Animated.View>
