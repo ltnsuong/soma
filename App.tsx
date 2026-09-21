@@ -4524,7 +4524,10 @@ Also: 1-2 short sentences. Never give advice yet — you're only getting to know
         `Translate the "ask", "opener" and "followUp" strings into ${currentLangName()}.
 Return the SAME JSON array with the same ids and keys, translated values only.
 Translate faithfully — these are carefully worded questions, do not rewrite, shorten or add to them.
-Always use the informal address (ты, tu, du), never the formal one. Keep the tone of a close friend.
+Use the register a close friend uses, never the polite or formal one — this matters as much as
+the words. ты not вы. tu not vous. du not Sie. In Vietnamese say "mình" for yourself and "bạn"
+for them; "tôi" is what a form says, not a friend. In Japanese, plain form, not です/ます.
+If the language has no such distinction, just keep it warm and spoken.
 "Soma" is a name. NEVER translate it into a word — in Russian it became "Сом", which means catfish.
 Keep it as "Soma", or transliterate it as a name if the script differs (Сома, ソーマ, 索玛), never as a common noun.
 Omit a key entirely if it was absent. Return only JSON.`,
