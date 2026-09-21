@@ -1330,6 +1330,18 @@ const DB = {
           p.circle = p.circle.filter((c: CirclePerson) => !(typeof c.id === 'string' && c.id.startsWith('seed_')))
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {}
         }
+        // Backfill people created by upsertPerson before it wrote the full shape.
+        // Without this every existing user keeps crashing on Home.
+        let repaired = false
+        for (const c of p.circle as CirclePerson[]) {
+          if (!c.messages) { c.messages = []; repaired = true }
+          if (!c.somaMessages) { c.somaMessages = []; repaired = true }
+          if (!c.type) { c.type = 'friend'; repaired = true }
+          if (!c.invitationStatus) { c.invitationStatus = 'active'; repaired = true }
+          if (!c.inviteCode) { c.inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase(); repaired = true }
+        }
+        if (repaired) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {} }
+
         // Repair Circles that already collected duplicates before addCircle
         // deduped. Keeps the first entry, which is the one holding the history.
         const seenIds = new Set<string>()
@@ -1377,7 +1389,17 @@ const DB = {
       if (context) found.context = context
       interests.forEach(i => { if (!found.sharedInterests.includes(i)) found.sharedInterests.push(i) })
     } else {
-      p.circle.push({ id: Date.now() + '', name, relationship, context, sharedInterests: interests, lastSeen: new Date().toLocaleDateString(), mentions: 1 })
+      // Must match addCircle's shape. It did not: messages, somaMessages, type,
+      // inviteCode and invitationStatus are all required on CirclePerson and all
+      // were missing, so anyone Soma extracted from conversation — which is now
+      // everyone, after the first conversation — had no messages array, and
+      // computeNotifs crashed on Home reading p.messages.length.
+      p.circle.push({
+        id: Date.now() + '', name, relationship, context,
+        sharedInterests: interests, lastSeen: new Date().toLocaleDateString(), mentions: 1,
+        type: 'friend', inviteCode: Math.random().toString(36).slice(2, 8).toUpperCase(),
+        invitationStatus: 'active', messages: [], somaMessages: [],
+      })
     }
     DB.save(p)
   },
@@ -3246,7 +3268,7 @@ function computeNotifs(profile: UserProfile): Omit<SomaNotif, 'id' | 'read' | 'c
   // One circle nudge (most neglected person only)
   const neglected = profile.circle.filter(p => {
     const latest = (p.interactions || [])[0]?.date
-    return latest ? Math.floor((now - new Date(latest).getTime()) / day) > 14 : p.messages.length === 0
+    return latest ? Math.floor((now - new Date(latest).getTime()) / day) > 14 : (p.messages || []).length === 0
   })
   if (neglected.length > 0) {
     const p = neglected[0]

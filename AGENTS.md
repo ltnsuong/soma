@@ -36,6 +36,20 @@ Deploy web — **all four steps, in order**:
 cd ~/soma && npx expo export -p web && bash scripts/postbuild-web.sh && npx vercel build --prod && npx vercel deploy --prebuilt --prod
 ```
 
+Both deploys have a trap that looks like something else:
+
+**Vercel needs `--scope mysomaapp`.** `.vercel/project.json` has no `projectId`, so without the
+scope the deploy fails with `Not authorized` — and the CLI reports that as a *deploy* failure,
+not an auth one. Nothing ships and the previous output stays live.
+
+**Railway deploys from `backend/`, not the repo root.** `backend/railway.json` is the service
+config, and `railway up` from the root installs dependencies against the Expo app's
+package.json — the container then dies with `Cannot find package 'express'` and the API returns
+502. The service also lives in the Railway project **`soma-backend`**, not `Soma`; `Soma` is a
+different project whose deployments were all removed in June, and linking to it shows a
+deploy history that has nothing to do with production. It is not connected to GitHub either, so
+pushing does nothing — `cd backend && railway up` is the deploy.
+
 `--prebuilt` deploys `.vercel/output`, **not** `dist/`. Skip `vercel build` and the deploy silently ships whatever snapshot was in `.vercel/output` last time. This once redeployed a two-week-old build five times in a row without any error. After deploying, compare the local bundle hash against the live one before believing it worked.
 
 ## Invariants — each of these has cost a multi-day outage
@@ -49,6 +63,12 @@ cd ~/soma && npx expo export -p web && bash scripts/postbuild-web.sh && npx verc
 **Google sign-in needs an ID token, not an access token.** Use `Google.useIdTokenAuthRequest` and read `response.params.id_token` — the backend validates against `tokeninfo?id_token=`. `useAuthRequest` returns an access token and fails with "Invalid Google token".
 
 **`migrations.sql` is read top to bottom.** An `ALTER TABLE ... ADD COLUMN` must sit *after* the `CREATE TABLE` it alters, or a fresh database fails on it.
+
+**A CirclePerson needs its full shape.** `messages`, `somaMessages`, `type`, `inviteCode` and
+`invitationStatus` are required. `upsertPerson` omitted all five, so every person Soma
+extracted from a conversation — which is everyone, since the first conversation extracts
+people — crashed `computeNotifs` on Home with `Cannot read properties of undefined (reading
+'length')`. Read these defensively anyway; there is old data in the wild.
 
 **Demo accounts stay.** They are not test data to clean up.
 

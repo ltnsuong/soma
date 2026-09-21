@@ -1,7 +1,7 @@
 {
   "errors": 37,
   "warnings": 289,
-  "types": 31,
+  "types": 30,
   "cycles": 0,
   "dead": 5,
   "recorded": "2026-09-21"
