@@ -104,6 +104,8 @@ const LIGHT_THEME = {
   red:         '#E57373',
   shadow:      '#7B6EF6',
 }
+const SOMA_SURFACE_DARK = 'rgba(123,110,246,0.18)'   // Soma's bubble / border on the dark onboarding screen
+
 const DARK_THEME: typeof LIGHT_THEME = {
   bg:          '#0E1016',
   card:        '#181B2A',
@@ -4420,6 +4422,7 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
 
   const color = phase >= 1 && phase <= 3 ? COLORS[phase - 1] : '#7B6EF6'
   const [quickAnswer, setQuickAnswer] = useState('')
+  const [obTyping, setObTyping] = useState(false)   // false = voice, which is the point
   const [onboardPhoto, setOnboardPhoto] = useState('')
   const [somaReply, setSomaReply] = useState('')
   const [somaReplyLoading, setSomaReplyLoading] = useState(false)
@@ -4498,6 +4501,29 @@ Also: 1-2 short sentences. Never give advice yet — you're only getting to know
     if (sectionConvoRef.current.length) return
     pushSoma(OPENING)
     askNextBeat()
+  }
+
+  // Start or stop listening. Lifted out of the old send button, which had to be
+  // three things at once — send, record, stop — because the text box owned the bar.
+  const onObMic = () => {
+    if (somaGenerating || allAnswered) return
+    if (listening) {
+      stopListeningRef.current?.()
+      setListening(false)
+      const said = transcript.trim()
+      setTranscript('')
+      if (said) sendToSoma(said)
+      return
+    }
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
+    setListening(true)
+    setTimeout(() => {
+      stopListeningRef.current = listen(
+        (text) => { setListening(false); setTranscript(''); if (text.trim()) sendToSoma(text) },
+        () => setListening(false),
+        (interim) => setTranscript(interim),
+      )
+    }, 300)
   }
 
   const sendToSoma = async (raw: string) => {
@@ -4796,45 +4822,41 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
 
         {/* Input bar */}
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30, borderTopWidth: 1, borderTopColor: 'rgba(123,110,246,0.15)' }}>
-            <TextInput
-              value={draft}
-              onChangeText={(v) => { setQuickAnswer(v); setTranscript('') }}
-              placeholder={allAnswered ? 'All done — build your profile above' : listening ? 'Listening…' : 'Tell Soma…'}
-              placeholderTextColor="rgba(168,155,250,0.3)"
-              multiline
-              editable={!somaGenerating && !allAnswered}
-              {...enterToSend(() => { if (draft.trim() && !somaGenerating && !allAnswered) sendToSoma(draft) })}
-              style={{ flex: 1, maxHeight: 120, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, borderWidth: 1, borderColor: listening ? 'rgba(246,55,155,0.5)' : 'rgba(123,110,246,0.25)', paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: '#E8E5FF', lineHeight: 21 }}
+          {obTyping ? (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30, borderTopWidth: 1, borderTopColor: 'rgba(123,110,246,0.15)' }}>
+              <TouchableOpacity
+                onPress={() => { setObTyping(false); setQuickAnswer('') }}
+                style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: SOMA_SURFACE_DARK }}>
+                <Ionicons name="mic" size={19} color="#A89BFA" />
+              </TouchableOpacity>
+              <TextInput
+                value={draft}
+                onChangeText={(v) => { setQuickAnswer(v); setTranscript('') }}
+                placeholder={allAnswered ? 'All done — build your profile above' : 'Type to Soma…'}
+                placeholderTextColor="rgba(168,155,250,0.3)"
+                multiline autoFocus
+                editable={!somaGenerating && !allAnswered}
+                {...enterToSend(() => { if (draft.trim() && !somaGenerating && !allAnswered) sendToSoma(draft) })}
+                style={{ flex: 1, maxHeight: 120, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, borderWidth: 1, borderColor: SOMA_SURFACE_DARK, paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: '#E8E5FF', lineHeight: 21 }}
+              />
+              <TouchableOpacity
+                disabled={!draft.trim() || somaGenerating || allAnswered}
+                onPress={() => { if (draft.trim()) sendToSoma(draft) }}
+                style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: draft.trim() && !somaGenerating && !allAnswered ? '#7B6EF6' : 'rgba(123,110,246,0.35)' }}>
+                <Ionicons name="send" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <VoiceComposer
+              onDark
+              listening={listening}
+              heard={transcript}
+              loading={somaGenerating}
+              done={allAnswered}
+              onMic={onObMic}
+              onType={() => { haptic.light(); setObTyping(true) }}
             />
-            <TouchableOpacity
-              disabled={somaGenerating || allAnswered}
-              onPress={() => {
-                if (draft.trim()) { sendToSoma(draft); return }
-                if (listening) {
-                  stopListeningRef.current?.()
-                  setListening(false)
-                  const said = transcript.trim()
-                  setTranscript('')
-                  if (said) sendToSoma(said)
-                } else {
-                  if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
-                  setListening(true)
-                  setTimeout(() => {
-                    stopListeningRef.current = listen(
-                      (text) => { setListening(false); setTranscript(''); if (text.trim()) sendToSoma(text) },
-                      () => setListening(false),
-                      (interim) => setTranscript(interim),
-                    )
-                  }, 300)
-                }
-              }}
-              style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: somaGenerating || allAnswered ? 'rgba(123,110,246,0.35)' : listening ? '#F6379B' : '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
-              <Animated.View style={{ transform: [{ scale: listening ? micAnim : 1 }] }}>
-                <Ionicons name={draft.trim() ? 'send' : listening ? 'stop' : 'mic'} size={draft.trim() ? 20 : 22} color="#fff" />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
+          )}
         </KeyboardAvoidingView>
       </View>
     )
@@ -4993,7 +5015,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
               <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
               </View>
-              <View style={{ backgroundColor: 'rgba(123,110,246,0.18)', borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
+              <View style={{ backgroundColor: SOMA_SURFACE_DARK, borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
                 <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 20 }}>
                   Hey {name.split(' ')[0]}! I'm here for you — ask me anything about your life, goals, or how you're feeling. 💜
                 </Text>
@@ -5015,7 +5037,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
                 <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
                 </View>
-                <View style={{ backgroundColor: 'rgba(123,110,246,0.18)', borderRadius: 16, borderBottomLeftRadius: 4, padding: 12 }}>
+                <View style={{ backgroundColor: SOMA_SURFACE_DARK, borderRadius: 16, borderBottomLeftRadius: 4, padding: 12 }}>
                   <Text style={{ color: 'rgba(168,155,250,0.6)', fontSize: 14 }}>Thinking…</Text>
                 </View>
               </View>
@@ -5025,7 +5047,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
                 <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
                 </View>
-                <View style={{ backgroundColor: 'rgba(123,110,246,0.18)', borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
+                <View style={{ backgroundColor: SOMA_SURFACE_DARK, borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
                   <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 20 }}>{tourChatReply}</Text>
                 </View>
               </View>
@@ -6440,11 +6462,19 @@ function ResetPasswordScreen({ token, onDone }: { token: string; onDone: () => v
 // is one tap away for anyone who would rather write, or cannot speak right now.
 // What the button says it is doing. Extracted so the component stays inside the
 // complexity budget — a chain of ternaries in JSX is a chain of branches.
-const composerStatus = (listening: boolean, loading: boolean, heard: string): string => {
+const composerStatus = (listening: boolean, loading: boolean, heard: string, done?: boolean): string => {
+  if (done) return 'All done — build your profile above'
   if (loading) return 'Soma is thinking…'
   if (!listening) return 'Tap to talk'
   return heard || 'Listening…'
 }
+
+// Onboarding is always dark, whatever theme the app is in, so it cannot take
+// the theme's colours. One branch here rather than four fallbacks inside the
+// component, which would push it over the complexity budget.
+const composerColors = (t: TTheme, onDark?: boolean) => (onDark
+  ? { border: SOMA_SURFACE_DARK, text: '#E8E5FF', sub: 'rgba(168,155,250,0.55)', card: 'rgba(255,255,255,0.06)' }
+  : { border: t.border, text: t.text, sub: t.textSub, card: t.card })
 
 // The expanding ring while it is listening. Its own component so the animation
 // lives with the thing it animates.
@@ -6471,26 +6501,28 @@ function ListeningRing() {
   )
 }
 
-function VoiceComposer({ listening, heard, loading, onMic, onType }: {
+function VoiceComposer({ listening, heard, loading, onMic, onType, onDark, done }: {
   listening: boolean; heard: string; loading: boolean
   onMic: () => void; onType: () => void
+  onDark?: boolean; done?: boolean
 }) {
   const { t } = useT()
+  const c = composerColors(t, onDark)
   const accent = listening ? '#F6379B' : '#7B6EF6'
   const hearing = listening && !!heard
 
   return (
-    <View style={{ paddingTop: 14, paddingBottom: 26, borderTopWidth: 1, borderTopColor: t.border, alignItems: 'center' }}>
+    <View style={{ paddingTop: 14, paddingBottom: 26, borderTopWidth: 1, borderTopColor: c.border, alignItems: 'center' }}>
       {/* What it heard, so speaking never feels like shouting into nothing. */}
       <Text
         numberOfLines={2}
         style={{
           fontSize: 13.5, lineHeight: 19, textAlign: 'center', minHeight: 38,
           paddingHorizontal: 32, marginBottom: 6,
-          color: hearing ? t.text : t.textSub,
+          color: hearing ? c.text : c.sub,
           fontWeight: hearing ? '600' : '500',
         }}>
-        {composerStatus(listening, loading, heard)}
+        {composerStatus(listening, loading, heard, done)}
       </Text>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
@@ -6498,19 +6530,19 @@ function VoiceComposer({ listening, heard, loading, onMic, onType }: {
         <TouchableOpacity
           onPress={onType}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={{ position: 'absolute', right: 26, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.border }}>
-          <Ionicons name="keypad-outline" size={19} color={t.textSub} />
+          style={{ position: 'absolute', right: 26, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}>
+          <Ionicons name="keypad-outline" size={19} color={c.sub} />
         </TouchableOpacity>
 
         <View style={{ width: 84, height: 84, alignItems: 'center', justifyContent: 'center' }}>
           {listening && <ListeningRing />}
           <TouchableOpacity
             onPress={onMic}
-            disabled={loading}
+            disabled={loading || done}
             activeOpacity={0.85}
             style={{
               width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: accent, opacity: loading ? 0.45 : 1,
+              backgroundColor: accent, opacity: loading || done ? 0.4 : 1,
               shadowColor: accent, shadowOpacity: 0.4, shadowRadius: 18,
               shadowOffset: { width: 0, height: 8 }, elevation: 8,
             }}>
