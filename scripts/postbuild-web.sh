@@ -39,3 +39,12 @@ require('$ROOT/node_modules/sharp')('$ROOT/assets/icon.png')
   .then(()=>console.log('✓ Generated dist/apple-touch-icon.png (180x180)'))
   .catch(e=>{console.error('✗ apple-touch-icon failed:',e.message);process.exit(1)})
 "
+
+# The App Store requires a reachable privacy policy, and an auto-renewing
+# subscription requires terms. These are plain static pages; expo export does not
+# know about them, and vercel.json excludes both from the SPA rewrite so they are
+# served as themselves rather than as index.html.
+for page in privacy.html terms.html; do
+  cp "$(dirname "$0")/../web/$page" "$DIST/$page"
+  echo "\u2713 Copied $page"
+done
