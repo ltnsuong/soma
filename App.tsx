@@ -11,6 +11,7 @@ import * as Font from 'expo-font'
 import * as WebBrowser from 'expo-web-browser'
 import * as ImagePicker from 'expo-image-picker'
 import * as AppleAuthentication from 'expo-apple-authentication'
+import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio'
 import * as Google from 'expo-auth-session/providers/google'
 import * as Notifications from 'expo-notifications'
 import * as Location from 'expo-location'
@@ -3034,6 +3035,58 @@ const LANG_CODES: Record<string, string> = {
 
 // Record with MediaRecorder, transcribe with Whisper. Same contract as listen():
 // returns a stop function; stopping ends the recording and resolves the transcript.
+// expo-audio hands out its recorder through a hook, but listen() is a plain
+// function called from a dozen screens. The root component parks its recorder
+// here once, and listen() picks it up.
+let nativeRecorder: any = null
+const setNativeRecorder = (r: any) => { nativeRecorder = r }
+
+// Voice on a real phone. Neither Web Speech nor MediaRecorder exists on
+// native, so listen() fell through to listenViaWhisper and hit its guard —
+// meaning voice input answered "not supported in this browser" on every iPhone.
+//
+// Records with expo-audio and posts the file to the same /ai/transcribe the web
+// path uses, so there is one transcription route, not two.
+function listenNative(
+  recorder: any,
+  onResult: (t: string) => void,
+  onEnd: () => void,
+  onInterim?: (t: string) => void,
+): () => void {
+  let stopped = false
+
+  const run = async () => {
+    const perm = await AudioModule.requestRecordingPermissionsAsync()
+    if (!perm.granted) { alert('SOMA needs the microphone to hear you.'); onEnd(); return }
+    await recorder.prepareToRecordAsync()
+    recorder.record()
+    onInterim?.('Listening…')
+  }
+
+  run().catch(() => onEnd())
+
+  return () => {
+    if (stopped) return
+    stopped = true
+    ;(async () => {
+      try {
+        await recorder.stop()
+        const uri = recorder.uri
+        if (!uri) { onEnd(); return }
+        onInterim?.('Transcribing…')
+        // The file is on disk, so fetch() is the shortest route to its bytes.
+        const blob = await (await fetch(uri)).blob()
+        const text = await transcribe(blob)
+        if (text) onResult(text)
+      } catch (e) {
+        console.warn('[voice] native capture failed:', e instanceof Error ? e.message : e)
+      } finally {
+        onEnd()
+      }
+    })()
+  }
+}
+
 function listenViaWhisper(
   onResult: (t: string) => void,
   onEnd: () => void,
@@ -3084,6 +3137,11 @@ function listen(
   onEnd: () => void,
   onInterim?: (t: string) => void,
 ): () => void {
+  // On a phone there is no Web Speech and no MediaRecorder — record with
+  // expo-audio and transcribe through the same backend route.
+  if (Platform.OS !== 'web' && nativeRecorder) {
+    return listenNative(nativeRecorder, onResult, onEnd, onInterim)
+  }
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   // No Web Speech (Firefox, Telegram WebView, most in-app browsers) → record and
   // send to Whisper instead. No interim text there, so report progress via onInterim.
@@ -3454,6 +3512,11 @@ type Screen = 'splash' | 'language' | 'onboarding' | 'try' | 'register' | 'home'
 //  ROOT
 // ════════════════════════════════════════════════════════════
 export default function App() {
+  // Owned here because expo-audio only exposes a recorder through a hook; every
+  // voice surface in the app shares this one.
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
+  useEffect(() => { if (Platform.OS !== 'web') setNativeRecorder(audioRecorder) }, [audioRecorder])
+
   const [screen, setScreen] = useState<Screen>('splash')
   const [profile, setProfile] = useState<UserProfile>(DB.get())
   const [fromOnboarding, setFromOnboarding] = useState(false)

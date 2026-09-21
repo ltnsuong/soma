@@ -64,7 +64,13 @@
           "photosPermission": "SOMA uses your photos so you can set a profile picture. Nothing is uploaded until you choose one."
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "SOMA uses your microphone so you can talk to Soma instead of typing."
+        }
+      ]
     ]
   }
 }
