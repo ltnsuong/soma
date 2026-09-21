@@ -233,6 +233,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: "Thanks for sharing. Now tell me about your social world — what do you do for work, what are your relationships like? Family, friends, romantic life, the roles you play in people's lives.",
     ob_q3: "Last one — tell me about who you are on the inside. Your personality, what you love doing, your habits, what brings you joy, and what challenges you most.",
     ob_tap_mic: 'Tap the mic and speak', ob_listening: 'Listening…', ob_type_instead: 'Or type your answer here…',
+    dom_health: 'Health', dom_career: 'Career', dom_finance: 'Finance', dom_relationship: 'Love', dom_family: 'Family', dom_growth: 'Growth', dom_hobby: 'Fun', dom_purpose: 'Purpose', dom_mind: 'Mind', dom_environment: 'Home',
+    tab_bond: 'Bond', no_photo_yet: 'No photo yet', nearby: 'Nearby',
     ob_all_done: 'All done — build your profile above', ob_getting_to_know: 'getting to know you', ob_typing: 'typing…',
     ob_physical_self: 'Physical self', ob_social_self: 'Social self', ob_inner_self: 'Psychological self',
     ob_next: 'Next →', ob_finish: 'Finish →', ob_skip: 'Skip', ob_skip_finish: 'Skip & finish',
@@ -361,6 +363,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Спасибо, что поделился. Теперь расскажи о своём социальном мире — чем занимаешься, какие у тебя отношения? Семья, друзья, романтика, роли, которые ты играешь в жизни людей.',
     ob_q3: 'Последний вопрос — расскажи, кто ты внутри. Твоя личность, что ты любишь делать, твои привычки, что приносит радость и что больше всего испытывает тебя.',
     ob_tap_mic: 'Нажми на микрофон и говори', ob_listening: 'Слушаю…', ob_type_instead: 'Или напиши свой ответ здесь…',
+    dom_health: 'Здоровье', dom_career: 'Карьера', dom_finance: 'Финансы', dom_relationship: 'Любовь', dom_family: 'Семья', dom_growth: 'Рост', dom_hobby: 'Отдых', dom_purpose: 'Смысл', dom_mind: 'Разум', dom_environment: 'Дом',
+    tab_bond: 'Связь', no_photo_yet: 'Пока без фото', nearby: 'Рядом',
     ob_all_done: 'Готово — собери профиль выше', ob_getting_to_know: 'знакомлюсь с тобой', ob_typing: 'печатает…',
     ob_physical_self: 'Физическое я', ob_social_self: 'Социальное я', ob_inner_self: 'Психологическое я',
     ob_next: 'Далее →', ob_finish: 'Завершить →', ob_skip: 'Пропустить', ob_skip_finish: 'Пропустить и завершить',
@@ -489,6 +493,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Gracias por compartir. Ahora cuéntame sobre tu mundo social — ¿qué haces para trabajar, cómo son tus relaciones? Familia, amigos, vida romántica, los roles que juegas en la vida de las personas.',
     ob_q3: 'La última — cuéntame sobre quién eres por dentro. Tu personalidad, lo que te encanta hacer, tus hábitos, lo que te trae alegría y lo que más te desafía.',
     ob_tap_mic: 'Toca el micrófono y habla', ob_listening: 'Escuchando…', ob_type_instead: 'O escribe tu respuesta aquí…',
+    dom_health: 'Salud', dom_career: 'Carrera', dom_finance: 'Finanzas', dom_relationship: 'Amor', dom_family: 'Familia', dom_growth: 'Crecimiento', dom_hobby: 'Ocio', dom_purpose: 'Propósito', dom_mind: 'Mente', dom_environment: 'Hogar',
+    tab_bond: 'Vínculo', no_photo_yet: 'Aún sin foto', nearby: 'Cerca',
     ob_all_done: 'Listo — crea tu perfil arriba', ob_getting_to_know: 'conociéndote', ob_typing: 'escribiendo…',
     ob_physical_self: 'Yo físico', ob_social_self: 'Yo social', ob_inner_self: 'Yo psicológico',
     ob_next: 'Siguiente →', ob_finish: 'Terminar →', ob_skip: 'Omitir', ob_skip_finish: 'Omitir y terminar',
@@ -545,6 +551,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: "Merci de partager. Maintenant parle-moi de ton monde social — que fais-tu comme travail, comment sont tes relations ? Famille, amis, vie romantique, les rôles que tu joues dans la vie des gens.",
     ob_q3: "Dernière question — parle-moi de qui tu es à l'intérieur. Ta personnalité, ce que tu aimes faire, tes habitudes, ce qui te rend joyeux et ce qui te défie le plus.",
     ob_tap_mic: 'Appuie sur le micro et parle', ob_listening: "J'écoute…", ob_type_instead: 'Ou écris ta réponse ici…',
+    dom_health: 'Santé', dom_career: 'Carrière', dom_finance: 'Finances', dom_relationship: 'Amour', dom_family: 'Famille', dom_growth: 'Évolution', dom_hobby: 'Loisirs', dom_purpose: 'Sens', dom_mind: 'Esprit', dom_environment: 'Chez soi',
+    tab_bond: 'Lien', no_photo_yet: 'Pas encore de photo', nearby: 'À proximité',
     ob_all_done: 'C\'est tout — crée ton profil ci-dessus', ob_getting_to_know: 'je fais connaissance', ob_typing: 'écrit…',
     ob_physical_self: 'Moi physique', ob_social_self: 'Moi social', ob_inner_self: 'Moi psychologique',
     ob_next: 'Suivant →', ob_finish: 'Terminer →', ob_skip: 'Passer', ob_skip_finish: 'Passer et terminer',
@@ -601,6 +609,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Danke fürs Teilen. Jetzt erzähl mir von deiner sozialen Welt — was machst du beruflich, wie sind deine Beziehungen? Familie, Freunde, Romantik, die Rollen die du im Leben der Menschen spielst.',
     ob_q3: 'Die letzte — erzähl mir wer du innen bist. Deine Persönlichkeit, was du gerne machst, deine Gewohnheiten, was dir Freude bringt und was dich am meisten herausfordert.',
     ob_tap_mic: 'Tippe auf das Mikrofon und sprich', ob_listening: 'Ich höre zu…', ob_type_instead: 'Oder schreib deine Antwort hier…',
+    dom_health: 'Gesundheit', dom_career: 'Karriere', dom_finance: 'Finanzen', dom_relationship: 'Liebe', dom_family: 'Familie', dom_growth: 'Wachstum', dom_hobby: 'Freizeit', dom_purpose: 'Sinn', dom_mind: 'Geist', dom_environment: 'Zuhause',
+    tab_bond: 'Bindung', no_photo_yet: 'Noch kein Foto', nearby: 'In der Nähe',
     ob_all_done: 'Fertig — erstelle oben dein Profil', ob_getting_to_know: 'lerne dich kennen', ob_typing: 'schreibt…',
     ob_physical_self: 'Physisches Selbst', ob_social_self: 'Soziales Selbst', ob_inner_self: 'Psychologisches Selbst',
     ob_next: 'Weiter →', ob_finish: 'Abschließen →', ob_skip: 'Überspringen', ob_skip_finish: 'Überspringen und abschließen',
@@ -657,6 +667,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Grazie per aver condiviso. Ora dimmi del tuo mondo sociale — cosa fai per lavoro, come sono le tue relazioni? Famiglia, amici, vita romantica, i ruoli che giochi nella vita delle persone.',
     ob_q3: 'Ultima — dimmi chi sei dentro. La tua personalità, cosa ami fare, le tue abitudini, cosa ti porta gioia e cosa ti sfida di più.',
     ob_tap_mic: 'Tocca il microfono e parla', ob_listening: 'Ascolto…', ob_type_instead: 'O scrivi la tua risposta qui…',
+    dom_health: 'Salute', dom_career: 'Carriera', dom_finance: 'Finanze', dom_relationship: 'Amore', dom_family: 'Famiglia', dom_growth: 'Crescita', dom_hobby: 'Svago', dom_purpose: 'Scopo', dom_mind: 'Mente', dom_environment: 'Casa',
+    tab_bond: 'Legame', no_photo_yet: 'Ancora nessuna foto', nearby: 'Vicino',
     ob_all_done: 'Fatto — crea il tuo profilo qui sopra', ob_getting_to_know: 'ti sto conoscendo', ob_typing: 'sta scrivendo…',
     ob_physical_self: 'Io fisico', ob_social_self: 'Io sociale', ob_inner_self: 'Io psicologico',
     ob_next: 'Avanti →', ob_finish: 'Fine →', ob_skip: 'Salta', ob_skip_finish: 'Salta e finisci',
@@ -713,6 +725,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Obrigada por compartilhar. Agora me fale sobre seu mundo social — o que você faz no trabalho, como são seus relacionamentos? Família, amigos, vida romântica, os papéis que você desempenha na vida das pessoas.',
     ob_q3: 'Última — me fale sobre quem você é por dentro. Sua personalidade, o que você ama fazer, seus hábitos, o que te traz alegria e o que te desafia mais.',
     ob_tap_mic: 'Toque no microfone e fale', ob_listening: 'Ouvindo…', ob_type_instead: 'Ou escreva sua resposta aqui…',
+    dom_health: 'Saúde', dom_career: 'Carreira', dom_finance: 'Finanças', dom_relationship: 'Amor', dom_family: 'Família', dom_growth: 'Crescimento', dom_hobby: 'Lazer', dom_purpose: 'Propósito', dom_mind: 'Mente', dom_environment: 'Casa',
+    tab_bond: 'Vínculo', no_photo_yet: 'Ainda sem foto', nearby: 'Por perto',
     ob_all_done: 'Pronto — crie seu perfil acima', ob_getting_to_know: 'te conhecendo', ob_typing: 'digitando…',
     ob_physical_self: 'Eu físico', ob_social_self: 'Eu social', ob_inner_self: 'Eu psicológico',
     ob_next: 'Próximo →', ob_finish: 'Terminar →', ob_skip: 'Pular', ob_skip_finish: 'Pular e terminar',
@@ -727,6 +741,139 @@ const STRINGS: Record<string, Record<string, string>> = {
     nudge_copy: 'Copiar mensagem', nudge_copied: '✓ Copiado!', nudge_retry: '↺ Tentar outro', nudge_dismiss: 'Fechar',
   },
   vi: {
+    // Completed 2026-09-21: vi had 131 of the 251 English keys, so half the
+    // interface fell back to English inside an otherwise Vietnamese app.
+    messages: 'Tin nhắn',
+    no_messages: 'Chưa có tin nhắn nào. Chào một câu đi!',
+    outer_world: 'Thế giới bên ngoài',
+    soma_picks: 'Soma chọn cho bạn',
+    who_likes_me: 'Ai thích mình',
+    likes_you_count: 'người đã thích bạn',
+    unlock_likes: 'Mở khoá để xem ai đã thích bạn',
+    rel_tools: 'Công cụ cho các mối quan hệ',
+    bond_journey: 'Hành trình gắn kết',
+    rel_insights: 'Thấu hiểu mối quan hệ',
+    rel_support: 'Lời khuyên và hỗ trợ về các mối quan hệ',
+    feeling_card: 'Hôm nay bạn thấy thế nào?',
+    trends: 'Xu hướng →',
+    todays_intention: 'Dự định hôm nay',
+    todays_plan: 'Kế hoạch hôm nay',
+    activity: 'Hoạt động',
+    diary: 'Nhật ký',
+    life: 'Cuộc sống',
+    edit_profile: 'Sửa hồ sơ',
+    edit: 'Sửa',
+    edit_entry: 'Sửa ghi chép hôm nay',
+    no_diary: 'Chưa có ghi chép nào.\nCùng Soma nhìn lại ở màn hình chính nhé.',
+    grateful_for: 'Hôm nay mình biết ơn vì…',
+    feeling_now: 'Ngay lúc này bạn thấy thế nào?',
+    health_data: 'Dữ liệu sức khoẻ hôm nay',
+    profile_complete: 'Hồ sơ đã hoàn tất',
+    wheel_empty: 'Ghi lại vài ngày tới — biểu đồ cân bằng của bạn sẽ hiện ra',
+    see_who_likes: 'Xem ai thích bạn',
+    unlock_all: 'Mở khoá toàn bộ hồ sơ ở mọi lĩnh vực',
+    no_likes_yet: 'Chưa có lượt thích nào',
+    keep_exploring: 'Khám phá tiếp để được chú ý',
+    bonds: 'Gắn kết',
+    bond_sub: 'Chăm chút những điều quan trọng',
+    today: 'Hôm nay',
+    yesterday: 'Hôm qua',
+    no_entries: 'Chưa có ghi chép nào',
+    start_reflecting: 'Bắt đầu nhìn lại cùng Soma',
+    my_profile: 'Hồ sơ của mình',
+    your_profile: 'Hồ sơ của bạn',
+    gratitude: 'Lòng biết ơn',
+    health: 'Sức khoẻ',
+    habits: 'Thói quen',
+    talk_soma: 'Trò chuyện với Soma',
+    start_talking: '✦  Bắt đầu trò chuyện',
+    how_was_day: 'Ngày hôm nay\ncủa bạn thế nào?',
+    soma_ready: 'Soma đã sẵn sàng.',
+    save_entry: 'Lưu',
+    home: 'Trang chính',
+    join: 'Tham gia →',
+    no_memories: 'Chưa lưu ký ức nào',
+    memories: 'Ký ức',
+    pinned: 'Đã ghim',
+    recent: 'Gần đây',
+    your_wheel: 'Vòng tròn cuộc sống của bạn',
+    life_balance: 'Cân bằng cuộc sống',
+    good_morning: 'Chào buổi sáng',
+    good_evening: 'Chào buổi tối',
+    good_afternoon: 'Chào buổi chiều',
+    notifications_title: 'Thông báo',
+    notif_sub: 'Quản lý lời nhắc của bạn',
+    mood_log: 'Nhật ký tâm trạng',
+    mood_trends: 'Xu hướng tâm trạng',
+    streak_days: '-ngày liên tiếp!',
+    showing_up: 'Bạn đang có mặt mỗi ngày',
+    check_in_done: 'Đã ghi nhận ✓',
+    check_in_cta: 'Ghi nhận',
+    todays_moments: 'Khoảnh khắc hôm nay',
+    recent_activity: 'Hoạt động gần đây',
+    your_diary: 'Nhật ký của bạn',
+    mood_trends_title: 'Xu hướng tâm trạng',
+    thankful_diary: 'Nhật ký biết ơn',
+    diary_entry: 'Ghi chép nhật ký',
+    wrote_today: 'Đã viết hôm nay',
+    memories_count: 'điều Soma biết về bạn',
+    bonds_label: 'Gắn kết',
+    memories_label: 'Ký ức',
+    soma_memories: 'Ký ức của Soma',
+    remembered: 'đã ghi nhớ',
+    love_yourself: 'Yêu bản thân',
+    medications: 'Thuốc',
+    mood: 'Tâm trạng',
+    open: 'Mở →',
+    timeline: 'Dòng thời gian',
+    my_soma_code: 'Mã SOMA của mình',
+    share_friends: 'Chia sẻ với bạn bè',
+    generate_insight: '✦ Tạo thấu hiểu cho mình',
+    insights_btn: 'Tạo thấu hiểu',
+    no_search_results: 'Không có ghi chép nào khớp với tìm kiếm.\nThử từ khoá khác hoặc xoá bộ lọc.',
+    ask_soma: 'Hỏi Soma',
+    insights: 'Thấu hiểu',
+    view_profile: 'Xem hồ sơ',
+    interests: 'Sở thích',
+    values: 'Giá trị sống',
+    close: 'Đóng',
+    profile_not_set: 'Họ chưa thiết lập hồ sơ.',
+    my_circle: 'Vòng tròn của mình',
+    circle_sub: 'Tối đa 20 người. Chia sẻ thế giới của bạn với họ.',
+    add_someone: 'Thêm một người',
+    find_by_code: 'Tìm bằng mã',
+    needs_attention: 'Cần để tâm',
+    needs_attention_sub: 'Dạo này bạn ít nhắc đến những người này. Soma có thể giúp bạn kết nối lại.',
+    reach_out: 'Kết nối lại',
+    on_soma: 'Trên SOMA',
+    person: 'người',
+    people: 'người',
+    days_ago: ' ngày trước',
+    circle_log: 'Ghi lại',
+    circle_draft: 'Bản nháp',
+    circle_journey: 'Hành trình',
+    circle_chat: 'Trò chuyện',
+    circle_report: 'Báo cáo',
+    circle_remove_confirm: 'Xoá {name} khỏi Vòng tròn của bạn?',
+    add_to_circle_as: 'Thêm vào Vòng tròn với vai trò',
+    last_step: 'Bước cuối',
+    add_a_photo: 'Thêm ảnh của bạn',
+    photo_why: 'Đó là cách mọi người nhận ra bạn — không có ảnh, bạn sẽ không xuất hiện với họ.',
+    choose_photo: 'Chọn một tấm ảnh',
+    finish_profile: 'Hoàn tất hồ sơ →',
+    photo_required: 'Thêm ảnh để tiếp tục',
+    copied: 'Đã sao chép!',
+    soma_code: 'Mã SOMA',
+    looking_for: 'Đang tìm',
+    love_language: 'Ngôn ngữ yêu thương',
+    attachment: 'Kiểu gắn bó',
+    member_since: 'Thành viên từ',
+    ct_dating: 'Hẹn hò',
+    ct_friends: 'Tình bạn',
+    ct_professional: 'Công việc',
+    ct_support: 'Đồng hành',
+    circle_full: 'Vòng tròn của bạn đã đầy (tối đa 20 người). Hãy xoá bớt một người trước.',
+    in_your_circle: 'Trong Vòng tròn của bạn',
     tab_circle: 'Vòng tròn', tab_inner: 'Nội tâm', tab_explore: 'Khám phá',
     continue: 'Tiếp tục', back: '← Quay lại', save: 'Lưu', cancel: 'Hủy',
     done: 'Xong', skip: 'Bỏ qua', settings: 'Cài đặt', language: 'Ngôn ngữ',
@@ -769,6 +916,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'Cảm ơn bạn đã chia sẻ. Bây giờ hãy cho tôi biết về thế giới xã hội — bạn làm gì cho công việc, các mối quan hệ như thế nào? Gia đình, bạn bè, cuộc sống tình cảm, các vai trò bạn đóng trong cuộc sống mọi người.',
     ob_q3: 'Câu cuối — hãy cho tôi biết bạn là ai bên trong. Tính cách, những gì bạn thích làm, thói quen, điều mang lại niềm vui và điều thách thức bạn nhất.',
     ob_tap_mic: 'Nhấn vào micro và nói', ob_listening: 'Đang nghe…', ob_type_instead: 'Hoặc gõ câu trả lời của bạn ở đây…',
+    dom_health: 'Sức khoẻ', dom_career: 'Sự nghiệp', dom_finance: 'Tài chính', dom_relationship: 'Tình yêu', dom_family: 'Gia đình', dom_growth: 'Phát triển', dom_hobby: 'Vui chơi', dom_purpose: 'Lẽ sống', dom_mind: 'Tâm trí', dom_environment: 'Tổ ấm',
+    tab_bond: 'Gắn kết', no_photo_yet: 'Chưa có ảnh', nearby: 'Gần đây',
     ob_all_done: 'Xong rồi — tạo hồ sơ của bạn ở trên', ob_getting_to_know: 'đang làm quen với bạn', ob_typing: 'đang nhập…',
     ob_physical_self: 'Bản thân thể chất', ob_social_self: 'Bản thân xã hội', ob_inner_self: 'Bản thân tâm lý',
     ob_next: 'Tiếp theo →', ob_finish: 'Hoàn thành →', ob_skip: 'Bỏ qua', ob_skip_finish: 'Bỏ qua và hoàn thành',
@@ -825,6 +974,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: '感谢分享。现在告诉我你的社交世界——你做什么工作，你的关系如何？家庭、朋友、恋爱生活，你在人们生活中扮演的角色。',
     ob_q3: '最后一个——告诉我你内心是谁。你的个性，你喜欢做什么，你的习惯，什么给你带来快乐，什么最挑战你。',
     ob_tap_mic: '点击麦克风并说话', ob_listening: '正在听…', ob_type_instead: '或者在这里输入你的回答…',
+    dom_health: '健康', dom_career: '事业', dom_finance: '财务', dom_relationship: '爱', dom_family: '家人', dom_growth: '成长', dom_hobby: '乐趣', dom_purpose: '意义', dom_mind: '心智', dom_environment: '家',
+    tab_bond: '羁绊', no_photo_yet: '还没有照片', nearby: '附近',
     ob_all_done: '完成了 — 在上面创建你的资料', ob_getting_to_know: '正在了解你', ob_typing: '正在输入…',
     ob_physical_self: '身体自我', ob_social_self: '社交自我', ob_inner_self: '心理自我',
     ob_next: '下一步 →', ob_finish: '完成 →', ob_skip: '跳过', ob_skip_finish: '跳过并完成',
@@ -881,6 +1032,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'シェアしてくれてありがとう。次に社会的な世界について教えてください — 仕事は何をしていますか、人間関係はどうですか？家族、友人、恋愛、人々の生活で果たしている役割など。',
     ob_q3: '最後 — 内面の自分を教えてください。あなたの性格、好きなこと、習慣、喜びをもたらすもの、そして最も挑戦的なことを。',
     ob_tap_mic: 'マイクをタップして話す', ob_listening: '聞いています…', ob_type_instead: 'またはここに回答を入力してください…',
+    dom_health: '健康', dom_career: '仕事', dom_finance: 'お金', dom_relationship: '愛', dom_family: '家族', dom_growth: '成長', dom_hobby: '楽しみ', dom_purpose: '目的', dom_mind: '心', dom_environment: '住まい',
+    tab_bond: '絆', no_photo_yet: '写真はまだありません', nearby: '近く',
     ob_all_done: '完了 — 上でプロフィールを作成', ob_getting_to_know: 'あなたを知っているところ', ob_typing: '入力中…',
     ob_physical_self: '身体的な自己', ob_social_self: '社会的な自己', ob_inner_self: '心理的な自己',
     ob_next: '次へ →', ob_finish: '完了 →', ob_skip: 'スキップ', ob_skip_finish: 'スキップして完了',
@@ -937,6 +1090,8 @@ const STRINGS: Record<string, Record<string, string>> = {
     ob_q2: 'شكراً للمشاركة. الآن أخبرني عن عالمك الاجتماعي — ماذا تعمل، كيف هي علاقاتك؟ العائلة والأصدقاء والحياة العاطفية والأدوار التي تلعبها في حياة الناس.',
     ob_q3: 'السؤال الأخير — أخبرني من أنت في الداخل. شخصيتك وما تحب فعله وعاداتك وما يجلب لك الفرح وما يتحداك أكثر.',
     ob_tap_mic: 'اضغط على الميكروفون وتحدث', ob_listening: 'أستمع…', ob_type_instead: 'أو اكتب إجابتك هنا…',
+    dom_health: 'الصحة', dom_career: 'المسيرة المهنية', dom_finance: 'المال', dom_relationship: 'الحب', dom_family: 'العائلة', dom_growth: 'النمو', dom_hobby: 'المتعة', dom_purpose: 'المعنى', dom_mind: 'العقل', dom_environment: 'البيت',
+    tab_bond: 'رابط', no_photo_yet: 'لا توجد صورة بعد', nearby: 'قريب',
     ob_all_done: 'انتهينا — أنشئ ملفك أعلاه', ob_getting_to_know: 'أتعرّف عليك', ob_typing: 'يكتب…',
     ob_physical_self: 'الذات الجسدية', ob_social_self: 'الذات الاجتماعية', ob_inner_self: 'الذات النفسية',
     ob_next: 'التالي ←', ob_finish: 'إنهاء ←', ob_skip: 'تخطى', ob_skip_finish: 'تخطى وإنهاء',
@@ -960,6 +1115,11 @@ function t(key: string): string {
 // THEME object — calling t('key') there throws "t is not a function" at render. Use tr()
 // for translation inside any component that destructures the theme as `t`.
 const tr = (key: string): string => t(key)
+
+// DOMAINS carries English labels — it is pure data with no access to the
+// translator. Every screen that shows a life area goes through this, so the
+// wheel, Home and the pickers stop being English islands in a translated app.
+const domLabel = (key: DomainKey): string => tr(`dom_${key}`)
 
 // Fallback sentiment for older memories saved before sentiment was tracked.
 function inferSentiment(text: string): Sentiment {
@@ -2726,7 +2886,7 @@ function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string; con
     connectionType: u.connectionType,
     name: u.name, age: u.age || 0, emoji: '💜', color: '#7B6EF6',
     photo: u.photo || '', photos: u.photos?.length ? u.photos : (u.photo ? [u.photo] : []),
-    location: u.city || (u.distanceKm != null ? 'Nearby' : 'On SOMA'),
+    location: u.city || (u.distanceKm != null ? tr('nearby') : tr('on_soma')),
     distance: u.distanceKm != null ? `${u.distanceKm} km` : '',
     height: '', weight: '',
     bio: u.bio || (hasProfile ? '' : '✨ Just joined SOMA — profile coming soon.'),
@@ -4038,9 +4198,9 @@ export default function App() {
     { id: 'inner',  icon: 'sparkles-outline',    label: t('tab_inner') },
     { id: 'circle', icon: 'people-outline',       label: t('tab_circle') },
     inRelationship
-      ? { id: 'bond',  icon: 'heart-outline',     label: 'Bond' }
+      ? { id: 'bond',  icon: 'heart-outline',     label: tr('tab_bond') }
       : { id: 'outer', icon: 'compass-outline',   label: t('tab_explore') },
-    { id: 'chat',   icon: 'chatbubbles-outline',  label: 'Messages' },
+    { id: 'chat',   icon: 'chatbubbles-outline',  label: tr('messages') },
   ]
   const appTabBar = (
     <View dataSet={{ class: 'tab-bar-safe' }} style={{
@@ -5166,7 +5326,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
               return (
                 <View key={d.key} style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ fontSize: 14, color: '#E8E5FF', fontWeight: '600' }}>{d.icon} {d.label}</Text>
+                    <Text style={{ fontSize: 14, color: '#E8E5FF', fontWeight: '600' }}>{d.icon} {domLabel(d.key)}</Text>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: d.color }}>{Math.round(score / 10)}/10</Text>
                   </View>
                   <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3 }}>
@@ -9834,7 +9994,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                   <Ionicons name={DOMAIN_ICONS[d.key]} size={20} color={d.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[g.lbTitle, { color: theme.text }]}>{d.label}</Text>
+                  <Text style={[g.lbTitle, { color: theme.text }]}>{domLabel(d.key)}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
                     <View style={{ flex: 1, height: 4, backgroundColor: theme.border2, borderRadius: 2, overflow: 'hidden' }}>
                       <View style={{ width: `${Math.min(score, 100)}%`, height: '100%', backgroundColor: d.color, borderRadius: 2 }} />
@@ -9867,7 +10027,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
 
               {/* 30-day goal */}
               {goals[d.key] ? (
-                <TouchableOpacity onPress={() => openGoalModal(d.key, d.label, d.color)}
+                <TouchableOpacity onPress={() => openGoalModal(d.key, domLabel(d.key), d.color)}
                   style={{ backgroundColor: d.color + '12', borderRadius: 12, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: d.color + '30' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                     <Text style={{ fontSize: 11, fontWeight: '600', color: d.color }}>Goal</Text>
@@ -9879,7 +10039,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                   </View>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity onPress={() => openGoalModal(d.key, d.label, d.color)}
+                <TouchableOpacity onPress={() => openGoalModal(d.key, domLabel(d.key), d.color)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                   <Text style={{ fontSize: 11, color: theme.textTertiary, fontWeight: '600' }}>+ Set a 30-day goal</Text>
                 </TouchableOpacity>
@@ -10089,7 +10249,7 @@ function LifeBalance({ profile, onBack }: { profile: UserProfile; onBack: () => 
                   <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: d.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name={DOMAIN_ICONS[d.key]} size={20} color={d.color} />
                   </View>
-                  <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>{d.label}</Text>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>{domLabel(d.key)}</Text>
                   {typeof cur === 'number' && (
                     <TouchableOpacity onPress={() => { setRating(d.key, cur); setRatingModal(null) }} style={{ marginLeft: 'auto' as any }}>
                       <Text style={{ fontSize: 12, color: theme.textSub }}>Clear</Text>
@@ -13029,7 +13189,7 @@ function CardPhoto({ uri, name }: { uri?: string; name: string }) {
       <Text style={{ fontSize: 72, fontWeight: '800', color: 'rgba(255,255,255,0.65)' }}>
         {(name || '?').trim().slice(0, 2).toUpperCase()}
       </Text>
-      <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 10 }}>No photo yet</Text>
+      <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 10 }}>{tr('no_photo_yet')}</Text>
     </View>
   )
 }
