@@ -9,6 +9,7 @@ import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path 
 import { Ionicons } from '@expo/vector-icons'
 import * as Font from 'expo-font'
 import * as WebBrowser from 'expo-web-browser'
+import * as ImagePicker from 'expo-image-picker'
 import * as Google from 'expo-auth-session/providers/google'
 import * as Notifications from 'expo-notifications'
 import * as Location from 'expo-location'
@@ -3093,8 +3094,27 @@ function listen(
 }
 
 // Web photo upload → data URL (attached to DOM so iOS Safari keeps the picker open)
+// Native picker first. This used to be web-only: on iOS it showed an alert
+// saying "Photo upload works on web" and returned — and onboarding REQUIRES a
+// photo, so an iPhone user could not finish signing up at all.
+async function pickPhotoNative(onPicked: (dataUrl: string) => void) {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+  if (!perm.granted) { alert('SOMA needs access to your photos to set your picture.') ; return }
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.7,
+    base64: true,
+  })
+  if (res.canceled || !res.assets?.length) return
+  const a = res.assets[0]
+  if (a.base64) onPicked(`data:image/jpeg;base64,${a.base64}`)
+}
+
 function pickPhoto(onPicked: (dataUrl: string) => void) {
-  if (typeof document === 'undefined') { alert('Photo upload works on web'); return }
+  if (Platform.OS !== 'web') { pickPhotoNative(onPicked).catch(() => {}) ; return }
+  if (typeof document === 'undefined') return
   const inp = document.createElement('input')
   inp.type = 'file'; inp.accept = 'image/*'
   Object.assign(inp.style, { position: 'fixed', top: '-9999px', left: '-9999px', opacity: '0' })

@@ -12,7 +12,8 @@
       "bundleIdentifier": "site.mysoma.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -54,6 +55,12 @@
           "icon": "./assets/icon.png",
           "color": "#7B6EF6",
           "sounds": []
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SOMA uses your photos so you can set a profile picture. Nothing is uploaded until you choose one."
         }
       ]
     ]
