@@ -13659,7 +13659,11 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           {/* Connection style — sector-specific highlights */}
           <View style={g.dSection}>
             {(() => {
-              const ct = (currentBrowse as any).connectionType || 'dating'
+              // The category being BROWSED, not what the other person happens to
+              // have set on their own profile. Reading theirs meant Alex — whose
+              // connectionType is the default 'dating' — showed LOVE LANGUAGE and
+              // ATTACHMENT on the Professional tab, which is the whole complaint.
+              const ct = asConnectionType(category)
               if (ct === 'friends') return (
                 <>
                   <Text style={g.dH}>As a friend</Text>
