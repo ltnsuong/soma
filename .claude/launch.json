@@ -2,9 +2,24 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "soma-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8081"
+      ],
+      "port": 8081
+    },
+    {
       "name": "soma-web",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd /Users/suongle/soma/dist && python3 -m http.server $PORT"],
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/suongle/soma/dist && python3 -m http.server $PORT"
+      ],
       "port": 9090,
       "autoPort": true
     }

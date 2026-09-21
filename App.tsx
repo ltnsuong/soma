@@ -59,6 +59,16 @@ WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app 
 // this never runs, which distinguishes "never executed" from "threw while rendering".
 if (typeof window !== 'undefined') (window as any).__SOMA_BUNDLE_OK__ = true
 
+// An unhandled rejection otherwise reaches the console as a bare "NetworkError"
+// with no stack and no origin. That is exactly how a real crash on a real
+// user's profile card sat unexplained — it looked like noise. Name it.
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (e: any) => {
+    const r = e?.reason
+    console.error('[soma] unhandled rejection:', r?.name ?? r, r?.message ?? '', r?.stack ?? '')
+  })
+}
+
 const AI_KEY      = process.env.EXPO_PUBLIC_AI_KEY ?? ''
 // Google OAuth client IDs (create in Google Cloud Console; leave blank to disable)
 const GOOGLE_WEB_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? ''
@@ -1320,6 +1330,19 @@ const DB = {
           p.circle = p.circle.filter((c: CirclePerson) => !(typeof c.id === 'string' && c.id.startsWith('seed_')))
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {}
         }
+        // Repair Circles that already collected duplicates before addCircle
+        // deduped. Keeps the first entry, which is the one holding the history.
+        const seenIds = new Set<string>()
+        const deduped = p.circle.filter((c: CirclePerson) => {
+          if (!c.somaUserId) return true
+          if (seenIds.has(c.somaUserId)) return false
+          seenIds.add(c.somaUserId)
+          return true
+        })
+        if (deduped.length !== p.circle.length) {
+          p.circle = deduped
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)) } catch {}
+        }
         if (!p.diary) p.diary = []
         if (!p.facts) p.facts = {}
         if (p.conversations === undefined) p.conversations = 0
@@ -1371,6 +1394,25 @@ const DB = {
   // Circle: add/invite someone, accept invite, send direct message
   addCircle: (name: string, type: string, context?: string, somaUserId?: string) => {
     const p = DB.get()
+
+    // The same person added twice — once by SOMA code, once from their profile —
+    // produced two Circle entries for one human, two rows in the bubble strip
+    // and two chat threads. upsertPerson has always deduped; this path never did.
+    //
+    // Two linked accounts with different ids are different people even when they
+    // share a first name, so ids win over names whenever both sides have one.
+    const sameHuman = (c: CirclePerson) =>
+      (somaUserId && c.somaUserId) ? c.somaUserId === somaUserId
+        : c.name.toLowerCase() === name.toLowerCase()
+    const existing = p.circle.find(sameHuman)
+    if (existing) {
+      if (context) existing.context = context
+      if (somaUserId) existing.somaUserId = somaUserId
+      existing.lastSeen = new Date().toLocaleDateString()
+      DB.save(p)
+      return existing.inviteCode
+    }
+
     const code = Math.random().toString(36).slice(2, 8).toUpperCase()
     const id = `circle_${Date.now()}`
     p.circle.unshift({
@@ -3575,18 +3617,32 @@ export default function App() {
     if (p.registered && datingApi.authed()) registerPushToken()
   }, [profile.registered])
 
-  // Navigate to right screen when user taps a push notification
+  // Navigate to the right screen when the user taps a push notification.
   useEffect(() => {
-    // App already open — foreground notification tap
-    const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data as any
-      if (data?.screen === 'connections') go('connections')
-    })
-    // App opened from a notification (was closed/background)
-    Notifications.getLastNotificationResponseAsync().then(response => {
-      if (!response) return
-      const data = response.notification.request.content.data as any
-      if (data?.screen === 'connections') setTimeout(() => go('connections'), 500)
+    // expo-notifications has no web implementation for either of these, so on
+    // web they threw ERR_UNAVAILABLE into the console on every page load. Every
+    // other Notifications call in this file already guards; this one did not.
+    if (Platform.OS === 'web') return
+
+    const open = (data: any) => {
+      if (!data?.screen) return
+      // Tell the server a proactive message was opened. opened_at against
+      // sent_at is the only measure of whether Soma reaching out first works.
+      if (data.nudge && auth.getToken()) {
+        fetch(`${BACKEND_URL}/notifications/opened`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${auth.getToken()}` },
+        }).catch(() => {})
+      }
+      go(data.screen as Screen)
+    }
+
+    // App already open — foreground tap.
+    const sub = Notifications.addNotificationResponseReceivedListener(r =>
+      open(r.notification.request.content.data))
+    // App opened from a notification while closed or backgrounded.
+    Notifications.getLastNotificationResponseAsync().then(r => {
+      if (r) setTimeout(() => open(r.notification.request.content.data), 500)
     })
     return () => sub.remove()
   }, [])
@@ -3673,6 +3729,19 @@ export default function App() {
   }, [])
 
   // ── Duolingo-style notification engine ──
+  // Screens with a text box at the bottom. A toast slides up from there, so on
+  // the Messages tab it lands squarely on the message input — the same bug it
+  // had at the top, where it covered the life-balance score, just moved.
+  //
+  // The overlap is the smaller half of it: interrupting someone mid-conversation
+  // to suggest a different conversation is the wrong moment wherever the card
+  // sits. Suppressed toasts are not lost — notifDB.add already put them in the
+  // inbox and the badge still counts them.
+  const TYPING_SCREENS: Screen[] = ['aura', 'diary', 'asksoma', 'checkin', 'gratitude', 'bondjourney', 'loveyourself']
+  const canToast = tab !== 'chat' && !TYPING_SCREENS.includes(screen)
+  const canToastRef = useRef(canToast)
+  useEffect(() => { canToastRef.current = canToast }, [canToast])
+
   const showNextToast = () => {
     if (toastQueue.current.length === 0) { toastShowing.current = false; return }
     toastShowing.current = true
@@ -3680,6 +3749,9 @@ export default function App() {
   }
 
   const queueToast = (n: SomaNotif) => {
+    // Read through a ref: this runs inside a 3s timer, which would otherwise
+    // capture whichever screen was showing when the timer was set.
+    if (!canToastRef.current) return
     toastQueue.current.push(n)
     if (!toastShowing.current) showNextToast()
   }
@@ -3848,7 +3920,7 @@ export default function App() {
         </Animated.View>
         {showAppTabBar && appTabBar}
         {/* Duolingo-style toast overlay */}
-        {activeToast && (
+        {activeToast && canToast && (
           <NotifToast
             key={activeToast.id}
             notif={activeToast}
@@ -8488,7 +8560,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: t.border }}>
                   <Text style={{ fontSize: 24 }}>{m.emoji}</Text>
                 </View>
-                <Text style={{ fontSize: 10, color: t.textSub, fontWeight: '600' }}>{m.label}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 10, color: t.textSub, fontWeight: '600', textAlign: 'center', width: '100%' }}>{m.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -10208,7 +10280,7 @@ function DailyCheckinScreen({ profile, onDone, onBack }: {
                       transform: [{ scale: mood === m.val ? 1.12 : 1 }] }}>
                       <Text style={{ fontSize: 26 }}>{m.emoji}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, fontWeight: mood === m.val ? '700' : '500', color: mood === m.val ? t.accent : t.textSub }}>{m.label}</Text>
+                    <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: mood === m.val ? '700' : '500', color: mood === m.val ? t.accent : t.textSub, textAlign: 'center', width: '100%' }}>{m.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
