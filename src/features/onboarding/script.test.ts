@@ -3,7 +3,7 @@ import {
   BEATS, MAX_EXCHANGES, TARGET_DOMAINS,
   coveredDomains, isDone, nextBeat, type Progress,
 } from './script'
-import type { DomainKey } from '../../shared/domains'
+import { DOMAINS, type DomainKey } from '../../shared/domains'
 import type { FactKey } from './script'
 
 const progress = (over: Partial<Progress> = {}): Progress =>
@@ -119,16 +119,18 @@ describe('stored facts drive the skip', () => {
 })
 
 describe('isDone', () => {
-  const sevenDomains: DomainKey[] = ['health', 'career', 'finance', 'relationship', 'family', 'growth', 'hobby']
+  // Derived, not hardcoded: a test that pins the threshold to a literal list
+  // breaks the moment the threshold is tuned, which says nothing about whether
+  // isDone still works.
+  const enoughDomains: DomainKey[] = DOMAINS.map(d => d.key).slice(0, TARGET_DOMAINS)
 
   it('is not done before the act III question, however much was covered', () => {
     // Connection intent is the one thing talking about yesterday never reveals.
-    expect(isDone(progress({ covered: sevenDomains, exchanges: 20 }))).toBe(false)
+    expect(isDone(progress({ covered: enoughDomains, exchanges: 20 }))).toBe(false)
   })
 
   it('is done once enough domains are filled and act III was asked', () => {
-    expect(isDone(progress({ covered: sevenDomains, asked: ['missing'] }))).toBe(true)
-    expect(sevenDomains.length).toBe(TARGET_DOMAINS)
+    expect(isDone(progress({ covered: enoughDomains, asked: ['missing'] }))).toBe(true)
   })
 
   it('stops at the exchange ceiling even with an empty wheel', () => {

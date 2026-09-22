@@ -144,10 +144,25 @@ export const BEATS: Beat[] = [
   },
 ]
 
-/** Domains we want covered before the conversation can end early. */
-export const TARGET_DOMAINS = 7
-/** Hard ceiling. Someone who gives short answers still gets out in time. */
-export const MAX_EXCHANGES = 12
+/**
+ * Domains we want covered before the conversation can end early.
+ *
+ * Five, not seven. Soma needs enough to derive a profile worth showing, not a
+ * complete life audit before the user has agreed to anything. The other five
+ * domains fill in through ordinary use, which is the product's whole premise —
+ * asking for all of them up front contradicts it and made the first
+ * conversation feel like a questionnaire, which is exactly what it exists to
+ * replace.
+ */
+export const TARGET_DOMAINS = 5
+/**
+ * Hard ceiling. Someone who gives short answers still gets out in time.
+ *
+ * Eight, not twelve. Twelve exchanges with a stranger before you have an
+ * account is a lot to ask, and the last few added the least: by then the rich
+ * beats have already been asked and what remains is the filling-in.
+ */
+export const MAX_EXCHANGES = 8
 
 export type FactKey = 'name' | 'age' | 'heightCm' | 'city' | 'job' | 'hobbies'
 

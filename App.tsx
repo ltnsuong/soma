@@ -4606,11 +4606,6 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
   const [regPassword, setRegPassword] = useState('')
   const [regLoading, setRegLoading] = useState(false)
   const [regError, setRegError] = useState('')
-  const [tourIdx, setTourIdx] = useState(0)
-  const [tourChatMsg, setTourChatMsg] = useState('')
-  const [tourChatReply, setTourChatReply] = useState('')
-  const [tourChatLoading, setTourChatLoading] = useState(false)
-  const [tourChatSent, setTourChatSent] = useState('')
   const stopListeningRef = useRef<(() => void) | null>(null)
   const sectionConvoRef = useRef<{role:'soma'|'user', text:string, isFollowUp?:boolean}[]>([])
   // pushSoma runs inside async callbacks, which would capture a stale voiceOn.
@@ -4758,7 +4753,7 @@ Ask ONE short empathetic follow-up question to learn a bit more. 1-2 sentences m
     if (ans.every(a => !a.trim())) {
       DB.setOnboarding([], ['mind', 'body', 'love'] as DomainKey[])
       setProfileSummary(tr('ob_profile_ready'))
-      fadeTransition(() => setPhase(8))
+      fadeTransition(() => setPhase(5))
       return
     }
     try {
@@ -4841,7 +4836,7 @@ Write a warm, personal reflection (4-5 sentences) addressed directly to them. Ru
       ans.forEach((a, i) => { if (a.trim()) DB.addMemory((['body', 'social', 'mind'] as DomainKey[])[i], a.trim()) })
       setProfileSummary("I truly heard you. The way you showed up for this conversation tells me so much about who you are — and I can't wait to walk this journey with you.")
     }
-    fadeTransition(() => setPhase(8))
+    fadeTransition(() => setPhase(5))
   }
 
   const color = phase >= 1 && phase <= 3 ? COLORS[phase - 1] : '#7B6EF6'
@@ -5423,7 +5418,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
 
         <TouchableOpacity
           disabled={!shot}
-          onPress={() => setPhase(8)}
+          onPress={() => setPhase(5)}
           style={{ backgroundColor: shot ? '#7B6EF6' : 'rgba(123,110,246,0.25)', borderRadius: 18, paddingVertical: 18, alignItems: 'center',
                    ...(shot ? { shadowColor: '#7B6EF6', shadowOpacity: 0.45, shadowRadius: 22, shadowOffset: { width: 0, height: 7 } } : {}) }}>
           <Text style={{ color: shot ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: 17, fontWeight: '900' }}>
@@ -5449,190 +5444,6 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
     </View>
   )
 
-  // Phase 8 — Interactive mini-demos (3 screens)
-  if (phase === 8) {
-    const p = DB.get()
-    const name = p.name || userName || 'you'
-    const goNext = () => tourIdx < 2 ? setTourIdx(i => i + 1) : setPhase(5)
-
-    // Named rather than inline so the send button and the Enter key run the
-    // same path — the two drifting apart is how one of them quietly stops working.
-    const sendTourChat = async () => {
-      const msg = tourChatMsg.trim()
-      if (!msg || tourChatLoading) return
-      setTourChatSent(msg); setTourChatMsg(''); setTourChatLoading(true); setTourChatReply('')
-      try {
-        const context = p.memories.slice(0, 3).map(m => m.content).join('. ')
-        const reply = await groq([{ role: 'user', content: msg }],
-          `You are Soma. The user's name is ${name}. Context: ${context || 'new user'}. Reply warmly in 1-2 sentences. Be personal and specific.`, 120)
-        setTourChatReply(reply || 'I hear you. Let\'s explore that together. 💜')
-      } catch { setTourChatReply('I hear you. Let\'s explore that together. 💜') }
-      finally { setTourChatLoading(false) }
-    }
-
-    // Screen 0 — Talk to Soma (live mini chat)
-    if (tourIdx === 0) return (
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
-        <View style={{ position: 'absolute', top: -40, left: -40, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(123,110,246,0.1)' }} />
-        <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: HEADER_TOP, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
-          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' }}>Skip →</Text>
-        </TouchableOpacity>
-
-        <View style={{ flex: 1, padding: 24, paddingTop: 70 }}>
-          <Text style={{ fontSize: 13, fontWeight: '800', color: '#7B6EF6', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>1 of 3</Text>
-          <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', marginBottom: 4, letterSpacing: -0.5 }}>Ask Soma anything</Text>
-          <Text style={{ fontSize: 14, color: 'rgba(168,155,250,0.55)', marginBottom: 20 }}>Try it — send a real message right now.</Text>
-
-          {/* Chat preview */}
-          <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(123,110,246,0.2)', padding: 16, gap: 12 }}>
-            {/* Soma intro bubble */}
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
-              <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
-              </View>
-              <View style={{ backgroundColor: SOMA_SURFACE_DARK, borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
-                <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 20 }}>
-                  Hey {name.split(' ')[0]}! I'm here for you — ask me anything about your life, goals, or how you're feeling. 💜
-                </Text>
-              </View>
-            </View>
-
-            {/* User sent message */}
-            {tourChatSent ? (
-              <View style={{ alignItems: 'flex-end' }}>
-                <View style={{ backgroundColor: '#7B6EF6', borderRadius: 16, borderBottomRightRadius: 4, padding: 12, maxWidth: '80%' }}>
-                  <Text style={{ color: '#fff', fontSize: 14, lineHeight: 20 }}>{tourChatSent}</Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Soma reply or loading */}
-            {tourChatLoading && (
-              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
-                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
-                </View>
-                <View style={{ backgroundColor: SOMA_SURFACE_DARK, borderRadius: 16, borderBottomLeftRadius: 4, padding: 12 }}>
-                  <Text style={{ color: 'rgba(168,155,250,0.6)', fontSize: 14 }}>Thinking…</Text>
-                </View>
-              </View>
-            )}
-            {tourChatReply ? (
-              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
-                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>✦</Text>
-                </View>
-                <View style={{ backgroundColor: SOMA_SURFACE_DARK, borderRadius: 16, borderBottomLeftRadius: 4, padding: 12, maxWidth: '80%' }}>
-                  <Text style={{ color: '#E8E5FF', fontSize: 14, lineHeight: 20 }}>{tourChatReply}</Text>
-                </View>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Input row */}
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, alignItems: 'flex-end' }}>
-            <TextInput
-              value={tourChatMsg}
-              onChangeText={setTourChatMsg}
-              placeholder="Ask me anything..."
-              placeholderTextColor="rgba(168,155,250,0.3)"
-              {...enterToSend(sendTourChat)}
-              style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(123,110,246,0.3)', paddingHorizontal: 16, paddingVertical: 13, fontSize: 15, color: '#E8E5FF' }}
-            />
-            <TouchableOpacity
-              onPress={sendTourChat}
-              style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: tourChatMsg.trim() ? '#7B6EF6' : 'rgba(123,110,246,0.3)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="send" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          {tourChatReply ? (
-            <TouchableOpacity onPress={goNext} style={{ marginTop: 14, backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 16, alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>See your wellness scores →</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={goNext} style={{ marginTop: 14, alignItems: 'center', paddingVertical: 10 }}>
-              <Text style={{ color: 'rgba(168,155,250,0.35)', fontSize: 13 }}>Skip for now →</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-    )
-
-    // Screen 1 — Wheel of life (show their actual scores)
-    if (tourIdx === 1) {
-      const wheel = p.wheel?.scores || {}
-      return (
-        <ScrollView style={{ flex: 1, backgroundColor: '#080418' }} contentContainerStyle={{ padding: 24, paddingTop: 70 }}>
-          <View style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(16,185,129,0.08)' }} />
-          <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: HEADER_TOP, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
-            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' }}>Skip →</Text>
-          </TouchableOpacity>
-
-          <Text style={{ fontSize: 13, fontWeight: '800', color: '#10B981', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>2 of 3</Text>
-          <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', marginBottom: 4, letterSpacing: -0.5 }}>Your wellness scores</Text>
-          <Text style={{ fontSize: 14, color: 'rgba(168,155,250,0.55)', marginBottom: 24 }}>Built from what you shared — tap any area to update.</Text>
-
-          <View style={{ gap: 10, marginBottom: 28 }}>
-            {DOMAINS.map(d => {
-              const score = wheel[d.key]?.score ?? 50
-              return (
-                <View key={d.key} style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ fontSize: 14, color: '#E8E5FF', fontWeight: '600' }}>{d.icon} {domLabel(d.key)}</Text>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: d.color }}>{Math.round(score / 10)}/10</Text>
-                  </View>
-                  <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3 }}>
-                    <View style={{ height: 6, width: `${score}%` as any, backgroundColor: d.color, borderRadius: 3 }} />
-                  </View>
-                </View>
-              )
-            })}
-          </View>
-
-          <TouchableOpacity onPress={goNext} style={{ backgroundColor: '#10B981', borderRadius: 16, paddingVertical: 16, alignItems: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Save your profile →</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )
-    }
-
-    // Screen 2 — Save profile CTA
-    return (
-      <View style={{ flex: 1, backgroundColor: '#080418', padding: 28, justifyContent: 'center' }}>
-        <View style={{ position: 'absolute', top: -60, left: -60, width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(246,55,155,0.08)' }} />
-        <Text style={{ fontSize: 13, fontWeight: '800', color: '#F6379B', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>3 of 3</Text>
-        <Text style={{ fontSize: 30, fontWeight: '900', color: '#fff', lineHeight: 38, marginBottom: 12, letterSpacing: -0.5 }}>
-          Your profile{'\n'}is ready, {name.split(' ')[0]}.
-        </Text>
-        <Text style={{ fontSize: 15, color: 'rgba(168,155,250,0.6)', lineHeight: 24, marginBottom: 36 }}>
-          Save it so Soma can grow with you — your memories, your scores, your story. Free forever.
-        </Text>
-
-        {/* Profile preview card */}
-        <View style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(246,55,155,0.2)', padding: 18, marginBottom: 28, gap: 10 }}>
-          {[
-            { label: `💜 ${t('memories_label')}`, value: `${p.memories.length} ${t('memories_count')}` },
-            { label: '🎯 Wellness profile', value: p.wheel ? '10 life areas scored' : 'Ready to build' },
-            { label: '📊 Mood baseline', value: (p.moodLogs || []).length > 0 ? 'Set from your words' : 'Ready to track' },
-          ].map(row => (
-            <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, color: '#E8E5FF', fontWeight: '600' }}>{row.label}</Text>
-              <Text style={{ fontSize: 12, color: 'rgba(168,155,250,0.5)' }}>{row.value}</Text>
-            </View>
-          ))}
-        </View>
-
-        <TouchableOpacity onPress={() => setPhase(5)}
-          style={{ backgroundColor: '#F6379B', borderRadius: 18, paddingVertical: 18, alignItems: 'center', shadowColor: '#F6379B', shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 6 } }}>
-          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>Save my profile →</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setPhase(5)} style={{ alignItems: 'center', marginTop: 14 }}>
-          <Text style={{ fontSize: 13, color: 'rgba(168,155,250,0.35)' }}>Continue without saving</Text>
-        </TouchableOpacity>
-      </View>
-    )
-  }
 
   // Phase 5 — Profile summary + photo
   if (phase === 5) return (
