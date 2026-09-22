@@ -9,7 +9,15 @@
 // to run before App.tsx is evaluated, hence the bare import above everything.
 import 'expo-sqlite/localStorage/install'
 
+import { LogBox } from 'react-native'
 import { registerRootComponent } from 'expo'
 import App from './App'
+
+// expo-notifications cannot reach the keychain on an UNSIGNED simulator build and
+// logs this on every launch. LogBox then covers the whole screen, which makes the
+// simulator unusable for testing the app. A signed device build does not hit it,
+// and LogBox does not exist in release builds at all, so this only quiets
+// development — it hides nothing a user would ever have seen.
+LogBox.ignoreLogs(['[expo-notifications] Error reading persisted server registration info'])
 
 registerRootComponent(App)

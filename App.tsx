@@ -27,12 +27,24 @@ import { readToken, writeTokens, clearTokens as clearStoredTokens, TOKEN_KEY, RE
 import { mergeCloudProfile } from './src/shared/mergeProfile'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
+// Haptics are decoration, so nothing here may ever throw. The `.catch()` on its
+// own only covers a REJECTED promise — if impactAsync throws synchronously, as it
+// does where there is no haptic engine, `.catch` is read off undefined and the
+// TypeError escapes into the caller. Every one of these is called first in an
+// onPress handler, so a throw here silently kills the button: onType did
+// haptic.light() before setTyping(true), and the keyboard toggle in the voice
+// composer simply did nothing on a simulator.
+const buzz = (run: () => Promise<unknown>) => {
+  if (Platform.OS === 'web') return
+  try { void run()?.catch?.(() => {}) } catch { /* no haptic engine here */ }
+}
+
 const haptic = {
-  light: () => { if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}) },
-  medium: () => { if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}) },
-  heavy: () => { if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {}) },
-  success: () => { if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}) },
-  error: () => { if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {}) },
+  light: () => buzz(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
+  medium: () => buzz(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
+  heavy: () => buzz(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)),
+  success: () => buzz(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
+  error: () => buzz(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)),
 }
 
 // Enter sends; Shift+Enter makes a new line. Web only, and deliberately so:
