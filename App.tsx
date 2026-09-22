@@ -9200,16 +9200,20 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
 
       {/* ── HEADER ROW ── */}
       <FadeIn delay={0}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <View>
-          <Text style={{ fontSize: 13, color: t.textSub, marginBottom: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
+        {/* flex:1 + minWidth:0 + numberOfLines, or a long name pushes the icons
+            clean off the right edge. That hid the avatar — and with it Settings,
+            which is the only route to account deletion. Apple requires that route
+            to exist, so this is not merely cosmetic. */}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ fontSize: 13, color: t.textSub, marginBottom: 2 }}>
             {new Date().toLocaleDateString(localeTag(), { weekday: 'long', month: 'short', day: 'numeric' })}
           </Text>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, letterSpacing: -0.5 }}>
+          <Text numberOfLines={1} style={{ fontSize: 24, fontWeight: '800', color: t.text, letterSpacing: -0.5 }}>
             {profile.name ? `${greeting}, ${profile.name} 👋` : `${greeting} 👋`}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <TouchableOpacity onPress={() => go('notifs')} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: t.border }}>
             <Ionicons name="notifications-outline" size={20} color={t.text} />
             {(notifDB.unreadCount() > 0 || unreadCount > 0) && (

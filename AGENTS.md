@@ -89,6 +89,16 @@ removing one silently orphans a user's data after they were told it was erased.
 respectively. Without them the app builds for web and crashes on a device. `npx expo-doctor`
 catches this; run it before any native build.
 
+**After every web deploy, check the legal pages are still served.** They 404'd
+silently once between deploys, and App Store Connect rejects a submission whose privacy
+policy URL does not resolve:
+
+```bash
+for u in privacy.html terms.html; do
+  printf "%s -> %s\n" "$u" "$(curl -s -o /dev/null -w '%{http_code}' https://mysoma.site/$u)"
+done
+```
+
 **Static pages need two edits, not one.** `vercel.json`'s SPA rewrite swallows every path, so a
 new page (privacy.html, terms.html) must be added to the rewrite's exclusion list *and* copied
 into `dist/` by `scripts/postbuild-web.sh` — `expo export` does not know it exists. Miss either
