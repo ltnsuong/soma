@@ -7,11 +7,9 @@
       "runtimeArgs": [
         "expo",
         "start",
-        "--web",
-        "--port",
-        "8081"
+        "--web"
       ],
-      "port": 8081
+      "autoPort": true
     },
     {
       "name": "soma-web",

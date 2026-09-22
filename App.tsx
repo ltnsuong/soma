@@ -2967,15 +2967,44 @@ const RC_ANDROID_KEY = process.env.EXPO_PUBLIC_RC_ANDROID_KEY ?? ''
 let _RC: any = null
 try { _RC = require('react-native-purchases').default } catch {}
 
+const RC_KEY = Platform.OS === 'ios' ? RC_IOS_KEY : RC_ANDROID_KEY
+
+/**
+ * Whether RevenueCat may be configured at all.
+ *
+ * A RevenueCat Test Store key (they start with `test_`) in a RELEASE build makes
+ * the SDK call a Swift fatalError and take the process down on launch — for every
+ * user, on first open. It is not catchable: the `try` around configure() below is
+ * JS, and the crash happens in native code. The App Store build was doing exactly
+ * this, and it only shows in a Release build, which is why months of Debug testing
+ * never surfaced it.
+ *
+ * So a test key is simply not used outside development. The cost is that the
+ * upgrade button does nothing; the alternative is an app that cannot start.
+ * Replace EXPO_PUBLIC_RC_IOS_KEY with the Apple key from the RevenueCat dashboard
+ * (it begins `appl_`) and subscriptions come back on their own.
+ */
+const RC_IS_TEST_KEY = RC_KEY.startsWith('test_')
+const RC_USABLE = !!RC_KEY && !(RC_IS_TEST_KEY && !__DEV__)
+
 const purchaseApi = {
-  // True only when native module is loaded AND API key is set
-  configured: () => Platform.OS !== 'web' && !!_RC && !!(Platform.OS === 'ios' ? RC_IOS_KEY : RC_ANDROID_KEY),
+  // Native module loaded, a key present, and that key safe to use in this build.
+  configured: () => Platform.OS !== 'web' && !!_RC && RC_USABLE,
 
   init: () => {
+    if (Platform.OS !== 'web' && _RC && !RC_USABLE) {
+      console.warn(
+        '[purchases] RevenueCat not configured: a Test Store key cannot be used in a release build ' +
+        '(it crashes on launch). Subscriptions are disabled until an appl_ key is set.',
+      )
+      return
+    }
     if (!purchaseApi.configured()) return
     try {
-      _RC.configure({ apiKey: Platform.OS === 'ios' ? RC_IOS_KEY : RC_ANDROID_KEY })
-    } catch {}
+      _RC.configure({ apiKey: RC_KEY })
+    } catch (e) {
+      console.warn('[purchases] configure failed:', (e as Error)?.message)
+    }
   },
 
   // Returns true if user has active 'premium' entitlement — used on launch to sync
