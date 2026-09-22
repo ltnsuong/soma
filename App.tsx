@@ -86,7 +86,36 @@ if (IS_WEB) {
 const GOOGLE_WEB_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? ''
 const GOOGLE_IOS_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? ''
 const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? ''
-const GOOGLE_ENABLED = !!(GOOGLE_WEB_CLIENT_ID || GOOGLE_IOS_CLIENT_ID || GOOGLE_ANDROID_CLIENT_ID)
+// A client ID for THIS platform, not for any platform. expo-auth-session throws
+// from useIdTokenAuthRequest — at hook-call time, so it is a render error that
+// takes the whole screen down — when the running platform's ID is missing. Only
+// the web ID has ever been configured, so ORing the three reported "enabled" on
+// iOS and killed both the login and signup screens: the app rendered a red box
+// instead of a sign-in form, and App Review could not have got past it.
+const GOOGLE_PLATFORM_CLIENT_ID = (Platform.select({
+  ios: GOOGLE_IOS_CLIENT_ID,
+  android: GOOGLE_ANDROID_CLIENT_ID,
+  default: GOOGLE_WEB_CLIENT_ID,
+}) ?? '')
+const GOOGLE_ENABLED = !!GOOGLE_PLATFORM_CLIENT_ID
+
+/**
+ * Google's request hook, or inert stand-ins when this platform has no client ID.
+ *
+ * The conditional call is deliberate and safe: GOOGLE_ENABLED is computed once
+ * from build-time env, so it cannot change between renders and hook order is
+ * stable for the life of the process. Calling the real hook unconditionally is
+ * what threw.
+ */
+function useGoogleAuth(redirectUri: string) {
+  if (!GOOGLE_ENABLED) return [null, null, async () => {}] as const
+  return Google.useIdTokenAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID || null as any,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || null as any,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || null as any,
+    redirectUri,
+  })
+}
 const GOOGLE_REDIRECT_URI = process.env.EXPO_PUBLIC_GOOGLE_REDIRECT_URI ?? 'https://dist-mysomaapp.vercel.app'
 const STORAGE_KEY = 'soma_v3'
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:3000'
@@ -6090,12 +6119,7 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
   // ── Real Google OAuth (expo-auth-session) ──
   // useIdTokenAuthRequest, NOT useAuthRequest: the latter defaults to ResponseType.Token
   // and returns only an access token, which the backend can't verify via tokeninfo?id_token.
-  const [gRequest, gResponse, gPromptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: GOOGLE_WEB_CLIENT_ID || null as any,
-    iosClientId: GOOGLE_IOS_CLIENT_ID || null as any,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID || null as any,
-    redirectUri: GOOGLE_REDIRECT_URI,
-  })
+  const [gRequest, gResponse, gPromptAsync] = useGoogleAuth(GOOGLE_REDIRECT_URI)
   useEffect(() => {
     if (gResponse?.type !== 'success') return
     const idToken = (gResponse.params as any)?.id_token || gResponse.authentication?.idToken
@@ -6371,12 +6395,7 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
   const isTgMiniApp = typeof window !== 'undefined' && !!(window as any).Telegram?.WebApp?.initData
 
   // useIdTokenAuthRequest, NOT useAuthRequest — see the signup screen for why.
-  const [gRequest, gResponse, gPromptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: GOOGLE_WEB_CLIENT_ID || null as any,
-    iosClientId: GOOGLE_IOS_CLIENT_ID || null as any,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID || null as any,
-    redirectUri: GOOGLE_REDIRECT_URI,
-  })
+  const [gRequest, gResponse, gPromptAsync] = useGoogleAuth(GOOGLE_REDIRECT_URI)
   useEffect(() => {
     if (gResponse?.type !== 'success') return
     const idToken = (gResponse.params as any)?.id_token || gResponse.authentication?.idToken
