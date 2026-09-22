@@ -164,6 +164,15 @@ export const TARGET_DOMAINS = 5
  */
 export const MAX_EXCHANGES = 8
 
+/**
+ * Facts that only a direct question will ever produce.
+ *
+ * Everything else a beat asks for — a job title, hobbies — surfaces on its own
+ * when someone describes their life, so those must not keep a beat alive after
+ * its subject has already been covered.
+ */
+export const ASK_ONLY_FACTS: FactKey[] = ['name', 'age', 'heightCm']
+
 export type FactKey = 'name' | 'age' | 'heightCm' | 'city' | 'job' | 'hobbies'
 
 export interface Progress {
@@ -208,14 +217,25 @@ export const nextBeat = (p: Progress): Beat | null => {
     return remaining.find(b => b.id === 'missing') ?? null
   }
 
-  // A beat earns its place if it asks for a fact we don't have, or reaches a
-  // domain nothing has filled. Someone who mentions cooking while describing
-  // yesterday should not then be asked what they do for fun.
+  // A beat earns its place by reaching a domain nothing has filled yet, or by
+  // carrying a fact that talking will never reveal.
+  //
+  // The distinction matters. 'work' wants a job title and 'hobbies' wants
+  // hobbies, but both come out naturally when someone describes their day — so
+  // asking anyway produced "what do you actually do?" to someone who had just
+  // said they worked on a pitch deck until eight. That is the form-filling this
+  // conversation exists to avoid. Name, age and height are different: no amount
+  // of talking reveals them, so a beat carrying one is still worth asking even
+  // when its domains are covered.
   const known = new Set(p.knownFacts ?? [])
   const worthAsking = remaining.find(b =>
     b.act === 3
-    || b.facts?.some(f => !known.has(f))
     || b.covers.some(d => !covered.has(d))
+    || b.facts?.some(f => ASK_ONLY_FACTS.includes(f) && !known.has(f))
   )
-  return worthAsking ?? remaining[0] ?? null
+  // Nothing new left to reach: go to the closing question rather than walking
+  // the rest of the list. Falling through to remaining[0] asked whatever came
+  // next in the array, which is how a conversation with nothing left to learn
+  // still ran to the exchange ceiling.
+  return worthAsking ?? remaining.find(b => b.act === 3) ?? remaining[0] ?? null
 }

@@ -70,6 +70,32 @@ describe('nextBeat', () => {
     expect(nextBeat(p)?.id).toBe('body')
   })
 
+  it('does not ask about work again just because no job title was extracted', () => {
+    // Someone described a pitch deck and a workday; career is covered. Asking
+    // "what do you actually do?" anyway is the form-filling this exists to
+    // avoid, and a job title is not worth a whole question when the extractor
+    // can take it from what they already said.
+    const p = progress({ asked: ['name', 'why', 'yesterday'], knownFacts: ['name'], covered: ['career'] })
+    expect(nextBeat(p)?.id).not.toBe('work')
+  })
+
+  it('still asks for age and height, which talking never reveals', () => {
+    const p = progress({ asked: ['name', 'why', 'yesterday'], knownFacts: ['name'], covered: ['health', 'mind'] })
+    expect(nextBeat(p)?.id).toBe('body')
+  })
+
+  it('goes to the closing question when nothing new is left to reach', () => {
+    // Used to fall through to whatever came next in the array, which is how a
+    // conversation with nothing left to learn still ran to the ceiling.
+    const all = DOMAINS.map(d => d.key)
+    const p = progress({
+      asked: ['name', 'why', 'yesterday', 'body'],
+      knownFacts: ['name', 'age', 'heightCm'],
+      covered: all,
+    })
+    expect(nextBeat(p)?.act).toBe(3)
+  })
+
   it('skips a fact beat once every fact it asks for is known', () => {
     // Someone who mentioned cooking while describing yesterday should not then
     // be asked what they do for fun.

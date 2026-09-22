@@ -5206,6 +5206,12 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
     // -> re-render -> .trim() -> "i". A space could never be entered at all, which
     // made the whole first conversation untypeable. Trim where it is SENT instead.
     const draft = quickAnswer + (transcript ? (quickAnswer ? ' ' : '') + transcript : '')
+    // The very first question is "what should I call you?", and until a name is
+    // stored that is what this answer is. iOS predictive text turned "Sofia"
+    // into "WorkSofia" — and Soma then greets you by that name in every message
+    // it ever sends. Autocorrect earns its place on the sentence answers that
+    // follow; on a proper noun it only does damage.
+    const askingName = !DB.get().name?.trim()
     const canFinish = allAnswered && !somaGenerating
     return (
       <View style={{ flex: 1, backgroundColor: '#080418' }}>
@@ -5304,6 +5310,8 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
                 placeholder={allAnswered ? tr('ob_all_done') : tr('ob_type_instead')}
                 placeholderTextColor="rgba(168,155,250,0.3)"
                 multiline autoFocus
+                autoCorrect={!askingName}
+                autoCapitalize={askingName ? 'words' : 'sentences'}
                 editable={!somaGenerating && !allAnswered}
                 {...enterToSend(() => { if (draft.trim() && !somaGenerating && !allAnswered) sendToSoma(draft) })}
                 style={{ flex: 1, maxHeight: 120, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, borderWidth: 1, borderColor: SOMA_SURFACE_DARK, paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: '#E8E5FF', lineHeight: 21 }}
