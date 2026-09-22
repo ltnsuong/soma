@@ -9193,7 +9193,10 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
   ]
 
   return (
-    <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={[g.homePad, { paddingTop: 8 }]}>
+    // 8pt worked only because the guest banner sat above and absorbed the status
+    // bar. Signed in there is no banner, so the greeting rendered under the
+    // Dynamic Island. Every sibling tab already pads by HEADER_TOP; Home now matches.
+    <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={[g.homePad, { paddingTop: HEADER_TOP }]}>
 
       {/* ── HEADER ROW ── */}
       <FadeIn delay={0}>
@@ -9686,7 +9689,9 @@ function WheelOfLifeChart({ domains, scoreOf, size = 340, onDomainPress }: { dom
   }, [])
 
   const scores1to9 = domains.map(d => {
-    const s100 = Math.max(0, Math.min(100, scoreOf(d.key)))
+    // A domain the user has said nothing about scores NaN, not 0.
+    const raw = scoreOf(d.key)
+    const s100 = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 0
     return Math.max(0.3, (s100 / 100) * RINGS)
   })
 
@@ -9695,10 +9700,17 @@ function WheelOfLifeChart({ domains, scoreOf, size = 340, onDomainPress }: { dom
   const startDeg = (i: number) => -90 + sliceDeg * i + GAP_DEG / 2
   const endDeg = (i: number) => -90 + sliceDeg * (i + 1) - GAP_DEG / 2
   const toRad = (d: number) => d * Math.PI / 180
-  const ptOnArc = (angleDeg: number, r: number) => ({
-    x: C + r * Math.cos(toRad(angleDeg)),
-    y: C + r * Math.sin(toRad(angleDeg)),
-  })
+  // Every coordinate in this chart goes through here, so this is where NaN gets
+  // stopped. A domain with no data yet yields NaN from scoreOf, and Math.max /
+  // Math.min PROPAGATE NaN rather than clamping it — Math.max(0.3, NaN) is NaN —
+  // so the existing clamps let it straight through. A browser silently drops a
+  // path containing NaN; react-native-svg's native parser throws UnexpectedData
+  // and takes the whole Home screen down with it.
+  const ptOnArc = (angleDeg: number, r: number) => {
+    const rr = Number.isFinite(r) ? r : 0
+    const a = Number.isFinite(angleDeg) ? angleDeg : 0
+    return { x: C + rr * Math.cos(toRad(a)), y: C + rr * Math.sin(toRad(a)) }
+  }
 
   // SVG arc path for a sector ring between r1 and r2, from a1 to a2 (degrees)
   const arcPath = (a1: number, a2: number, r1: number, r2: number) => {
@@ -9718,7 +9730,7 @@ function WheelOfLifeChart({ domains, scoreOf, size = 340, onDomainPress }: { dom
   const midDeg = (i: number) => startDeg(i) + (endDeg(i) - startDeg(i)) / 2
   const scoreDots = domains.map((_, i) => {
     const scoreR = (scores1to9[i] / RINGS) * R * prog
-    return ptOnArc(midDeg(i), Math.max(scoreR, 4))
+    return ptOnArc(midDeg(i), Number.isFinite(scoreR) ? Math.max(scoreR, 4) : 4)
   })
   const polygon = scoreDots.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
 
