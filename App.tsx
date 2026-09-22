@@ -4586,12 +4586,6 @@ function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrow
   const [listening, setListening] = useState(false)
   const [somaThinking, setSomaThinking] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [profileSummary, setProfileSummary] = useState('')
-  // Was useState(''), so this screen never saw the photo chosen earlier and
-  // asked for it again with an empty circle.
-  const [profilePhotoUri, setProfilePhotoUri] = useState(
-    () => DB.get().profilePhoto || DB.get().dating?.photo || '',
-  )
   const [sectionConvo, setSectionConvo] = useState<{role:'soma'|'user', text:string, isFollowUp?:boolean}[]>([])
   const [finished, setFinished] = useState(false)          // the conversation reached its end
   const [covered, setCovered] = useState<DomainKey[]>([])  // wheel domains filled so far
@@ -4752,8 +4746,7 @@ Ask ONE short empathetic follow-up question to learn a bit more. 1-2 sentences m
     speak(t('ob_building'))
     if (ans.every(a => !a.trim())) {
       DB.setOnboarding([], ['mind', 'body', 'love'] as DomainKey[])
-      setProfileSummary(tr('ob_profile_ready'))
-      fadeTransition(() => setPhase(5))
+      fadeTransition(() => setPhase(12))
       return
     }
     try {
@@ -4802,41 +4795,16 @@ Return ONLY valid JSON (no markdown, no explanation):
       const domainMap = ['body', 'social', 'mind'] as DomainKey[]
       ans.forEach((a, i) => { if (a.trim()) DB.addMemory(domainMap[i], a.trim()) })
 
-      // Generate a warm, personal profile reflection using AI
-      const summaryPrompt = `You are Soma, a deeply empathetic life-coaching AI. You just had a heartfelt onboarding conversation with someone.
-
-Here's what they shared:
-- About their physical self: "${ans[0] || '(not shared)'}"
-- About their social world: "${ans[1] || '(not shared)'}"
-- About their inner self: "${ans[2] || '(not shared)'}"
-
-Key facts extracted: name=${nameToUse || 'unknown'}, age=${data.age || 'unknown'}, occupation=${data.occupation || 'unknown'}, relationship=${data.relationshipStatus || 'unknown'}
-
-Write a warm, personal reflection (4-5 sentences) addressed directly to them. Rules:
-- Start with their name if known, otherwise "I love that you shared this with me"
-- Reference 2-3 SPECIFIC things they actually said — not just age/job, but real things they mentioned
-- Show genuine insight: notice a pattern, a tension, or something meaningful about who they are
-- Express what excites you about helping them grow
-- Tone: warm, poetic, deeply human — like a wise friend who truly listened
-- DO NOT list facts robotically. Write flowing prose.
-- Do NOT mention adding a photo.
-- Keep it under 80 words.`
-
-      try {
-        const richSummary = await groq([{role: 'user', content: summaryPrompt}],
-          'You are Soma. Write in first person, warm and poetic. No bullet points.', 180)
-        setProfileSummary(richSummary || `${nameToUse ? `${nameToUse}, ` : ''}I truly heard you. The way you showed up for this conversation tells me so much about who you are — and I can't wait to walk this journey with you.`)
-      } catch {
-        setProfileSummary(`${nameToUse ? `${nameToUse}, ` : ''}I truly heard you. The way you showed up for this conversation tells me so much about who you are — and I can't wait to walk this journey with you.`)
-      }
+      // The reflection this used to generate had exactly one reader: the phase 5
+      // screen, which is gone. Phase 10 writes its own reflection into somaReply
+      // from the live conversation, so there is nothing left to feed here.
 
     } catch {
       if (userName.trim()) DB.setName(userName.trim())
       DB.setOnboarding([], ['mind', 'body', 'love'] as DomainKey[])
       ans.forEach((a, i) => { if (a.trim()) DB.addMemory((['body', 'social', 'mind'] as DomainKey[])[i], a.trim()) })
-      setProfileSummary("I truly heard you. The way you showed up for this conversation tells me so much about who you are — and I can't wait to walk this journey with you.")
     }
-    fadeTransition(() => setPhase(5))
+    fadeTransition(() => setPhase(12))
   }
 
   const color = phase >= 1 && phase <= 3 ? COLORS[phase - 1] : '#7B6EF6'
@@ -5405,7 +5373,6 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
         <TouchableOpacity
           onPress={() => pickPhoto(dataUrl => {
             setOnboardPhoto(dataUrl)
-            setProfilePhotoUri(dataUrl)
             DB.setUserPhoto(dataUrl)
           })}
           style={{ alignSelf: 'center', marginBottom: 32 }}>
@@ -5426,7 +5393,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
 
         <TouchableOpacity
           disabled={!shot}
-          onPress={() => setPhase(5)}
+          onPress={() => setPhase(6)}
           style={{ backgroundColor: shot ? '#7B6EF6' : 'rgba(123,110,246,0.25)', borderRadius: 18, paddingVertical: 18, alignItems: 'center',
                    ...(shot ? { shadowColor: '#7B6EF6', shadowOpacity: 0.45, shadowRadius: 22, shadowOffset: { width: 0, height: 7 } } : {}) }}>
           <Text style={{ color: shot ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: 17, fontWeight: '900' }}>
@@ -5453,58 +5420,12 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
   )
 
 
-  // Phase 5 — Profile summary + photo
-  if (phase === 5) return (
-    <View style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: HEADER_TOP, paddingBottom: 48, flexGrow: 1 }}>
-      {/* Soma avatar */}
-      <Image source={require('./assets/icon.png')} style={{ width: 72, height: 72, borderRadius: 22, marginBottom: 16 }} />
-
-      {/* Soma speech bubble */}
-      <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: 18, width: '100%', marginBottom: 32 }}>
-        <Text style={{ fontSize: 15, color: '#E8E5FF', lineHeight: 24, textAlign: 'center' }}>
-          {profileSummary || tr('ob_profile_ready')}
-        </Text>
-      </View>
-
-      {/* Photo upload */}
-      <Text style={{ fontSize: 13, color: '#A89BFA', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 16 }}>
-        {tr('your_photo')}
-      </Text>
-      <TouchableOpacity
-        onPress={() => pickPhoto(uri => { setProfilePhotoUri(uri); setOnboardPhoto(uri); DB.setUserPhoto(uri) })}
-        style={{
-          width: 110, height: 110, borderRadius: 55, marginBottom: 32,
-          backgroundColor: 'rgba(123,110,246,0.15)',
-          borderWidth: 2, borderColor: profilePhotoUri ? '#7B6EF6' : 'rgba(168,155,250,0.4)',
-          borderStyle: profilePhotoUri ? 'solid' : 'dashed',
-          alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-        }}>
-        {profilePhotoUri
-          ? <Image source={{ uri: profilePhotoUri }} style={{ width: 110, height: 110 }} resizeMode="cover" />
-          : <>
-              <Text style={{ fontSize: 30, marginBottom: 4 }}>📷</Text>
-              <Text style={{ fontSize: 12, color: '#A89BFA', fontWeight: '600' }}>{tr('add_photo_short')}</Text>
-            </>
-        }
-      </TouchableOpacity>
-
-      {/* Continue to account choice */}
-      <TouchableOpacity onPress={() => setPhase(6)}
-        style={{ backgroundColor: '#7B6EF6', borderRadius: 16, paddingVertical: 17, paddingHorizontal: 48, width: '100%', alignItems: 'center', ...shadowSm }}>
-        <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>{tr('continue')} →</Text>
-      </TouchableOpacity>
-      {/* Only offer to skip when there is nothing to skip. With a photo already
-          chosen one screen earlier, "Skip photo" read as though it had not
-          registered. */}
-      {!profilePhotoUri && (
-        <TouchableOpacity onPress={() => setPhase(6)} style={{ marginTop: 14, alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>{tr('skip_photo')}</Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
-    </View>
-  )
+  // Phase 5 was a second photo screen between the photo and the account choice.
+  // It re-showed the photo just chosen under a "Your photo" heading and offered
+  // to change it, so the flow asked for a photo, then appeared to ask again. The
+  // summary it carried is already the whole of phase 10, and on this path its own
+  // `profileSummary` was never set, so it fell back to a generic line. Phase 12
+  // now goes straight to the account choice.
 
   // Phase 6 — Account choice
   if (phase === 7) return (
