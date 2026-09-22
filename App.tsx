@@ -21,8 +21,10 @@ import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { BEATS, OPENING, coveredDomains, isDone, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
+import { initialWindowMetrics } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store'
 import { readToken, writeTokens, clearTokens as clearStoredTokens, TOKEN_KEY, REFRESH_KEY, type TokenBackend } from './src/shared/tokenStore'
+import { mergeCloudProfile } from './src/shared/mergeProfile'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
 const haptic = {
@@ -69,6 +71,21 @@ WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app 
 // it. Check the platform; keep `typeof window` only for things that genuinely may
 // be absent on web too.
 const IS_WEB = Platform.OS === 'web'
+
+// The app had no safe-area handling at all — no SafeAreaView, no StatusBar —
+// and every header hardcoded a paddingTop between 52 and 64, eyeballed in a
+// browser. On an iPhone with a Dynamic Island the top inset is ~62pt, so those
+// headers sat under it and the guest banner, which had no top padding at all,
+// rendered behind the clock.
+//
+// initialWindowMetrics is read from the native side at module load, so it is
+// available synchronously here and needs no provider. It does not follow
+// rotation, which is fine: this is a portrait phone app.
+const SAFE_TOP = initialWindowMetrics?.insets.top ?? 0
+const SAFE_BOTTOM = initialWindowMetrics?.insets.bottom ?? 0
+// Keep the old 56pt as a floor so nothing shifts on devices without a notch,
+// and let the real inset win where it is bigger.
+const HEADER_TOP = Math.max(SAFE_TOP + 12, 56)
 
 // Read by the boot watchdog in web/index.html: if the bundle hits a parse error
 // this never runs, which distinguishes "never executed" from "threw while rendering".
@@ -181,18 +198,45 @@ const useT = () => useContext(ThemeCtx)
  * store does not. expo-secure-store's getItem/setItem are synchronous, which
  * matters because auth.getToken() is read during render all over this file.
  */
-const tokenBackend: TokenBackend = IS_WEB
-  ? {
-      getItem: (k) => localStorage.getItem(k),
-      setItem: (k, v) => localStorage.setItem(k, v),
-      removeItem: (k) => localStorage.removeItem(k),
-    }
-  : {
-      getItem: (k) => SecureStore.getItem(k),
-      setItem: (k, v) => SecureStore.setItem(k, v),
-      // Only deletion is async in expo-secure-store; nothing waits on it.
-      removeItem: (k) => { void SecureStore.deleteItemAsync(k).catch(() => {}) },
-    }
+// localStorage on web, and on a device the keychain — but only if the keychain
+// actually answers. An unsigned simulator build has no keychain-access entitlement
+// and every call throws (expo-notifications fails the same way, with
+// ERR_NOTIFICATIONS_KEYCHAIN_ACCESS). Falling back to the SQLite-backed store
+// keeps sign-in working there instead of leaving the user unable to log in at all.
+const kvBackend: TokenBackend = {
+  getItem: (k) => localStorage.getItem(k),
+  setItem: (k, v) => localStorage.setItem(k, v),
+  removeItem: (k) => localStorage.removeItem(k),
+}
+
+const keychainBackend: TokenBackend = {
+  getItem: (k) => SecureStore.getItem(k),
+  setItem: (k, v) => SecureStore.setItem(k, v),
+  // Only deletion is async in expo-secure-store; nothing waits on it.
+  removeItem: (k) => { void SecureStore.deleteItemAsync(k).catch(() => {}) },
+}
+
+/**
+ * Ask the keychain once, at startup, whether it works — a write and a read back,
+ * not a guess. Probing beats splitting reads and writes across two stores, which
+ * is how a token gets written to one and looked for in the other.
+ */
+function pickTokenBackend(): TokenBackend {
+  if (IS_WEB) return kvBackend
+  const probe = 'soma_keychain_probe'
+  try {
+    SecureStore.setItem(probe, '1')
+    const ok = SecureStore.getItem(probe) === '1'
+    void SecureStore.deleteItemAsync(probe).catch(() => {})
+    if (ok) return keychainBackend
+    console.warn('[auth] keychain did not read back — using the local store instead')
+  } catch (e) {
+    console.warn('[auth] keychain unavailable, using the local store instead:', (e as Error)?.message)
+  }
+  return kvBackend
+}
+
+const tokenBackend: TokenBackend = pickTokenBackend()
 
 // ── LIFE DOMAINS (Circle of Life) ──────────────────────────
 const DOMAIN_ICONS: Record<DomainKey, keyof typeof Ionicons.glyphMap> = {
@@ -2788,14 +2832,10 @@ const cloudSync = {
       const { profile: row } = await res.json()
       if (!row || !row.data) return false
 
-      // Merge: restore cloud data but keep registered=true and current tokens
-      const local = DB.get()
-      const merged = {
-        ...row.data,
-        registered: true,
-        name: row.name || row.data.name || local.name,
-        language: row.language || row.data.language || local.language,
-      }
+      // Cloud wins on content, the device keeps its own preferences.
+      // See src/shared/mergeProfile.ts — dropping languageChosen here sent every
+      // signed-in user back to the language picker on each launch.
+      const merged = mergeCloudProfile(row, DB.get())
       // Keep cloud restoration in the same store used everywhere else in SOMA.
       // Using a second key left the visible app out of sync with an account session.
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
@@ -4335,7 +4375,8 @@ export default function App() {
       flexDirection: 'row', alignItems: 'flex-end',
       backgroundColor: themeVal.t.bg,
       borderTopWidth: 0.5, borderTopColor: themeVal.t.border,
-      paddingBottom: Platform.OS === 'ios' ? 28 : 10, paddingTop: 6, paddingHorizontal: 16,
+      // The home indicator is 34pt on a modern iPhone; the old flat 28 sat under it.
+      paddingBottom: Math.max(SAFE_BOTTOM, 10), paddingTop: 6, paddingHorizontal: 16,
     }}>
       {TAB_ITEMS.flatMap((item, i) => {
         const active = tab === item.id
@@ -5093,7 +5134,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
         <View style={{ position: 'absolute', top: -60, left: -60, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(123,110,246,0.08)' }} />
 
         {/* Header */}
-        <View style={{ paddingTop: 58, paddingHorizontal: 24, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ paddingTop: HEADER_TOP, paddingHorizontal: 24, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TouchableOpacity onPress={() => {
             stopListeningRef.current?.()
             if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
@@ -5512,7 +5553,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
   // Phase 5 — Profile summary + photo
   if (phase === 5) return (
     <View style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: 56, paddingBottom: 48, flexGrow: 1 }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: HEADER_TOP, paddingBottom: 48, flexGrow: 1 }}>
       {/* Soma avatar */}
       <Image source={require('./assets/icon.png')} style={{ width: 72, height: 72, borderRadius: 22, marginBottom: 16 }} />
 
@@ -5683,7 +5724,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
   return (
     <Animated.View style={{ flex: 1, backgroundColor: '#0F0A2E', opacity: fadeAnim }}>
       {/* Progress bar */}
-      <View style={{ paddingTop: 56, paddingHorizontal: 24 }}>
+      <View style={{ paddingTop: HEADER_TOP, paddingHorizontal: 24 }}>
         <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
           {[1, 2, 3].map(i => (
             <View key={i} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: i <= phase ? color : 'rgba(255,255,255,0.12)' }} />
@@ -7241,7 +7282,7 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
     <>
       <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
             <Text style={[g.greeting, { fontSize: 28, color: theme.text }]}>{tr('circle_header')}</Text>
             <Text style={[g.auraSub, { marginTop: 2, color: theme.textSub }]}>{tr('circle_tagline')}</Text>
@@ -7813,7 +7854,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
     return (
       <View style={{ flex: 1, backgroundColor: theme.bg }}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.border, backgroundColor: theme.bg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: HEADER_TOP, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.border, backgroundColor: theme.bg }}>
           <TouchableOpacity onPress={closeChat} style={{ padding: 4 }}>
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
@@ -8074,7 +8115,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
     const accentColor = DEMO_AVATARS[demoOpen.userId] || '#7B6EF6'
     return (
       <View style={{ flex: 1, backgroundColor: theme.bg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.border, backgroundColor: theme.bg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: HEADER_TOP, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.border, backgroundColor: theme.bg }}>
           <TouchableOpacity onPress={() => setDemoOpen(null)} style={{ padding: 4 }}>
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
@@ -8223,7 +8264,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 12, flexDirection: 'row', alignItems: 'center' }}>
         <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, flex: 1 }}>{t('messages')}</Text>
         <TouchableOpacity onPress={() => setShowCompose(true)}
           style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#7B6EF615', borderWidth: 1.5, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center' }}>
@@ -8561,7 +8602,7 @@ function HowOthersSeeMe({ profile, onEdit, onClose }: { profile: UserProfile; on
   return (
     <View style={{ position: 'absolute' as any, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: t.bg, zIndex: 200 }}>
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: t.border, gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: t.border, gap: 12 }}>
         <TouchableOpacity onPress={onClose} style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="arrow-back" size={20} color={t.text} />
         </TouchableOpacity>
@@ -8623,7 +8664,7 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
 
   if (showPicksList) return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <TouchableOpacity onPress={() => setShowPicksList(false)}>
           <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>{tr('back').replace('←', '‹')}</Text>
         </TouchableOpacity>
@@ -8678,7 +8719,7 @@ function OuterWorldTab({ profile, go, onMeetPeople }: { profile: UserProfile; go
         onClose={() => { setShowProfiles(false); force() }}
       />
     )}
-    <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 100, gap: 14 }}>
+    <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ padding: 20, paddingTop: HEADER_TOP, paddingBottom: 100, gap: 14 }}>
       <View style={{ marginBottom: 8 }}>
         <Text style={[g.greeting, { fontSize: 28, color: t.text }]}>{tr('outer_world')}</Text>
         <Text style={[g.auraSub, { marginTop: 4, color: t.textSub }]}>{tr('find_aligned')}</Text>
@@ -8918,7 +8959,7 @@ function MainTabs({ profile, go, onReset, tab, setTab, dmUnread, onMeetPeople, p
   const guestBanner = isGuest ? (
     <TouchableOpacity onPress={() => go('register')} style={{
       flexDirection: 'row', alignItems: 'center', gap: 8,
-      paddingHorizontal: 16, paddingVertical: 9,
+      paddingHorizontal: 16, paddingBottom: 9, paddingTop: SAFE_TOP + 9,
       backgroundColor: '#7B6EF612',
       borderBottomWidth: 0.5, borderBottomColor: '#7B6EF630',
     }}>
@@ -10759,7 +10800,7 @@ function BondJourney({ person, profile, onBack, onRefresh }: {
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 80 }}>
       {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 8 }}>
         <TouchableOpacity onPress={onBack}><Text style={g.backLink}>{tr('back')}</Text></TouchableOpacity>
         <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, marginTop: 12 }}>{person.name}'s Journey</Text>
         <Text style={{ fontSize: 13, color: t.textSub, marginTop: 2 }}>{level.desc}</Text>
@@ -11371,7 +11412,7 @@ function MomentViewer({ moment, onClose, onReact }: { moment: Moment; onClose: (
       {/* Overlay */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 52, gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: HEADER_TOP, gap: 12 }}>
           <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
             <Text style={{ fontSize: 17, fontWeight: '800', color: '#fff' }}>{moment.authorName[0].toUpperCase()}</Text>
           </View>
@@ -11927,7 +11968,7 @@ Be specific and human. Under 120 words total.`
         <ScrollView ref={msgRef} style={{ flex: 1 }} contentContainerStyle={g.msgList} showsVerticalScrollIndicator={false}
           onContentSizeChange={() => msgRef.current?.scrollToEnd({ animated: false })}>
           {realMsgs.length === 0 && !loading && (
-            <View style={{ alignItems: 'center', paddingTop: 60 }}>
+            <View style={{ alignItems: 'center', paddingTop: HEADER_TOP }}>
               <Text style={{ fontSize: 32, marginBottom: 12 }}>💬</Text>
               <Text style={{ color: t.textSub, fontSize: 14, textAlign: 'center' }}>Start your conversation with {p.name}.</Text>
             </View>
@@ -12053,7 +12094,7 @@ Be specific and human. Under 120 words total.`
       )}
 
       {profile.circle.length === 0 ? (
-        <View style={[g.centerWrap, { paddingTop: 60 }]}>
+        <View style={[g.centerWrap, { paddingTop: HEADER_TOP }]}>
           <Text style={g.bigOrbIcon}>◈</Text>
           <Text style={[g.startSub, { marginTop: 20 }]}>Your circle is empty.{'\n'}Talk to Soma about people in your life, or invite someone.</Text>
         </View>
@@ -13877,7 +13918,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
   // Category Selection Screen
   if (step === 'category') {
     return (
-      <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 }}>
+      <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 40 }}>
         {/* Header */}
         <View style={{ marginBottom: 28 }}>
           <TouchableOpacity onPress={onBack} style={{ marginBottom: 16 }}>
@@ -14585,7 +14626,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
       {step === 'matched' && (
         <>
           {/* Match screen — fanned cards + confetti */}
-          <View style={{ alignItems: 'center', paddingTop: 60, paddingBottom: 16, backgroundColor: '#6B3FA0', marginHorizontal: -20, marginTop: -20, paddingHorizontal: 20, overflow: 'hidden', minHeight: 380 }}>
+          <View style={{ alignItems: 'center', paddingTop: HEADER_TOP, paddingBottom: 16, backgroundColor: '#6B3FA0', marginHorizontal: -20, marginTop: -20, paddingHorizontal: 20, overflow: 'hidden', minHeight: 380 }}>
             <MatchConfetti />
             {/* Fanned photo cards */}
             <View style={{ width: 280, height: 240, position: 'relative', marginBottom: 24, marginTop: 12 }}>
@@ -15009,7 +15050,7 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
 
   if (step === 'home') return (
     <View style={[g.screen, { backgroundColor: t.bg }]}>
-      <View style={[g.header, { paddingTop: 52 }]}>
+      <View style={[g.header, { paddingTop: HEADER_TOP }]}>
         <TouchableOpacity onPress={onBack}><Text style={g.backLink}>{tr('back')}</Text></TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={[g.auraTitle, { fontSize: 22, color: t.text }]}>{'⚡ ' + tr('synergy_scan')}</Text>
@@ -15059,7 +15100,7 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
 
   if (step === 'mycode') return (
     <View style={[g.screen, { backgroundColor: t.bg }]}>
-      <View style={[g.header, { paddingTop: 52 }]}>
+      <View style={[g.header, { paddingTop: HEADER_TOP }]}>
         <TouchableOpacity onPress={() => setStep('home')}><Text style={g.backLink}>{tr('back')}</Text></TouchableOpacity>
         <Text style={[g.auraTitle, { marginLeft: 12, color: t.text }]}>{tr('my_synergy_code')}</Text>
       </View>
@@ -15090,7 +15131,7 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
 
   if (step === 'scan') return (
     <View style={[g.screen, { backgroundColor: t.bg }]}>
-      <View style={[g.header, { paddingTop: 52 }]}>
+      <View style={[g.header, { paddingTop: HEADER_TOP }]}>
         <TouchableOpacity onPress={() => setStep('home')}><Text style={g.backLink}>{tr('back')}</Text></TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={[g.auraTitle, { color: t.text }]}>{tr('scan_someone')}</Text>
@@ -15129,7 +15170,7 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
 
   if (step === 'connecting') return (
     <View style={[g.screen, { backgroundColor: '#0D0D1A' }]}>
-      <View style={{ paddingTop: 52, paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View style={{ paddingTop: HEADER_TOP, paddingHorizontal: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <TouchableOpacity onPress={() => setStep('scan')} style={{ marginRight: 4 }}><Text style={[g.backLink, { color: '#9B8EFF' }]}>← Back</Text></TouchableOpacity>
         <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 18 }}>⚡</Text>
@@ -15169,7 +15210,7 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
     const color = scoreColor(report.score)
     return (
       <View style={[g.screen, { backgroundColor: t.bg }]}>
-        <View style={[g.header, { paddingTop: 52 }]}>
+        <View style={[g.header, { paddingTop: HEADER_TOP }]}>
           <TouchableOpacity onPress={onBack}><Text style={g.backLink}>← Done</Text></TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={[g.auraTitle, { color: t.text }]}>{tr('synergy_report')}</Text>
@@ -15444,7 +15485,7 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
       <Text style={g.logoSub}>Everyone you matched with. Conversations stay open.</Text>
       <View style={{ height: 16 }} />
       {conns.length === 0 ? (
-        <View style={[g.centerWrap, { paddingTop: 60 }]}>
+        <View style={[g.centerWrap, { paddingTop: HEADER_TOP }]}>
           <Text style={g.bigOrbIcon}>💜</Text>
           <Text style={[g.startSub, { marginTop: 20 }]}>No connections yet.{'\n'}Like someone in Dating to start chatting.</Text>
         </View>
@@ -15745,7 +15786,7 @@ function DiaryHistory({ profile, onBack }: { profile: UserProfile; onBack: () =>
       )}
 
       {profile.diary.length === 0 ? (
-        <View style={[g.centerWrap, { paddingTop: 60 }]}>
+        <View style={[g.centerWrap, { paddingTop: HEADER_TOP }]}>
           <Text style={g.bigOrbIcon}>📖</Text>
           <Text style={[g.startSub, { marginTop: 20 }]}>{tr('no_diary')}</Text>
         </View>
@@ -17905,7 +17946,7 @@ function LifeTimeline({ profile, onBack }: { profile: UserProfile; onBack: () =>
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 80 }}>
       {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 8 }}>
         <TouchableOpacity onPress={onBack}><Text style={g.backLink}>{tr('back')}</Text></TouchableOpacity>
         <Text style={{ fontSize: 26, fontWeight: '800', color: t.text, marginTop: 12 }}>Your Story</Text>
         <Text style={{ fontSize: 13, color: t.textSub, marginTop: 3 }}>
@@ -17929,7 +17970,7 @@ function LifeTimeline({ profile, onBack }: { profile: UserProfile; onBack: () =>
       </ScrollView>
 
       {days.length === 0 ? (
-        <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 }}>
+        <View style={{ alignItems: 'center', paddingTop: HEADER_TOP, paddingHorizontal: 32 }}>
           <Text style={{ fontSize: 44, marginBottom: 14 }}>📅</Text>
           <Text style={{ fontSize: 17, fontWeight: '800', color: t.text, textAlign: 'center' }}>Nothing here yet</Text>
           <Text style={{ fontSize: 13, color: t.textSub, marginTop: 6, textAlign: 'center', lineHeight: 20 }}>
@@ -18077,7 +18118,7 @@ function MemoryManager({ profile, onBack, onRefresh }: { profile: UserProfile; o
   return (
     <ScrollView style={[g.screen, { backgroundColor: t.bg }]} contentContainerStyle={{ paddingBottom: 80 }}>
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 8 }}>
         <TouchableOpacity onPress={onBack} style={{ marginRight: 12 }}>
           <Text style={g.backLink}>{tr('back')}</Text>
         </TouchableOpacity>
@@ -18990,7 +19031,7 @@ function CrisisSupport({ profile, onClose }: { profile: UserProfile; onClose: ()
 
 const cs = StyleSheet.create({
   wrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0A0A0F', zIndex: 100 },
-  scroll: { padding: 24, paddingTop: 64, alignItems: 'center' },
+  scroll: { padding: 24, paddingTop: HEADER_TOP, alignItems: 'center' },
   heart: { fontSize: 48, marginBottom: 12 },
   title: { color: '#222540', fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
   lead: { color: '#9CA0B5', fontSize: 15, lineHeight: 24, textAlign: 'center', marginBottom: 24 },
@@ -19504,7 +19545,7 @@ const g = StyleSheet.create({
   logoSm: { fontSize: 26, fontWeight: '700', color: '#7B6EF6' },
   logoSub: { fontSize: 14, color: '#6E7191', fontStyle: 'italic', marginTop: 6 },
   centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 14 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 14 },
   orbMd: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   orbSm: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   orbIcon: { fontSize: 17, color: '#fff' },
@@ -19558,7 +19599,7 @@ const g = StyleSheet.create({
   iconOn: { backgroundColor: '#7B6EF6', borderColor: '#7B6EF6' },
   sendBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#7B6EF6', alignItems: 'center', justifyContent: 'center' },
   sendIcon: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  homePad: { padding: 24, paddingTop: 58, paddingBottom: 100 },
+  homePad: { padding: 24, paddingTop: HEADER_TOP, paddingBottom: 100 },
   homeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
   greeting: { fontSize: 28, fontWeight: '700', color: '#222540', letterSpacing: 0.3 },
   greetDate: { fontSize: 12, color: '#6E7191', marginTop: 3, fontWeight: '500' },
@@ -19718,7 +19759,7 @@ const g = StyleSheet.create({
   whyMatchLbl: { color: '#7B6EF6', fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 6 },
   whyMatchTxt: { color: '#222540', fontSize: 13, lineHeight: 20 },
   // Cinematic dating profile
-  dTop: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
+  dTop: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: HEADER_TOP, paddingBottom: 12, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   dBack: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(20,20,24,0.7)', alignItems: 'center', justifyContent: 'center' },
   dBackTxt: { color: '#fff', fontSize: 24, marginTop: -2 },
   dToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(20,20,24,0.7)', borderRadius: 24, padding: 4 },
@@ -19804,7 +19845,7 @@ const g = StyleSheet.create({
   paywallPriceTxt: { color: '#F6D66E', fontSize: 15, fontWeight: '800' },
   paywallBtn: { width: '100%', height: 54, borderRadius: 16, backgroundColor: '#F6D66E', alignItems: 'center', justifyContent: 'center', marginBottom: 12, ...shadowMd },
   paywallBtnTxt: { color: '#FBFAF8', fontSize: 16, fontWeight: '800' },
-  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#EFEDF6' },
+  chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: HEADER_TOP, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#EFEDF6' },
   chatAvatar: { width: 42, height: 42, borderRadius: 21 },
   chatName: { color: '#222540', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
   chatStatus: { color: '#6EF6A8', fontSize: 12, marginTop: 1 },
@@ -19856,7 +19897,7 @@ const g = StyleSheet.create({
   privacyTxt: { color: '#9CA0B5', fontSize: 13, lineHeight: 21 },
   aboutTxt: { color: '#9A9DB2', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 30 },
   // ── Settings (home-card style) ──
-  stgHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16 },
+  stgHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 20, paddingTop: HEADER_TOP, paddingBottom: 16 },
   stgBackBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center' as const, justifyContent: 'center' as const },
   stgBackTxt: { fontSize: 22, color: '#7B6EF6', fontWeight: '600' },
   stgHeaderTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' as const },
