@@ -1753,12 +1753,32 @@ app.get('/users/find', async (req, res) => {
     const { data: users, error } = await query.limit(5)
     if (error) throw error
     if (!users || users.length === 0) return res.status(404).json({ error: 'No user found' })
-    const results = users.map(u => ({
-      name: u.name,
-      code: u.id.replace(/-/g, '').slice(0, 6).toUpperCase(),
-      userId: u.id,
-      email: u.email
-    }))
+
+    // Synergy Scan compares two people, so a name is not enough — it needs
+    // something to compare. These are the same public fields the browse list
+    // already shows; nothing private (diary, memories, Circle) is included.
+    const ids = users.map(u => u.id)
+    const { data: dps } = await supabase
+      .from('dating_profiles')
+      .select('user_id, bio, interests, values, work, city, age')
+      .in('user_id', ids)
+    const byUser = {}
+    ;(dps || []).forEach(d => { byUser[d.user_id] = d })
+
+    const results = users.map(u => {
+      const dp = byUser[u.id] || {}
+      return {
+        name: u.name,
+        code: u.id.replace(/-/g, '').slice(0, 6).toUpperCase(),
+        userId: u.id,
+        email: u.email,
+        bio: dp.bio || '',
+        interests: dp.interests || [],
+        values: dp.values || [],
+        work: dp.work || '',
+        city: dp.city || '',
+      }
+    })
     res.json({ users: results })
   } catch (err) {
     res.status(500).json({ error: err.message })
