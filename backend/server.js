@@ -1760,7 +1760,7 @@ app.get('/users/find', async (req, res) => {
     const ids = users.map(u => u.id)
     const { data: dps } = await supabase
       .from('dating_profiles')
-      .select('user_id, bio, interests, values, work, city, age')
+      .select('user_id, bio, sector_bios, interests, values, work, city, age')
       .in('user_id', ids)
     const byUser = {}
     ;(dps || []).forEach(d => { byUser[d.user_id] = d })
@@ -1773,6 +1773,10 @@ app.get('/users/find', async (req, res) => {
         userId: u.id,
         email: u.email,
         bio: dp.bio || '',
+        // The four per-purpose bios. A professional QR should compare the
+        // professional profile, not a blended one — that split is the whole
+        // reason four separate codes exist.
+        sectorBios: dp.sector_bios || {},
         interests: dp.interests || [],
         values: dp.values || [],
         work: dp.work || '',
