@@ -138,6 +138,13 @@ The dating profile is **derived server-side from what the user tells Soma** (`de
 
 `.quality-baseline.json` records current debt. `npm run verify` fails only when a number goes **up**; when a number goes down it rewrites the baseline, so the bar can tighten but never loosen. Thresholds come from the "AI-кодинг, не вайб-кодинг" talk. Everything is `warn` today because erroring on day one on an 18k-line file means the gate gets switched off within a week — flip rules to `error` as their real count reaches zero.
 
+**A syntax error can make the gate report an improvement.** eslint and tsc both stop
+early on a file they cannot parse, so they report *fewer* problems, and the ratchet writes
+those numbers into `.quality-baseline.json` as the new bar. An invalid JSX comment did this
+once — 30 type errors became 4, the gate said "Improved", and the next honest run failed
+with +26. If a number drops by more than a change plausibly explains, do not accept it:
+check the file parses, then `git checkout HEAD -- .quality-baseline.json`.
+
 To land a change: `npm run verify` before committing. If a number legitimately rises, say why and run `npm run verify:accept`.
 
 **Do not add a native module to `devDependencies`.** EAS runs `npm ci --include=dev` on the iOS

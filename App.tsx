@@ -5431,7 +5431,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
     if (tourIdx === 0) return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: '#0F0A2E' }}>
         <View style={{ position: 'absolute', top: -40, left: -40, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(123,110,246,0.1)' }} />
-        <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: 56, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+        <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: HEADER_TOP, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
           <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' }}>Skip →</Text>
         </TouchableOpacity>
 
@@ -5522,7 +5522,7 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
       return (
         <ScrollView style={{ flex: 1, backgroundColor: '#080418' }} contentContainerStyle={{ padding: 24, paddingTop: 70 }}>
           <View style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(16,185,129,0.08)' }} />
-          <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: 56, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+          <TouchableOpacity onPress={() => setPhase(5)} style={{ position: 'absolute', top: HEADER_TOP, right: 24, zIndex: 10, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)' }}>
             <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' }}>Skip →</Text>
           </TouchableOpacity>
 
@@ -14078,7 +14078,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
   if (step === 'browse' && category === 'romantic' && genderPref === null) {
     return (
       <View style={[g.screen, { backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
-        <TouchableOpacity onPress={onBack} style={{ position: 'absolute', top: 56, left: 20 }}>
+        <TouchableOpacity onPress={onBack} style={{ position: 'absolute', top: HEADER_TOP, left: 20 }}>
           <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>{tr('back').replace('←', '‹')}</Text>
         </TouchableOpacity>
         <Text style={{ fontSize: 32, marginBottom: 16 }}>💜</Text>
@@ -14120,8 +14120,10 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
     const currentBrowse = filteredRanked[browseIndex]?.c
     const currentScore = filteredRanked[browseIndex]?.score
 
+    // The card is full-bleed to the top, so this padding is the only thing between
+    // it and the Dynamic Island. 12 put the match badge under the status bar.
     return (
-      <View style={[g.screen, { backgroundColor: t.bg, paddingTop: 12 }]}>
+      <View style={[g.screen, { backgroundColor: t.bg, paddingTop: SAFE_TOP + 12 }]}>
 
         {/* No results state */}
         {filteredRanked.length === 0 && (
