@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   TextInput, ScrollView, KeyboardAvoidingView,
   Platform, Animated, Easing, Image, ImageBackground, Switch, Modal, ActivityIndicator,
-  PanResponder, FlatList, useWindowDimensions
+  PanResponder, FlatList, useWindowDimensions, Linking
 } from 'react-native'
 import Svg, { Circle as SvgCircle, Line as SvgLine, Polygon as SvgPolygon, Path as SvgPath, Polyline as SvgPolyline, Defs, RadialGradient, Stop as SvgStop, Ellipse as SvgEllipse, LinearGradient as SvgLinearGradient, Text as SvgText, G as SvgG } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
@@ -58,14 +58,24 @@ WebBrowser.maybeCompleteAuthSession() // finish the OAuth redirect when the app 
 //  Pillars: Try Soma · Register · Soma+Memory · Diary · Circle · Dating
 // ════════════════════════════════════════════════════════════
 
+// `typeof window !== 'undefined'` is NOT a web check. React Native defines a
+// global `window`, so that test passes on iOS and Android while the object has
+// almost none of the DOM on it — addEventListener, history and location are all
+// missing. Using it as a web guard put `window.addEventListener` at module scope,
+// which threw before React mounted and left the whole iOS app a white screen with
+// only "[runtime not ready]: TypeError: undefined is not a function" to show for
+// it. Check the platform; keep `typeof window` only for things that genuinely may
+// be absent on web too.
+const IS_WEB = Platform.OS === 'web'
+
 // Read by the boot watchdog in web/index.html: if the bundle hits a parse error
 // this never runs, which distinguishes "never executed" from "threw while rendering".
-if (typeof window !== 'undefined') (window as any).__SOMA_BUNDLE_OK__ = true
+if (IS_WEB) (window as any).__SOMA_BUNDLE_OK__ = true
 
 // An unhandled rejection otherwise reaches the console as a bare "NetworkError"
 // with no stack and no origin. That is exactly how a real crash on a real
 // user's profile card sat unexplained — it looked like noise. Name it.
-if (typeof window !== 'undefined') {
+if (IS_WEB) {
   window.addEventListener('unhandledrejection', (e: any) => {
     const r = e?.reason
     console.error('[soma] unhandled rejection:', r?.name ?? r, r?.message ?? '', r?.stack ?? '')
@@ -4079,7 +4089,7 @@ export default function App() {
   }, [profile.memories?.length, profile.gratitudeEntries?.length, profile.loveEntries?.length])
 
   const animateIn = (fromRight: boolean) => {
-    const w = typeof window !== 'undefined' ? window.innerWidth * 0.18 : 80
+    const w = IS_WEB ? window.innerWidth * 0.18 : 80
     slideAnim.setValue(fromRight ? w : -w)
     fadeAnim.setValue(0)
     Animated.parallel([
@@ -4103,7 +4113,7 @@ export default function App() {
   const go = (s: Screen) => {
     refresh()
     screenStack.current.push(screen)
-    if (typeof window !== 'undefined') window.history.pushState({ idx: screenStack.current.length }, '', window.location.pathname)
+    if (IS_WEB) window.history.pushState({ idx: screenStack.current.length }, '', window.location.pathname)
     animateIn(true)
     setScreen(s)
   }
@@ -4117,8 +4127,8 @@ export default function App() {
         setScreen(prev)
       }
     }
-    if (typeof window !== 'undefined') window.addEventListener('popstate', handler)
-    return () => { if (typeof window !== 'undefined') window.removeEventListener('popstate', handler) }
+    if (IS_WEB) window.addEventListener('popstate', handler)
+    return () => { if (IS_WEB) window.removeEventListener('popstate', handler) }
   }, [])
 
   // ── Duolingo-style notification engine ──
@@ -18819,8 +18829,16 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
 // ════════════════════════════════════════════════════════════
 //  CRISIS SUPPORT — shown when someone is in a dark moment
 // ════════════════════════════════════════════════════════════
+// This opens the crisis hotlines: tel:988, sms:741741, findahelpline.com, and
+// the message to a trusted contact. On native `window.location` does not exist,
+// so the assignment threw straight into the bare catch and every one of those
+// buttons did nothing at all, silently — on the screen where that matters most.
 function openLink(url: string) {
-  try { if (typeof window !== 'undefined') window.location.href = url } catch {}
+  if (IS_WEB) {
+    try { window.location.href = url } catch (e) { console.warn('[openLink]', url, e) }
+    return
+  }
+  Linking.openURL(url).catch((e) => console.warn('[openLink] could not open', url, e?.message))
 }
 
 function CrisisSupport({ profile, onClose }: { profile: UserProfile; onClose: () => void }) {
