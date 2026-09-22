@@ -32,13 +32,19 @@ echo "✓ Copied $(ls "$FONT_DEST"/*.ttf | wc -l | tr -d ' ') font files to dist
 
 # index.html references /apple-touch-icon.png but expo export doesn't emit it.
 # Without this it 404s (on Vercel the SPA rewrite masks it by returning HTML as the icon).
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-node -e "
-require('$ROOT/node_modules/sharp')('$ROOT/assets/icon.png')
-  .resize(180,180,{fit:'cover'}).png().toFile('$DIST/apple-touch-icon.png')
-  .then(()=>console.log('✓ Generated dist/apple-touch-icon.png (180x180)'))
-  .catch(e=>{console.error('✗ apple-touch-icon failed:',e.message);process.exit(1)})
-"
+#
+# This used to call sharp. sharp is a native module, and EAS runs
+# `npm ci --include=dev` on the iOS builder, where it cannot resolve a prebuilt
+# binary for that machine, falls back to compiling via node-gyp, and fails the
+# whole Install dependencies phase — so no iOS build could ever start. The icon is
+# a fixed 180x180 crop of assets/icon.png that changes only when the app icon does,
+# so it is generated once and committed at web/apple-touch-icon.png.
+#
+# Regenerate it only if the app icon changes (sharp is no longer a dependency, so
+# install it for the one-off):
+#   npx --yes sharp-cli@5 -i assets/icon.png -o web/ resize 180 180 --fit cover
+cp "$(dirname "$0")/../web/apple-touch-icon.png" "$DIST/apple-touch-icon.png"
+echo "  Copied apple-touch-icon.png (180x180)"
 
 # The App Store requires a reachable privacy policy, and an auto-renewing
 # subscription requires terms. These are plain static pages; expo export does not
@@ -46,5 +52,5 @@ require('$ROOT/node_modules/sharp')('$ROOT/assets/icon.png')
 # served as themselves rather than as index.html.
 for page in privacy.html terms.html; do
   cp "$(dirname "$0")/../web/$page" "$DIST/$page"
-  echo "\u2713 Copied $page"
+  echo "  Copied $page"
 done

@@ -130,7 +130,13 @@ The dating profile is **derived server-side from what the user tells Soma** (`de
 
 To land a change: `npm run verify` before committing. If a number legitimately rises, say why and run `npm run verify:accept`.
 
-`sharp` looks unused to knip but is required from inside `scripts/postbuild-web.sh`; it's pinned in `ignoreDependencies` for that reason.
+**Do not add a native module to `devDependencies`.** EAS runs `npm ci --include=dev` on the iOS
+builder, so every devDependency is installed there too. `sharp` lived there to generate one
+180×180 `apple-touch-icon.png` for the *web* build; on the builder it could not resolve a
+prebuilt binary, fell back to compiling via node-gyp, and failed the Install dependencies phase —
+no iOS build could start, and the CLI reported only "Unknown error". The icon is now generated
+once and committed at `web/apple-touch-icon.png`, and `sharp` is gone. If you need image
+processing at build time, do it once and commit the output.
 
 ## Where this is going
 

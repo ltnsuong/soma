@@ -6,8 +6,7 @@
       "project": ["App.tsx", "index.ts", "src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}", "scripts/**/*.mjs"],
       "ignoreBinaries": ["vercel", "railway", "eas", "dot"],
       "ignoreDependencies": [
-        "expo-router", "react-native-web", "@expo/metro-runtime",
-        "sharp"
+        "expo-router", "react-native-web", "@expo/metro-runtime"
       ]
     },
     "backend": {
