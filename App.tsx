@@ -21,6 +21,8 @@ import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { BEATS, OPENING, coveredDomains, isDone, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
+import * as SecureStore from 'expo-secure-store'
+import { readToken, writeTokens, clearTokens as clearStoredTokens, TOKEN_KEY, REFRESH_KEY, type TokenBackend } from './src/shared/tokenStore'
 
 // Safe haptic helpers — no-op on web where haptics aren't supported
 const haptic = {
@@ -168,8 +170,29 @@ const DARK_THEME: typeof LIGHT_THEME = {
 type TTheme = typeof LIGHT_THEME
 const ThemeCtx = createContext<{ t: TTheme; dark: boolean }>({ t: LIGHT_THEME, dark: false })
 const useT = () => useContext(ThemeCtx)
-const TOKEN_KEY   = 'soma_auth_token'
-const REFRESH_KEY = 'soma_refresh_token'
+// TOKEN_KEY and REFRESH_KEY are imported from src/shared/tokenStore — one
+// definition, so the store and its tests cannot drift from the app.
+
+/**
+ * Tokens go to the keychain on a device and to localStorage on web.
+ *
+ * They are credentials: the keychain is encrypted separately from the app
+ * sandbox and stays out of unencrypted backups, which the general key-value
+ * store does not. expo-secure-store's getItem/setItem are synchronous, which
+ * matters because auth.getToken() is read during render all over this file.
+ */
+const tokenBackend: TokenBackend = IS_WEB
+  ? {
+      getItem: (k) => localStorage.getItem(k),
+      setItem: (k, v) => localStorage.setItem(k, v),
+      removeItem: (k) => localStorage.removeItem(k),
+    }
+  : {
+      getItem: (k) => SecureStore.getItem(k),
+      setItem: (k, v) => SecureStore.setItem(k, v),
+      // Only deletion is async in expo-secure-store; nothing waits on it.
+      removeItem: (k) => { void SecureStore.deleteItemAsync(k).catch(() => {}) },
+    }
 
 // ── LIFE DOMAINS (Circle of Life) ──────────────────────────
 const DOMAIN_ICONS: Record<DomainKey, keyof typeof Ionicons.glyphMap> = {
@@ -2591,26 +2614,16 @@ async function signInWithApple(): Promise<{ accessToken: string; refreshToken: s
 const auth = {
   // Save tokens locally
   saveTokens: (accessToken: string, refreshToken: string) => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(TOKEN_KEY, accessToken)
-        localStorage.setItem(REFRESH_KEY, refreshToken)
-      }
-    } catch {}
+    const ok = writeTokens(tokenBackend, accessToken, refreshToken)
+    // Worth a line in the log: if this fails the user appears signed in for one
+    // session and is a guest again on the next launch, with no error anywhere.
+    if (!ok) console.warn('[auth] could not persist tokens — the session will not survive a restart')
+    return ok
   },
   // Get access token
-  getToken: () => {
-    try { return typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null } catch { return null }
-  },
+  getToken: () => readToken(tokenBackend, TOKEN_KEY),
   // Clear tokens (logout)
-  clearTokens: () => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem(REFRESH_KEY)
-      }
-    } catch {}
-  },
+  clearTokens: () => clearStoredTokens(tokenBackend),
   // Signup
   signup: async (email: string, name: string, password: string) => {
     const res = await fetch(`${BACKEND_URL}/auth/signup`, {
@@ -2653,7 +2666,7 @@ const auth = {
   },
   // Refresh access token
   refreshToken: async () => {
-    const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem(REFRESH_KEY) : null
+    const refreshToken = readToken(tokenBackend, REFRESH_KEY)
     if (!refreshToken) throw new Error('No refresh token')
     const res = await fetch(`${BACKEND_URL}/auth/refresh`, {
       method: 'POST',
@@ -3997,7 +4010,7 @@ export default function App() {
           person.sessionDay === todayDay &&
           person.lastReportSent?.split('T')[0] !== new Date().toISOString().split('T')[0]
         ) {
-          const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null
+          const authToken = auth.getToken()
           if (!authToken) continue
           try {
             const reportText = await generateTherapistReport(p, person.name)
@@ -11721,7 +11734,7 @@ function CircleScreen({ profile, onBack, onStartJourney, onViewInsights, onRefre
 
   const sendReport = async () => {
     if (!reportModal || !reportText || !therapistEmail) return
-    const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null
+    const authToken = auth.getToken()
     if (!authToken) { alert('Please log in to send reports.'); return }
     setSendingReport(true)
     DB.updateCirclePerson(reportModal.person.id, {
