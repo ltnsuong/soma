@@ -91,7 +91,7 @@ export const BEATS: Beat[] = [
   {
     id: 'ahead',
     act: 1,
-    ask: 'What are you trying to get better at at the moment?',
+    ask: 'What are you trying to get better at right now?',
     followUp: 'If the next year went well, what would be different?',
     covers: ['growth', 'purpose'],
   },
