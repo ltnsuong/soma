@@ -18,6 +18,8 @@
 export const ANON = 'anon'
 export const USER = 'user'
 export const GLOBAL = 'global'
+/** Face verification attempts, which cost money per call and prove identity. */
+export const FACE = 'face'
 
 // Windows are in milliseconds; budgets are requests per window.
 //
@@ -32,6 +34,12 @@ export const BUDGETS = {
   [ANON]: { limit: 40, windowMs: 60 * 60 * 1000 },
   [USER]: { limit: 240, windowMs: 60 * 60 * 1000 },
   [GLOBAL]: { limit: 1200, windowMs: 60 * 1000 },
+  // Verification is a handful of attempts, not an activity. Someone holding up
+  // photos of different people until one passes is exactly the attack the badge
+  // exists to stop, and each attempt bills us for two provider calls. Six an
+  // hour is enough to recover from bad light, a group photo, and a stale
+  // challenge in a row, and still leaves brute force pointless.
+  [FACE]: { limit: 6, windowMs: 60 * 60 * 1000 },
 }
 
 /**
@@ -95,6 +103,22 @@ export function checkAiRequest(limiter, { userId, ip }, now = Date.now()) {
   }
 
   return { ok: true, scope: kind, remaining: caller.remaining }
+}
+
+/**
+ * Decide on one face-verification attempt.
+ *
+ * Always per-user: the route requires auth, so there is no anonymous case, and
+ * an IP-keyed limit would punish everyone behind one office NAT. No global
+ * budget either — the per-user limit already bounds total spend at a level a
+ * shared AI key does not.
+ */
+export function checkFaceAttempt(limiter, userId, now = Date.now()) {
+  if (!userId) return { ok: false, scope: FACE, retryAfterMs: 0 }
+  const r = limiter.hit(FACE, userId, now)
+  return r.ok
+    ? { ok: true, scope: FACE, remaining: r.remaining }
+    : { ok: false, scope: FACE, retryAfterMs: r.retryAfterMs }
 }
 
 /** Seconds, rounded up — what a Retry-After header wants. */

@@ -241,3 +241,47 @@ ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS sector_bios JSONB DEFAULT '
 
 -- Add connection_type to dating_profiles (dating / friends / professional / support)
 ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS connection_type TEXT DEFAULT 'dating';
+
+-- ════════════════════════════════════════════════════════════
+-- PHOTO VERIFICATION (face)
+-- ════════════════════════════════════════════════════════════
+--
+-- What is stored here is deliberately small: a flag, a time, and an audit trail
+-- of decisions. The selfie itself is NEVER written anywhere — not to a column,
+-- not to storage, not to a log. It is held in memory for the length of one
+-- request, compared, and dropped.
+--
+-- That is not tidiness. A face template is biometric data: special category
+-- under GDPR Art. 9 and covered by BIPA/CUBI in some US states, which means
+-- storing it would pull retention limits, deletion deadlines and consent
+-- records onto every one of these rows. Keeping only the verdict keeps SOMA out
+-- of that entirely. If someone later proposes caching the selfie "to speed up
+-- re-verification", this comment is the reason not to.
+
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS photo_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS photo_verified_at TIMESTAMP;
+-- The photo that was verified. If someone swaps their main picture afterwards,
+-- the badge no longer describes what people are looking at, so it is withdrawn.
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS verified_photo_hash TEXT;
+
+-- Explicit, separate consent to have a face compared — not bundled into the
+-- terms accepted at signup, because Art. 9 processing needs its own yes.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS face_consent_at TIMESTAMP;
+
+-- One row per attempt. No images: a verdict, why, and the score that produced
+-- it, which is what an appeal or an abuse investigation actually needs.
+CREATE TABLE IF NOT EXISTS face_verifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  verdict TEXT NOT NULL,           -- verified | rejected | retry | review
+  reason TEXT NOT NULL,
+  similarity REAL,                 -- null when no comparison happened
+  gesture TEXT,
+  provider TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_face_verifications_user ON face_verifications(user_id, created_at DESC);
+-- The manual-review queue is a query, not a table: the newest row per user
+-- whose verdict is 'review' and who is not verified yet.
+CREATE INDEX IF NOT EXISTS idx_face_verifications_review ON face_verifications(verdict, created_at DESC);

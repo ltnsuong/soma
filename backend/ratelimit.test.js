@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  createLimiter, checkAiRequest, retryAfterSeconds, clientIp,
-  ANON, USER, GLOBAL, BUDGETS,
+  createLimiter, checkAiRequest, checkFaceAttempt, retryAfterSeconds, clientIp,
+  ANON, USER, GLOBAL, FACE, BUDGETS,
 } from './ratelimit.js'
 
 const T0 = 1_700_000_000_000
@@ -149,5 +149,40 @@ describe('retryAfterSeconds', () => {
     expect(retryAfterSeconds(1500)).toBe(2)
     expect(retryAfterSeconds(1)).toBe(1)
     expect(retryAfterSeconds(0)).toBe(1)
+  })
+})
+
+describe('face verification attempts', () => {
+  it('allows a handful, then stops', () => {
+    const l = createLimiter()
+    for (let i = 0; i < BUDGETS[FACE].limit; i++) {
+      expect(checkFaceAttempt(l, 'u1', T0).ok).toBe(true)
+    }
+    expect(checkFaceAttempt(l, 'u1', T0).ok).toBe(false)
+  })
+
+  it('counts each person separately', () => {
+    const l = createLimiter()
+    for (let i = 0; i < BUDGETS[FACE].limit; i++) checkFaceAttempt(l, 'u1', T0)
+    expect(checkFaceAttempt(l, 'u2', T0).ok).toBe(true)
+  })
+
+  it('refuses an attempt with no user rather than falling back to an IP', () => {
+    // The route is authenticated; a missing id means something is wrong, and
+    // an unkeyed limit would be one shared budget for every anonymous caller.
+    expect(checkFaceAttempt(createLimiter(), undefined, T0).ok).toBe(false)
+  })
+
+  it('lets them try again in the next window', () => {
+    const l = createLimiter()
+    for (let i = 0; i < BUDGETS[FACE].limit; i++) checkFaceAttempt(l, 'u1', T0)
+    expect(checkFaceAttempt(l, 'u1', T0 + BUDGETS[FACE].windowMs).ok).toBe(true)
+  })
+
+  it('does not spend the AI budget', () => {
+    // Verification and chat are different spends; one must not starve the other.
+    const l = createLimiter()
+    for (let i = 0; i < BUDGETS[FACE].limit; i++) checkFaceAttempt(l, 'u1', T0)
+    expect(checkAiRequest(l, { userId: 'u1' }, T0).ok).toBe(true)
   })
 })

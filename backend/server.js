@@ -7,7 +7,11 @@ import crypto from 'crypto'
 import { pickNudge, NUDGE_VOICE } from './nudges.js'
 import { deriveDatingProfile } from './derive.js'
 import { verifyAppleToken, appleAudiences } from './apple-auth.js'
-import { createLimiter, checkAiRequest, retryAfterSeconds, clientIp } from './ratelimit.js'
+import { createLimiter, checkAiRequest, checkFaceAttempt, retryAfterSeconds, clientIp } from './ratelimit.js'
+import {
+  decideVerification, pickGesture, readImage, grantsBadge, isChallengeFresh, CHALLENGE_TTL_MS,
+} from './faceverify.js'
+import { compareFaces, isConfigured } from './facematch.js'
 import { dirname, join } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -1027,9 +1031,175 @@ app.put('/dating/profile', auth, async (req, res) => {
       active: true,
       updated_at: new Date().toISOString(),
     }
+
+    // A verified badge is a claim about one specific picture. Swapping the main
+    // photo afterwards would leave the badge sitting next to a face nobody
+    // checked — which is exactly the impersonation it exists to prevent — so
+    // changing it withdraws the badge and verification has to be done again.
+    const nextHash = photoHash(row.photo)
+    const { data: prior } = await supabase.from('dating_profiles')
+      .select('photo_verified, verified_photo_hash').eq('user_id', req.user.userId).maybeSingle()
+    if (prior?.photo_verified && prior.verified_photo_hash !== nextHash) {
+      row.photo_verified = false
+      row.photo_verified_at = null
+      row.verified_photo_hash = null
+    }
+
     const { error } = await supabase.from('dating_profiles').upsert(row, { onConflict: 'user_id' })
     if (error) return res.status(500).json({ error: error.message })
-    res.json({ ok: true })
+    res.json({ ok: true, photoVerified: row.photo_verified ?? prior?.photo_verified ?? false })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// PHOTO VERIFICATION (face)
+// ════════════════════════════════════════════════════════════
+//
+// Three routes: ask for a challenge, answer it with a selfie, read your status.
+//
+// The selfie never leaves this request. It is not written to the database, not
+// put in storage, and not logged — see the comment above the migration for why
+// that is a constraint and not a preference.
+//
+// The challenge is a short-lived signed token rather than a row: it survives a
+// restart, works if this ever runs on more than one instance, and cannot be
+// forged into a longer window. It is not burned after use, which would need
+// shared state again; replaying one buys nothing, because a replayed selfie
+// gets the same verdict and the attempt limit below counts it either way.
+
+const faceLimiter = createLimiter()
+setInterval(() => faceLimiter.sweep(Date.now()), 10 * 60 * 1000).unref?.()
+
+/** Identifies a picture without storing it. */
+const photoHash = (dataUrl) =>
+  dataUrl ? crypto.createHash('sha256').update(dataUrl).digest('hex') : null
+
+/** Record the decision. Never the image. */
+async function recordAttempt(userId, { verdict, reason, similarity, gesture }) {
+  try {
+    await supabase.from('face_verifications').insert({
+      user_id: userId, verdict, reason,
+      similarity: typeof similarity === 'number' ? similarity : null,
+      gesture: gesture || null, provider: 'rekognition',
+    })
+  } catch { /* an audit row must never fail the user's request */ }
+}
+
+// Ask for a gesture to perform. Requires consent to have been given.
+app.post('/verify/face/challenge', auth, async (req, res) => {
+  try {
+    const { data: profile } = await supabase.from('dating_profiles')
+      .select('photo, photo_verified').eq('user_id', req.user.userId).maybeSingle()
+    if (!profile?.photo) {
+      return res.status(400).json({ error: 'no_profile_photo' })
+    }
+    if (profile.photo_verified) return res.json({ alreadyVerified: true })
+
+    // Consent is recorded when the challenge is issued, which is the screen
+    // that explains what is about to happen. Art. 9 wants a specific yes, so
+    // this is its own timestamp and not the signup terms.
+    if (req.body?.consent === true) {
+      await supabase.from('users')
+        .update({ face_consent_at: new Date().toISOString() })
+        .eq('id', req.user.userId)
+    } else {
+      const { data: u } = await supabase.from('users')
+        .select('face_consent_at').eq('id', req.user.userId).maybeSingle()
+      if (!u?.face_consent_at) return res.status(400).json({ error: 'consent_required' })
+    }
+
+    const gesture = pickGesture()
+    const challenge = jwt.sign(
+      { userId: req.user.userId, gesture, purpose: 'face' },
+      process.env.JWT_SECRET,
+      { expiresIn: Math.floor(CHALLENGE_TTL_MS / 1000) },
+    )
+    res.json({ gesture, challenge, expiresInMs: CHALLENGE_TTL_MS })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Answer the challenge with a selfie.
+/**
+ * Check the challenge token belongs to this caller and is still young enough.
+ * Separated so the route reads as a sequence rather than a nest of guards.
+ */
+function readChallenge(token, userId) {
+  const claim = token ? verifyToken(token) : null
+  if (!claim || claim.purpose !== 'face' || claim.userId !== userId) return null
+  // The JWT's own expiry already matches the TTL, so this only bites if a token
+  // is ever minted with a longer life — but the alternative is finding out
+  // after a database read and a billed provider call.
+  if (!isChallengeFresh(claim.iat * 1000, Date.now())) return null
+  return claim
+}
+
+/** Everything after the rate limit. Returns the body to send. */
+async function runFaceVerification(userId, { selfie, challenge }) {
+  const claim = readChallenge(challenge, userId)
+  if (!claim) return { verdict: 'retry', reason: 'challenge_expired' }
+
+  const image = readImage(selfie)
+  if (!image.ok) {
+    await recordAttempt(userId, { verdict: 'retry', reason: image.reason, gesture: claim.gesture })
+    return { verdict: 'retry', reason: image.reason }
+  }
+
+  const { data: profile } = await supabase.from('dating_profiles')
+    .select('photo').eq('user_id', userId).maybeSingle()
+  const reference = readImage(profile?.photo || '')
+  if (!reference.ok) return { verdict: 'retry', reason: 'no_profile_photo' }
+
+  const match = await compareFaces(image.base64, reference.base64)
+  const decision = decideVerification({ match, challengeIssuedAt: claim.iat * 1000 })
+  await recordAttempt(userId, { ...decision, gesture: claim.gesture })
+
+  if (grantsBadge(decision.verdict)) {
+    await supabase.from('dating_profiles').update({
+      photo_verified: true,
+      photo_verified_at: new Date().toISOString(),
+      verified_photo_hash: photoHash(profile.photo),
+    }).eq('user_id', userId)
+  }
+
+  // The similarity score stays on the server. Telling a caller they scored 88
+  // against a threshold of 92 hands them a dial to tune a spoof against.
+  return { verdict: decision.verdict, reason: decision.reason }
+}
+
+app.post('/verify/face', auth, async (req, res) => {
+  try {
+    const gate = checkFaceAttempt(faceLimiter, req.user.userId)
+    if (!gate.ok) {
+      res.set('Retry-After', String(retryAfterSeconds(gate.retryAfterMs)))
+      return res.status(429).json({ error: 'too_many_attempts', retryAfterMs: gate.retryAfterMs })
+    }
+    res.json(await runFaceVerification(req.user.userId, req.body || {}))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Where do I stand?
+app.get('/verify/face/status', auth, async (req, res) => {
+  try {
+    const [{ data: profile }, { data: last }] = await Promise.all([
+      supabase.from('dating_profiles')
+        .select('photo, photo_verified, photo_verified_at').eq('user_id', req.user.userId).maybeSingle(),
+      supabase.from('face_verifications')
+        .select('verdict, reason, created_at').eq('user_id', req.user.userId)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    res.json({
+      verified: !!profile?.photo_verified,
+      verifiedAt: profile?.photo_verified_at || null,
+      hasPhoto: !!profile?.photo,
+      available: await isConfigured(),
+      last: last ? { verdict: last.verdict, reason: last.reason, at: last.created_at } : null,
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -1057,9 +1227,11 @@ app.get('/dating/nearby', auth, async (req, res) => {
     const photosMap = {}
     const sectorBiosMap = {}
     const demoIds = new Set()
+    const verifiedIds = new Set()
     if (nearbyIds.length) {
       const { data: photoRows } = await supabase.from('dating_profiles')
-        .select('user_id, photos, sector_bios').in('user_id', nearbyIds)
+        .select('user_id, photos, sector_bios, photo_verified').in('user_id', nearbyIds)
+      ;(photoRows || []).filter(r => r.photo_verified).forEach(r => verifiedIds.add(r.user_id))
       ;(photoRows || []).forEach(r => {
         photosMap[r.user_id] = r.photos || []
         sectorBiosMap[r.user_id] = r.sector_bios || {}
@@ -1080,6 +1252,7 @@ app.get('/dating/nearby', auth, async (req, res) => {
         attachment: r.attachment, connectionType: r.connection_type || 'dating', work: r.work, city: r.city,
         distanceKm: Math.round(r.distance_km * 10) / 10,
         compatibility: compatibility(me, r),
+        photoVerified: verifiedIds.has(r.user_id),
       }))
       .sort((a, b) => b.compatibility - a.compatibility || a.distanceKm - b.distanceKm)
     res.json({ results })
@@ -1651,6 +1824,7 @@ const discoverRow = (u, dp) => {
     values: dp.values || [],
     connectionType: dp.connection_type || 'dating',
     hasDatingProfile: !!dp.age,
+    photoVerified: !!dp.photo_verified,
     distanceKm: null,
     compatibility: 50,
   }
@@ -1673,7 +1847,7 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
     // Also fetch their dating profiles if available
     const ids = (users || []).map(u => u.id)
     const { data: profiles } = ids.length
-      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city').in('user_id', ids)
+      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city, photo_verified').in('user_id', ids)
       : { data: [] }
     const profileMap = {}
     ;(profiles || []).forEach(p => { profileMap[p.user_id] = p })
@@ -1696,7 +1870,7 @@ app.get('/users/:id/profile', auth, async (req, res) => {
 
     const { data: dp } = await supabase
       .from('dating_profiles')
-      .select('age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city')
+      .select('age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city, photo_verified')
       .eq('user_id', id).maybeSingle()
 
     res.json({
@@ -1718,6 +1892,7 @@ app.get('/users/:id/profile', auth, async (req, res) => {
       connectionType: dp?.connection_type ?? null,
       work: dp?.work ?? null,
       city: dp?.city ?? null,
+      photoVerified: !!dp?.photo_verified,
       hasDatingProfile: !!dp,
     })
   } catch (err) {
@@ -1760,7 +1935,7 @@ app.get('/users/find', async (req, res) => {
     const ids = users.map(u => u.id)
     const { data: dps } = await supabase
       .from('dating_profiles')
-      .select('user_id, bio, sector_bios, interests, values, work, city, age')
+      .select('user_id, bio, sector_bios, interests, values, work, city, age, photo_verified')
       .in('user_id', ids)
     const byUser = {}
     ;(dps || []).forEach(d => { byUser[d.user_id] = d })

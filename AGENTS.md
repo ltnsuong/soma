@@ -85,6 +85,26 @@ Apple guideline 5.1.1(v) requires it, so do not "add" it again — grep for `app
 letting `ON DELETE CASCADE` take everything else; every referencing table declares it, and
 removing one silently orphans a user's data after they were told it was erased.
 
+**A face-verification answer we did not get is never a pass.** `backend/faceverify.js`
+turns every unknown — provider down, no AWS credentials, an error nobody anticipated — into
+the verdict `review`, which leaves the badge off. If that ever becomes `verified`, an outage
+turns into a way to mint verified accounts, and the badge stops meaning anything. The tests
+in `faceverify.test.js` under "an answer we do not have is never a pass" exist to hold this;
+do not relax them to make a refactor pass.
+
+**The verification selfie is never stored.** Not in a column, not in storage, not in a log,
+not appended to `photos`. It lives in memory for one request and is dropped. A face is
+special-category data under GDPR Art. 9, so storing it would pull consent records, retention
+limits and deletion deadlines onto every row — keeping only the verdict avoids all of it.
+`face_verifications` holds a verdict, a reason and a score, and that is the whole record.
+Consent is its own timestamp (`users.face_consent_at`), captured by its own tap, because
+Art. 9 needs a specific yes and not the signup terms.
+
+**Changing your main photo withdraws the badge.** `PUT /dating/profile` compares a hash of
+the new photo against `verified_photo_hash` and clears verification when they differ.
+Without that, someone verifies one face and then swaps in another — which is the exact
+impersonation the badge is supposed to prevent.
+
 **`expo-font` and `expo-asset` are required peers**, of `@expo/vector-icons` and `expo-audio`
 respectively. Without them the app builds for web and crashes on a device. `npx expo-doctor`
 catches this; run it before any native build.

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useReducer, useMemo, Component, createContext, useContext, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useCallback, useReducer, useMemo, Component, createContext, useContext, type ReactNode } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity,
   TextInput, ScrollView, KeyboardAvoidingView,
@@ -451,6 +451,52 @@ const STRINGS: Record<string, Record<string, string>> = {
     photo_why: "It's how people recognise you — and without one, you won't show up for anyone.",
     choose_photo: 'Choose a photo', finish_profile: 'Finish my profile →',
     photo_required: 'Add a photo to continue',
+
+    // ── Photo verification ──────────────────────────────────────
+    // The copy promises only what the check actually does: a live selfie
+    // matched the main photo. Nothing here says "real person" or "identity
+    // verified", because the check does not establish either.
+    verify_photo: 'Verify your photo',
+    verified_badge: 'Verified',
+    verify_sub: 'Show people the photo is really you',
+    verify_done_sub: 'Your photo is verified',
+    verify_intro_title: 'Prove the photo is you',
+    verify_intro_body: "We'll ask you to make one simple expression, take a selfie, and compare it with your main photo. It takes about ten seconds.",
+    verify_privacy_title: 'What happens to the selfie',
+    verify_privacy_body: "It's compared and then discarded. We never save it, and nobody sees it — not other users, not us. Only the result is kept.",
+    verify_consent: 'I agree to SOMA comparing a selfie with my photo',
+    verify_start: 'Start verification →',
+    verify_gesture_hint: 'Hold your face in the circle and',
+    verify_capture: 'Take the photo',
+    verify_checking: 'Checking…',
+    verify_why_badge: 'Verified profiles get seen more — people trust a face they know is real.',
+    // Gestures. Short imperatives; they sit under a live camera preview.
+    gesture_look_left: 'turn your head to the left',
+    gesture_look_right: 'turn your head to the right',
+    gesture_look_up: 'tilt your head up',
+    gesture_smile: 'smile',
+    gesture_open_mouth: 'open your mouth',
+    gesture_raise_eyebrows: 'raise your eyebrows',
+    // Outcomes. Each one says what to do next, not just what went wrong.
+    verify_ok_title: "That's you",
+    verify_ok_body: 'Your photo is verified. The badge is on your profile now.',
+    verify_no_title: "That didn't match",
+    verify_no_body: "The selfie doesn't look like your main photo. If your main photo is an old one, or not clearly you, change it and try again.",
+    verify_retry_title: 'Let’s try that again',
+    verify_review_title: 'We’ll finish this shortly',
+    verify_review_body: "We couldn't complete the check just now. We've saved your attempt and will review it — no need to do anything.",
+    reason_no_face: 'We couldn’t find a face. Find better light and fill the circle.',
+    reason_many_faces: 'There’s more than one person in shot. Try again on your own.',
+    reason_no_reference_face: 'Your main photo doesn’t clearly show your face, so there’s nothing to compare with. Change it and try again.',
+    reason_many_reference_faces: 'Your main photo has several people in it. Use one of just you.',
+    reason_no_profile_photo: 'Add a main photo first.',
+    reason_challenge_expired: 'That took a little too long. Start again.',
+    reason_image_too_large: 'That photo was too big. Try again.',
+    reason_bad_image: 'We couldn’t read that photo. Try again.',
+    reason_too_many_attempts: 'That’s a few tries now. Give it an hour and come back.',
+    verify_try_again: 'Try again',
+    verify_later: 'Not now',
+    verify_camera_needed: 'SOMA needs your camera to take the selfie.',
     copied: 'Copied!',
     soma_code: 'SOMA code', looking_for: 'Looking for', love_language: 'Love language',
     attachment: 'Attachment style', member_since: 'Member since',
@@ -2852,6 +2898,18 @@ interface NearbyUser {
   sectorBios?: Partial<Record<ConnectionType, string>>
   isExample?: boolean
   connectionType?: 'dating' | 'friends' | 'professional' | 'support'
+  /** A live selfie matched this person's main photo. See backend/faceverify.js. */
+  photoVerified?: boolean
+}
+
+/** What the server will say about a verification attempt. */
+type FaceVerdict = 'verified' | 'rejected' | 'retry' | 'review'
+interface FaceStatus {
+  verified: boolean
+  verifiedAt: string | null
+  hasPhoto: boolean
+  available: boolean
+  last: { verdict: FaceVerdict; reason: string; at: string } | null
 }
 
 // ── CLOUD SYNC ────────────────────────────────────────────────
@@ -2922,6 +2980,43 @@ const datingApi = {
       }),
     })
     if (!res.ok) throw new Error((await res.json()).error || 'Profile save failed')
+  },
+
+  // ── Photo verification ──────────────────────────────────────
+  // The selfie is posted once and never stored, here or on the server.
+
+  faceStatus: async (): Promise<FaceStatus> => {
+    const res = await fetch(`${BACKEND_URL}/verify/face/status`, {
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Could not read verification status')
+    return data
+  },
+
+  /** Ask for a gesture. `consent` is the user's explicit yes on the intro screen. */
+  faceChallenge: async (consent: boolean): Promise<{ gesture: string; challenge: string }> => {
+    const res = await fetch(`${BACKEND_URL}/verify/face/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+      body: JSON.stringify({ consent }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'challenge_failed')
+    return data
+  },
+
+  faceVerify: async (selfie: string, challenge: string): Promise<{ verdict: FaceVerdict; reason: string }> => {
+    const res = await fetch(`${BACKEND_URL}/verify/face`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+      body: JSON.stringify({ selfie, challenge }),
+    })
+    const data = await res.json()
+    // A 429 is not an error the user caused; surface it as its own outcome.
+    if (res.status === 429) return { verdict: 'retry', reason: 'too_many_attempts' }
+    if (!res.ok) throw new Error(data.error || 'verify_failed')
+    return data
   },
 
   nearby: async (radiusKm = 50): Promise<NearbyUser[]> => {
@@ -3113,6 +3208,7 @@ function nearbyToCandidate(u: NearbyUser): Candidate & { realUserId: string; con
     bio: u.bio || (hasProfile ? '' : '✨ Just joined SOMA — profile coming soon.'),
     sectorBios: u.sectorBios || {},
     isExample: u.isExample === true,
+    photoVerified: u.photoVerified === true,
     values: u.values || [], interests: u.interests || [],
     agentName: 'their Soma', loveLanguage: u.loveLanguage || '', attachment: u.attachment || '',
     intimacy: '', work: u.work || '', children: '', pets: '',
@@ -13091,6 +13187,8 @@ interface Candidate {
   sectorBios?: Partial<Record<ConnectionType, string>>
   /** A seeded example person, not a member. Must always be labelled as one. */
   isExample?: boolean
+  /** A live selfie matched their main photo. See backend/faceverify.js. */
+  photoVerified?: boolean
   loveLanguage: string; attachment: string; intimacy: string
   work: string; children: string; pets: string
   tags: { icon: string; label: string }[]
@@ -14440,7 +14538,10 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           <TouchableOpacity style={g.dBack} onPress={() => setStep('browse')}><Text style={g.dBackTxt}>‹</Text></TouchableOpacity>
           <Image source={{ uri: candidate.photo }} style={g.chatAvatar} />
           <View style={{ flex: 1 }}>
-            <Text style={[g.chatName, { color: t.text }]}>{candidate.name}, {candidate.age}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Text style={[g.chatName, { color: t.text }]}>{candidate.name}, {candidate.age}</Text>
+              {candidate.photoVerified && <VerifiedTick size={14} />}
+            </View>
             <Text style={g.chatStatus}>{chatLoading ? 'typing…' : '🟢 Matched just now'}</Text>
           </View>
           <TouchableOpacity onPress={() => { setStep('conversation'); setTurns([]); setVisibleCount(0); runMatch() }}>
@@ -14528,7 +14629,10 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           <View style={{ height: 16 }} />
           <View style={[g.matchCard, { backgroundColor: t.card, borderColor: t.border }]}>
             <Image source={{ uri: candidate.photo }} style={g.matchPhoto} />
-            <Text style={[g.matchName, { color: t.text }]}>{candidate.name}, {candidate.age}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <Text style={[g.matchName, { color: t.text }]}>{candidate.name}, {candidate.age}</Text>
+              {candidate.photoVerified && <VerifiedTick size={15} />}
+            </View>
             <Text style={g.matchBio}>{candidate.bio}</Text>
             <View style={g.valuesRow}>{candidate.values.map(v => <View key={v} style={g.valueChip}><Text style={g.valueChipTxt}>{v}</Text></View>)}</View>
           </View>
@@ -18438,10 +18542,238 @@ function AskSomaScreen({ profile, onBack }: { profile: UserProfile; onBack: () =
   )
 }
 
+// ════════════════════════════════════════════════════════════
+//  PHOTO VERIFICATION
+// ════════════════════════════════════════════════════════════
+//
+// Four stages on one screen: explain, capture, wait, tell them.
+//
+// The selfie is held in a local variable for the length of one request and
+// never written to DB, never added to `photos`, never logged. The server does
+// the same — see backend/faceverify.js. That is a legal position as much as a
+// design one, and the shape of this component depends on it: there is nowhere
+// to "save the selfie for later" because there is no later.
+
+/**
+ * The badge. One component so the mark is identical everywhere it appears —
+ * a badge that renders three slightly different ways stops reading as a badge.
+ */
+function VerifiedTick({ size = 15 }: { size?: number }) {
+  return (
+    <View style={{
+      width: size + 6, height: size + 6, borderRadius: (size + 6) / 2,
+      backgroundColor: '#2BB673', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Ionicons name="checkmark" size={size - 3} color="#fff" />
+    </View>
+  )
+}
+
+/** The gesture key the server sent → the sentence we show under the camera. */
+const gestureLine = (g: string) => tr(`gesture_${g}`)
+
+/** What to say about an outcome. Falls back to the verdict's own headline. */
+function verifyCopy(verdict: FaceVerdict, reason: string) {
+  if (verdict === 'verified') return { title: tr('verify_ok_title'), body: tr('verify_ok_body'), good: true }
+  if (verdict === 'review') return { title: tr('verify_review_title'), body: tr('verify_review_body'), good: true }
+  // A reason we have words for beats a generic failure line every time.
+  const key = `reason_${reason}`
+  const specific = tr(key)
+  const body = specific === key ? tr('verify_no_body') : specific
+  return {
+    title: verdict === 'rejected' ? tr('verify_no_title') : tr('verify_retry_title'),
+    body,
+    good: false,
+  }
+}
+
+/** The capture stage. Split out to keep FaceVerify inside the lint budgets. */
+function FaceCamera({ camRef, gesture, onCapture, onCancel }: {
+  camRef: React.RefObject<CameraView | null>; gesture: string; onCapture: () => void; onCancel: () => void
+}) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <CameraView ref={camRef} style={{ flex: 1 }} facing="front" />
+      {/* An oval, not the square used for QR: it tells people what to put in it. */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 260, height: 340, borderRadius: 170, borderWidth: 3, borderColor: '#7B6EF6' }} />
+      </View>
+      <View style={{ position: 'absolute', top: HEADER_TOP, left: 0, right: 0, paddingHorizontal: 28 }}>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center' }}>{tr('verify_gesture_hint')}</Text>
+        <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900', textAlign: 'center', marginTop: 6 }}>
+          {gestureLine(gesture)}
+        </Text>
+      </View>
+      <View style={{ position: 'absolute', bottom: Math.max(SAFE_BOTTOM, 16) + 24, left: 24, right: 24, gap: 12 }}>
+        <TouchableOpacity onPress={onCapture}
+          style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>{tr('verify_capture')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onCancel} style={{ alignItems: 'center', paddingVertical: 8 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15 }}>{tr('cancel')}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+/** The outcome. `review` reads as a success on purpose — nothing is required
+ *  of the user, and telling them it failed would be both wrong and dispiriting. */
+function FaceResult({ result, onRetry, onClose }: {
+  result: { verdict: FaceVerdict; reason: string }; onRetry: () => void; onClose: () => void
+}) {
+  const { t: theme } = useT()
+  const copy = verifyCopy(result.verdict, result.reason)
+  const done = result.verdict === 'verified' || result.verdict === 'review'
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.bg, padding: 28, justifyContent: 'center' }}>
+      <Text style={{ fontSize: 52, textAlign: 'center', marginBottom: 18 }}>{copy.good ? '✅' : '🙂'}</Text>
+      <Text style={{ fontSize: 26, fontWeight: '900', color: theme.text, textAlign: 'center', marginBottom: 12 }}>
+        {copy.title}
+      </Text>
+      <Text style={{ fontSize: 15, color: theme.textSub, textAlign: 'center', lineHeight: 23, marginBottom: 32 }}>
+        {copy.body}
+      </Text>
+      {!done && (
+        <TouchableOpacity onPress={onRetry}
+          style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 17, alignItems: 'center', marginBottom: 12 }}>
+          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>{tr('verify_try_again')}</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity onPress={onClose} style={{ alignItems: 'center', paddingVertical: 12 }}>
+        <Text style={{ fontSize: 15, color: done ? '#7B6EF6' : theme.textTertiary, fontWeight: done ? '800' : '500' }}>
+          {done ? tr('done') : tr('verify_later')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+/** The explain-and-consent stage. */
+function FaceIntro({ consent, onToggle, error, onStart, onClose }: {
+  consent: boolean; onToggle: () => void; error: string; onStart: () => void; onClose: () => void
+}) {
+  const { t: theme } = useT()
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: theme.bg }}
+      contentContainerStyle={{ padding: 28, paddingTop: HEADER_TOP, paddingBottom: 48, flexGrow: 1 }}>
+      <Text style={{ fontSize: 28, fontWeight: '900', color: theme.text, marginBottom: 12, letterSpacing: -0.5 }}>
+        {tr('verify_intro_title')}
+      </Text>
+      <Text style={{ fontSize: 15, color: theme.textSub, lineHeight: 23, marginBottom: 28 }}>
+        {tr('verify_intro_body')}
+      </Text>
+
+      <View style={{ backgroundColor: theme.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: theme.border, marginBottom: 28 }}>
+        <Text style={{ fontSize: 12, fontWeight: '800', color: '#7B6EF6', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+          {tr('verify_privacy_title')}
+        </Text>
+        <Text style={{ fontSize: 14, color: theme.textSub, lineHeight: 22 }}>{tr('verify_privacy_body')}</Text>
+      </View>
+
+      {/* Consent is its own deliberate tap, not a pre-ticked box bundled into
+          the button. Comparing a face is special-category data under GDPR
+          Art. 9 and needs a specific yes that can be shown to have been given. */}
+      <TouchableOpacity onPress={onToggle} activeOpacity={0.7}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <View style={{
+          width: 26, height: 26, borderRadius: 8, borderWidth: 2,
+          borderColor: consent ? '#7B6EF6' : theme.border,
+          backgroundColor: consent ? '#7B6EF6' : 'transparent',
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          {consent && <Ionicons name="checkmark" size={17} color="#fff" />}
+        </View>
+        <Text style={{ flex: 1, fontSize: 14, color: theme.text, lineHeight: 21 }}>{tr('verify_consent')}</Text>
+      </TouchableOpacity>
+
+      {error ? <Text style={{ color: '#FF6B6B', fontSize: 14, marginBottom: 16, lineHeight: 21 }}>{error}</Text> : null}
+
+      <TouchableOpacity disabled={!consent} onPress={onStart}
+        style={{ backgroundColor: consent ? '#7B6EF6' : theme.border, borderRadius: 18, paddingVertical: 18, alignItems: 'center' }}>
+        <Text style={{ color: consent ? '#fff' : theme.textTertiary, fontSize: 17, fontWeight: '900' }}>
+          {tr('verify_start')}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onClose} style={{ alignItems: 'center', paddingVertical: 16 }}>
+        <Text style={{ fontSize: 15, color: theme.textTertiary }}>{tr('verify_later')}</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  )
+}
+
+function FaceVerify({ onClose, onVerified }: { onClose: () => void; onVerified: () => void }) {
+  const { t: theme } = useT()
+  const [stage, setStage] = useState<'intro' | 'camera' | 'checking' | 'result'>('intro')
+  const [consent, setConsent] = useState(false)
+  const [gesture, setGesture] = useState('')
+  const [challenge, setChallenge] = useState('')
+  const [result, setResult] = useState<{ verdict: FaceVerdict; reason: string } | null>(null)
+  const [error, setError] = useState('')
+  const [camPerm, requestCamPerm] = useCameraPermissions()
+  const camRef = useRef<CameraView>(null)
+
+  const begin = async () => {
+    setError('')
+    try {
+      if (!camPerm?.granted) {
+        const p = await requestCamPerm()
+        if (!p.granted) { setError(tr('verify_camera_needed')); return }
+      }
+      const c = await datingApi.faceChallenge(consent)
+      setGesture(c.gesture); setChallenge(c.challenge)
+      setStage('camera')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      // The server's machine reasons, turned into something readable.
+      setError(msg === 'no_profile_photo' ? tr('reason_no_profile_photo') : tr('verify_no_body'))
+    }
+  }
+
+  const capture = async () => {
+    if (!camRef.current) return
+    setStage('checking')
+    try {
+      const shot = await camRef.current.takePictureAsync({ base64: true, quality: 0.6 })
+      if (!shot?.base64) { setResult({ verdict: 'retry', reason: 'bad_image' }); setStage('result'); return }
+      const r = await datingApi.faceVerify(`data:image/jpeg;base64,${shot.base64}`, challenge)
+      setResult(r)
+      setStage('result')
+      if (r.verdict === 'verified') { haptic.success(); onVerified() }
+    } catch {
+      // A network failure is not the user's fault and not a rejection.
+      setResult({ verdict: 'review', reason: 'provider_unavailable' })
+      setStage('result')
+    }
+  }
+
+  if (stage === 'camera') return <FaceCamera camRef={camRef} gesture={gesture} onCapture={capture} onCancel={onClose} />
+
+  if (stage === 'checking') return (
+    <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+      <ActivityIndicator size="large" color="#7B6EF6" />
+      <Text style={{ fontSize: 16, color: theme.textSub }}>{tr('verify_checking')}</Text>
+    </View>
+  )
+
+  if (stage === 'result' && result) return (
+    <FaceResult result={result} onRetry={() => { setResult(null); setStage('intro') }} onClose={onClose} />
+  )
+
+  return <FaceIntro consent={consent} onToggle={() => setConsent(c => !c)} error={error} onStart={begin} onClose={onClose} />
+}
+
 function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemories, onSignIn }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void; onToggleDark: () => void; onMemories: () => void; onSignIn?: () => void }) {
   const { t: theme, dark } = useT()
   type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice' | 'profile'
   const [panel, setPanel] = useState<Panel>(null)
+  const [faceOpen, setFaceOpen] = useState(false)
+  const [faceStatus, setFaceStatus] = useState<FaceStatus | null>(null)
+  const loadFaceStatus = useCallback(() => {
+    if (!datingApi.authed()) return
+    datingApi.faceStatus().then(setFaceStatus).catch(() => {})
+  }, [])
+  useEffect(loadFaceStatus, [loadFaceStatus])
   const [showPaywall, setShowPaywall] = useState(false)
   const [aiName, setAiName] = useState(profile.aiName || 'Soma')
   const [tcName, setTcName] = useState(profile.trustedContact?.name || '')
@@ -18696,6 +19028,15 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   // ── Sub-screen: Voice ─────────────────────────────────────
   if (panel === 'voice') return <VoiceSettingsPanel profile={profile} onBack={back} onRefresh={onRefresh} />
 
+  // ── Sub-screen: Photo verification ────────────────────────
+  // Re-reads status on close so the badge appears without a manual refresh.
+  if (faceOpen) return (
+    <FaceVerify
+      onClose={() => { setFaceOpen(false); loadFaceStatus() }}
+      onVerified={loadFaceStatus}
+    />
+  )
+
   // ── Main settings list ────────────────────────────────────
   const streak = calcActivityStreak(profile)
   const initials = (profile.name || '?').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -18736,6 +19077,7 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
                   <Text style={{ fontSize: 11, fontWeight: '700', color: '#F59E0B' }}>SOMA+</Text>
                 </View>
               )}
+              {faceStatus?.verified && <VerifiedTick size={16} />}
             </View>
             <Text style={{ fontSize: 13, color: theme.textSub, marginTop: 2 }} numberOfLines={2}>
               {profile.profileBio || tr('tap_add_tagline')}
@@ -18777,6 +19119,32 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
           </View>
         )}
       </TouchableOpacity>
+
+      {/* Photo verification. Only for people with an account and a photo —
+          there is nothing to verify against otherwise, and offering it would
+          lead to a dead end. */}
+      {faceStatus?.hasPhoto && (
+        <TouchableOpacity
+          onPress={() => { if (!faceStatus.verified) setFaceOpen(true) }}
+          activeOpacity={faceStatus.verified ? 1 : 0.7}
+          style={{ marginHorizontal: 20, marginTop: 14, backgroundColor: theme.card, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: faceStatus.verified ? '#2BB67322' : '#7B6EF622', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={faceStatus.verified ? 'shield-checkmark' : 'shield-outline'} size={20} color={faceStatus.verified ? '#2BB673' : '#7B6EF6'} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>
+                {faceStatus.verified ? tr('verified_badge') : tr('verify_photo')}
+              </Text>
+              {faceStatus.verified && <VerifiedTick size={14} />}
+            </View>
+            <Text style={{ fontSize: 13, color: theme.textSub, marginTop: 2 }}>
+              {faceStatus.verified ? tr('verify_done_sub') : tr('verify_sub')}
+            </Text>
+          </View>
+          {!faceStatus.verified && <Text style={{ fontSize: 18, color: theme.textTertiary }}>›</Text>}
+        </TouchableOpacity>
+      )}
 
       {/* My SOMA Code */}
       {(() => {
