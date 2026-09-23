@@ -48,7 +48,8 @@
     "production": {
       "ios": {
         "ascAppId": "6815187221",
-        "appleId": "lethinhutsuong@gmail.com"
+        "appleId": "lethinhutsuong@gmail.com",
+        "appleTeamId": "QKGXN4R5B2"
       }
     }
   }
