@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { BEATS, OPENING, coveredDomains, isDone, isEcho, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
+import { isEngineFailure, isPermanentFailure } from './src/shared/speech'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
 import QRCode from 'react-native-qrcode-svg'
@@ -3874,6 +3875,10 @@ function listenViaWhisper(
   }
 }
 
+// Set when the browser's speech engine reports it cannot do the job, so the
+// next tap goes straight to Whisper instead of failing the same way again.
+let webSpeechUnusable = false
+
 function listen(
   onResult: (t: string) => void,
   onEnd: () => void,
@@ -3887,7 +3892,11 @@ function listen(
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   // No Web Speech (Firefox, Telegram WebView, most in-app browsers) → record and
   // send to Whisper instead. No interim text there, so report progress via onInterim.
-  if (!SR) return listenViaWhisper(onResult, onEnd, onInterim)
+  //
+  // `webSpeechUnusable` carries a failure forward: Safari has the engine and
+  // cannot do ru-RU, so without this every Russian speaker pays the same failed
+  // attempt on every tap.
+  if (!SR || webSpeechUnusable) return listenViaWhisper(onResult, onEnd, onInterim)
   const lang = DB.get().language || 'en'
   const r = new SR()
   r.lang = LANG_CODES[lang] || 'en-US'
@@ -3918,12 +3927,30 @@ function listen(
   r.onerror = (e: any) => {
     if (ended) return
     ended = true
+
+    // The engine says it cannot do this. Whisper can — it transcribes the same
+    // Russian sentence exactly — and these errors fire on start, before anyone
+    // has finished speaking, so there is no captured audio to lose by switching
+    // now. Previously this path called onResult('') and the caller's
+    // `if (text.trim())` guard swallowed it: a mic that listened and did nothing.
+    if (isEngineFailure(e.error) && !finalText.trim()) {
+      if (isPermanentFailure(e.error)) webSpeechUnusable = true
+      console.warn(`[voice] web speech failed (${e.error}); using Whisper instead`)
+      stopCurrent = listenViaWhisper(onResult, onEnd, onInterim)
+      return
+    }
+
     if (e.error !== 'no-speech' && e.error !== 'aborted') onResult(finalText.trim())
     onEnd()
   }
 
+  // Declared before start(): onerror can fire synchronously from start() on some
+  // engines, and it assigns to this. Indirect because that handler can replace
+  // the recogniser with a Whisper recording partway through — the caller holds
+  // one stop function either way.
+  let stopCurrent: () => void = () => { try { r.stop() } catch { /* already stopped */ } }
   r.start()
-  return () => { try { r.stop() } catch {} }
+  return () => stopCurrent()
 }
 
 // Web photo upload → data URL (attached to DOM so iOS Safari keeps the picker open)
