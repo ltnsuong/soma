@@ -311,3 +311,25 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_location BOOLEAN;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_notifications BOOLEAN;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_health BOOLEAN;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_updated_at TIMESTAMP;
+
+-- ════════════════════════════════════════════════════════════
+-- ERASURE REACHES THE TELEGRAM TABLES
+-- ════════════════════════════════════════════════════════════
+--
+-- These four tables key off telegram_id and never referenced `users`, so
+-- ON DELETE CASCADE from a deleted account never reached them — and their own
+-- foreign keys were NO ACTION, so deleting a chat failed on its children
+-- instead of removing them. They hold message text, coaching history and a
+-- derived personality profile. Art. 17 erasure has to reach all of it.
+
+ALTER TABLE chat_messages DROP CONSTRAINT IF EXISTS chat_messages_chat_id_fkey;
+ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_chat_id_fkey
+  FOREIGN KEY (chat_id) REFERENCES dating_chats(id) ON DELETE CASCADE;
+
+ALTER TABLE coaching_history DROP CONSTRAINT IF EXISTS coaching_history_chat_id_fkey;
+ALTER TABLE coaching_history ADD CONSTRAINT coaching_history_chat_id_fkey
+  FOREIGN KEY (chat_id) REFERENCES dating_chats(id) ON DELETE CASCADE;
+
+ALTER TABLE dating_chats DROP CONSTRAINT IF EXISTS dating_chats_user_a_id_fkey;
+ALTER TABLE dating_chats ADD CONSTRAINT dating_chats_user_a_id_fkey
+  FOREIGN KEY (user_a_id) REFERENCES user_profiles(id) ON DELETE CASCADE;

@@ -47,13 +47,15 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   realtime: { transport: WebSocket }
 })
 
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, attachments }) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('⚠️  RESEND_API_KEY not set — email skipped:', subject)
     return
   }
   const r = new Resend(process.env.RESEND_API_KEY)
-  await r.emails.send({ from: process.env.EMAIL_FROM || 'SOMA <onboarding@resend.dev>', to, subject, html })
+  const msg = { from: process.env.EMAIL_FROM || 'SOMA <onboarding@resend.dev>', to, subject, html }
+  if (attachments?.length) msg.attachments = attachments
+  await r.emails.send(msg)
 }
 
 // JWT helpers
@@ -216,9 +218,109 @@ app.post('/auth/verify-email', async (req, res) => {
 // returns those as error objects rather than throwing, so they were swallowed
 // and the cascade did the real work regardless. Removed rather than corrected:
 // the cascade already covers them.
+/**
+ * Everything we hold about one person, for Art. 15 (access) and Art. 20
+ * (portability).
+ *
+ * The client used to do this by serialising its own localStorage, which meant
+ * the "export" contained only what the device happened to be caching and none
+ * of the messages, likes, matches, reports or verification history that live
+ * only on the server. A portability right that returns a subset is not one.
+ *
+ * Everything here is keyed by the caller's own id. Messages are included in
+ * both directions because a conversation the user took part in is their data
+ * too — but only the rows where they are a participant.
+ */
+async function collectUserData(userId) {
+  const one = async (table, column = 'user_id') => {
+    const { data } = await supabase.from(table).select('*').eq(column, userId)
+    return data || []
+  }
+  const [
+    user, profile, dating, memories, diary, circle,
+    likesGiven, likesReceived, matchesA, matchesB,
+    sent, received, faceHistory, nudgeRows,
+  ] = await Promise.all([
+    supabase.from('users')
+      // Never export the password hash or the Stripe ids: the first is a
+      // credential and the second is not the user's to carry anywhere.
+      .select('id, email, name, verified, premium, created_at, updated_at, avatar, tz_offset, telegram_id, google_id, apple_id, terms_consent_at, terms_version, consent_location, consent_notifications, consent_health, face_consent_at')
+      .eq('id', userId).maybeSingle().then(r => r.data),
+    supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle().then(r => r.data),
+    supabase.from('dating_profiles').select('*').eq('user_id', userId).maybeSingle().then(r => r.data),
+    one('memories'), one('diary_entries'), one('circle'),
+    one('dating_likes', 'liker_id'), one('dating_likes', 'target_id'),
+    one('dating_matches', 'user_a'), one('dating_matches', 'user_b'),
+    one('direct_messages', 'from_user_id'), one('direct_messages', 'to_user_id'),
+    one('face_verifications'), one('nudges'),
+  ])
+
+  return {
+    exportedAt: new Date().toISOString(),
+    note: 'Everything SOMA holds about your account. Photographs are included as data URLs.',
+    account: user,
+    profile,
+    connectionProfile: dating,
+    memories, diary, circle,
+    likes: { given: likesGiven, received: likesReceived },
+    matches: [...matchesA, ...matchesB],
+    messages: { sent, received },
+    photoVerificationHistory: faceHistory,
+    nudges: nudgeRows,
+  }
+}
+
+/**
+ * Email the export to the address on the account.
+ *
+ * Emailing rather than returning it to the client is deliberate: it works the
+ * same on every platform (the old client-side export silently did nothing on
+ * iOS, because it was written against `document`), and delivering to the
+ * address on file is a light identity check on a request that hands over
+ * everything we know about someone.
+ */
+app.post('/auth/export', auth, async (req, res) => {
+  try {
+    const bundle = await collectUserData(req.user.userId)
+    if (!bundle.account?.email) return res.status(400).json({ error: 'no_email_on_account' })
+
+    const json = JSON.stringify(bundle, null, 2)
+    await sendEmail({
+      to: bundle.account.email,
+      subject: 'Your SOMA data',
+      html: `<p>Attached is everything SOMA holds about your account, as JSON.</p>
+             <p>If you did not ask for this, someone may have access to your account —
+             change your password and tell us at lethinhutsuong@gmail.com.</p>`,
+      attachments: [{ filename: 'soma-my-data.json', content: Buffer.from(json).toString('base64') }],
+    })
+    res.json({ ok: true, sentTo: bundle.account.email, bytes: json.length })
+  } catch (err) {
+    console.error('[export] failed for', req.user.userId, err.message)
+    res.status(500).json({ error: 'Could not prepare the export' })
+  }
+})
+
 app.delete('/auth/account', auth, async (req, res) => {
   const userId = req.user.userId
   try {
+    // The Telegram bot's tables key off telegram_id and never referenced users,
+    // so ON DELETE CASCADE never reached them — they hold message text, coaching
+    // history and a derived personality profile, all of which the privacy policy
+    // promises to erase. Their own foreign keys now cascade (see migrations), so
+    // removing the user_profiles row takes dating_chats, chat_messages and
+    // coaching_history with it. Done first, while the telegram_id is still
+    // readable off the users row.
+    const { data: me } = await supabase.from('users')
+      .select('telegram_id').eq('id', userId).maybeSingle()
+    if (me?.telegram_id) {
+      const tg = me.telegram_id
+      await supabase.from('user_profiles').delete().eq('telegram_id', tg)
+      // The other side of a chat, where this person is user_b rather than the
+      // owner of the profile row just removed.
+      await supabase.from('dating_chats').delete().eq('user_b_telegram_id', tg)
+      await supabase.from('chat_messages').delete().eq('sender_telegram_id', tg)
+    }
+
     const { error } = await supabase.from('users').delete().eq('id', userId)
     if (error) throw error
     // Read it back. A row surviving here means someone dropped a cascade, and

@@ -452,6 +452,10 @@ const STRINGS: Record<string, Record<string, string>> = {
     choose_photo: 'Choose a photo', finish_profile: 'Finish my profile →',
     photo_required: 'Add a photo to continue',
 
+    export_sent: 'Sent. Check {email} — your data is attached as JSON.',
+    export_failed: 'Could not prepare your export. Try again, or email us.',
+    export_needs_account: 'Create an account to export your data.',
+
     // ── Consent ─────────────────────────────────────────────────
     // Shown before the first conversation, because that conversation is where
     // collection starts — the messages go to Groq the moment they are sent,
@@ -2314,9 +2318,14 @@ async function requestNotifPermission(): Promise<boolean> {
       })
     }
     const { status: existing } = await Notifications.getPermissionsAsync()
-    if (existing === 'granted') return true
+    if (existing === 'granted') { void recordOsConsent('notifications', true); return true }
     const { status } = await Notifications.requestPermissionsAsync()
-    return status === 'granted'
+    const granted = status === 'granted'
+    // The OS prompt IS the consent — specific, informed, withdrawable in system
+    // settings. Recording the answer is what makes it provable, and what stops
+    // Settings → Privacy & data from showing "Not set" forever.
+    void recordOsConsent('notifications', granted)
+    return granted
   } catch { return false }
 }
 
@@ -2946,10 +2955,27 @@ async function getApproxLocation(): Promise<{ lat: number; lng: number } | null>
       })
     }
     const { status } = await Location.requestForegroundPermissionsAsync()
+    void recordOsConsent('location', status === 'granted')
     if (status !== 'granted') return null
     const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })
     return { lat: pos.coords.latitude, lng: pos.coords.longitude }
   } catch { return null }
+}
+
+/**
+ * Mirror an OS permission answer into our own consent record.
+ *
+ * The system prompt is the consent — it is specific, informed, and revocable in
+ * Settings. What it does not do is leave us a record we can show, or a switch
+ * inside the app. Without this the Privacy & data panel reads "Not set" for
+ * someone who answered the prompt months ago.
+ *
+ * Fire-and-forget: a failure here must never block the feature the user just
+ * allowed. The next call reconciles it.
+ */
+async function recordOsConsent(purpose: ConsentPurpose, granted: boolean) {
+  if (!datingApi.authed()) return
+  try { await datingApi.setConsent(purpose, granted) } catch { /* reconciled next time */ }
 }
 
 // Real user returned by the backend nearby search
@@ -3076,6 +3102,17 @@ const datingApi = {
       }),
     })
     if (!res.ok) throw new Error((await res.json()).error || 'Profile save failed')
+  },
+
+  /** Art. 15/20 — ask the server to email a complete copy. */
+  exportMyData: async (): Promise<{ sentTo: string; bytes: number }> => {
+    const res = await fetch(`${BACKEND_URL}/auth/export`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'export_failed')
+    return data
   },
 
   // ── Consent ─────────────────────────────────────────────────
@@ -19144,6 +19181,7 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice' | 'profile' | 'consent'
   const [panel, setPanel] = useState<Panel>(null)
   const [faceOpen, setFaceOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [faceStatus, setFaceStatus] = useState<FaceStatus | null>(null)
   const loadFaceStatus = useCallback(() => {
     if (!datingApi.authed()) return
@@ -19189,15 +19227,44 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   const saveAiName = () => { DB.setAiName(aiName); onRefresh(); back() }
   const saveContact = () => { DB.setTrustedContact(tcName.trim(), tcPhone.trim()); onRefresh(); back() }
   const changePipPhoto = () => pickPhoto(url => { DB.setAiPhoto(url); onRefresh() })
-  const exportData = () => {
+  /**
+   * Art. 15 and 20: a copy of everything held about you.
+   *
+   * This used to serialise localStorage behind `if (typeof document !== ...)`,
+   * which meant two things on a phone: it exported only what the device
+   * happened to be caching — no messages, likes, matches, reports or
+   * verification history, all of which live on the server — and on iOS
+   * `document` is undefined, so the button silently did nothing at all while
+   * the privacy policy promised "a copy immediately".
+   *
+   * The server now assembles the full record and emails it to the address on
+   * the account, which works the same on every platform and is a light identity
+   * check on a request that hands over everything we know about someone. The
+   * local file stays as a fallback for signed-out users on web, whose data
+   * genuinely is only on the device.
+   */
+  const exportData = async () => {
+    if (datingApi.authed()) {
+      setExporting(true)
+      try {
+        const r = await datingApi.exportMyData()
+        alert(tr('export_sent').replace('{email}', r.sentTo))
+      } catch {
+        alert(tr('export_failed'))
+      }
+      setExporting(false)
+      return
+    }
     try {
       const data = JSON.stringify(DB.get(), null, 2)
       if (typeof document !== 'undefined') {
         const blob = new Blob([data], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a'); a.href = url; a.download = 'soma-my-data.json'; a.click()
+      } else {
+        alert(tr('export_needs_account'))
       }
-    } catch {}
+    } catch { alert(tr('export_failed')) }
   }
   const curLang = LANGS.find(l => l.code === (profile.language || 'en'))
 
@@ -19563,7 +19630,9 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
           if (ok) { DB.goPremium(); onRefresh() }
           else alert(tr('no_subscription'))
         }} />}
-        <StgRow icon="📦" label={tr('export_data')} value={tr('download_json')} iconBg="rgba(16,185,129,0.12)" onPress={exportData} last />
+        <StgRow icon="📦" label={tr('export_data')}
+          value={exporting ? tr('verify_checking') : tr('download_json')}
+          iconBg="rgba(16,185,129,0.12)" onPress={() => void exportData()} last />
       </View>
       {showPaywall && (
         <SomaPlusPaywall
