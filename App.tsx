@@ -456,6 +456,18 @@ const STRINGS: Record<string, Record<string, string>> = {
     export_failed: 'Could not prepare your export. Try again, or email us.',
     export_needs_account: 'Create an account to export your data.',
 
+    // ── Age ─────────────────────────────────────────────────────
+    age_title: 'How old are you?',
+    age_why: 'SOMA works differently under 17 — you can meet people as friends, and the dating side stays closed. We ask once.',
+    age_day: 'Day', age_month: 'Month', age_year: 'Year',
+    age_continue: 'Continue →',
+    age_invalid: "That date doesn't look right. Check it and try again.",
+    age_minor_title: 'You\'re all set',
+    age_minor_body: "Because you're under 17, SOMA will introduce you to other people under 17, as friends. The dating side is closed until you turn 17 — it opens on its own then.",
+    age_minor_ok: 'Got it →',
+    minor_dating_closed: 'Dating opens when you turn 17',
+    minor_friends_only: 'Friends',
+
     // ── Consent ─────────────────────────────────────────────────
     // Shown before the first conversation, because that conversation is where
     // collection starts — the messages go to Groq the moment they are sent,
@@ -1693,6 +1705,9 @@ interface UserProfile {
    *  Art. 7(1) puts the burden of demonstrating consent on us. */
   termsVersion?: string
   termsAcceptedAt?: string
+  /** The date this person turns 17. The server is authoritative; this is for UI. */
+  adultAt?: string
+  isMinor?: boolean
   moments?: Moment[]         // circle moments (own + received)
   sectorProfiles?: {
     dating?:       { bio?: string; photos?: string[] }
@@ -2045,6 +2060,25 @@ const DB = {
     const p = DB.get()
     p.termsVersion = version
     p.termsAcceptedAt = new Date().toISOString()
+    DB.save(p)
+  },
+
+  /**
+   * Record when this person turns 17.
+   *
+   * Local copy only — the server decides who is visible to whom, and this is
+   * what lets the UI hide the dating tabs without a round trip. Pushed on the
+   * next sync; if the two ever disagree the server wins.
+   */
+  setAdultAt: (adultAt: string, minor: boolean) => {
+    const p = DB.get()
+    p.adultAt = adultAt
+    p.isMinor = minor
+    if (minor) {
+      // Nothing under 17 should be sitting in a dating profile waiting to be
+      // matched, including one derived before the age was known.
+      p.dating = { ...p.dating, connectionType: 'friends' }
+    }
     DB.save(p)
   },
 
@@ -3036,6 +3070,30 @@ const cloudSync = {
     // is a legal record, and it should not be lost because a profile write
     // happened to fail.
     await cloudSync.pushConsent()
+    await cloudSync.pushAge()
+  },
+
+  /**
+   * Send the birth date up once there is an account.
+   *
+   * The server recomputes the band from this rather than trusting a flag the
+   * client sends: `isMinor` in local storage is editable by anyone who can
+   * reach the device, and this is a child-safety control.
+   */
+  pushAge: async () => {
+    if (!cloudSync.enabled()) return
+    const p = DB.get()
+    if (!p.adultAt) return
+    try {
+      // adultAt is the 17th birthday; the server wants the date of birth.
+      const a = new Date(p.adultAt)
+      const dob = new Date(Date.UTC(a.getUTCFullYear() - 17, a.getUTCMonth(), a.getUTCDate()))
+      await fetch(`${BACKEND_URL}/age`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+        body: JSON.stringify({ dob: dob.toISOString().slice(0, 10) }),
+      })
+    } catch {}
   },
 
   /** Make the local consent record durable. Safe to call repeatedly. */
@@ -4836,6 +4894,127 @@ const ONBOARDING_GOALS = [
 ]
 
 // ════════════════════════════════════════════════════════════
+//  AGE
+// ════════════════════════════════════════════════════════════
+//
+// Under 17 the dating side is closed and only other under-17s are shown.
+//
+// This screen and the `isMinor` flag it sets are CONVENIENCE, not enforcement.
+// The real separation is in backend/agegate.js and runs on every query that
+// returns a person, because anyone can call the API without this app. If the
+// two ever disagree, the server is right.
+
+const ADULT_AGE = 17
+
+/** The date this person turns 17, or null if the date is not a real one. */
+function adultDateFrom(y: number, m: number, d: number): Date | null {
+  if (!y || !m || !d) return null
+  const dob = new Date(Date.UTC(y, m - 1, d))
+  // Reject what the calendar rolled over: 31 February would become 2 March.
+  if (dob.getUTCFullYear() !== y || dob.getUTCMonth() !== m - 1 || dob.getUTCDate() !== d) return null
+  const now = new Date()
+  if (dob > now) return null
+  if (y < now.getUTCFullYear() - 120) return null
+  return new Date(Date.UTC(y + ADULT_AGE, m - 1, d))
+}
+
+const isMinorOn = (adultAt: string | null | undefined, today = new Date()) =>
+  !!adultAt && new Date(adultAt) > today
+
+/** Ask once, before anything is processed. */
+function AgeGate({ onDone }: { onDone: (adultAt: string, minor: boolean) => void }) {
+  const [d, setD] = useState('')
+  const [m, setM] = useState('')
+  const [y, setY] = useState('')
+  const [err, setErr] = useState(false)
+  const [minorNotice, setMinorNotice] = useState(false)
+
+  const submit = () => {
+    const adultAt = adultDateFrom(Number(y), Number(m), Number(d))
+    if (!adultAt) { setErr(true); return }
+    const iso = adultAt.toISOString().slice(0, 10)
+    const minor = isMinorOn(iso)
+    if (minor) { setMinorNotice(true); return }
+    onDone(iso, false)
+  }
+
+  if (minorNotice) {
+    const adultAt = adultDateFrom(Number(y), Number(m), Number(d))
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0E0E1C', padding: 28, justifyContent: 'center' }}>
+        <Text style={{ fontSize: 46, textAlign: 'center', marginBottom: 20 }}>👋</Text>
+        <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', textAlign: 'center', marginBottom: 14 }}>
+          {tr('age_minor_title')}
+        </Text>
+        <Text style={{ fontSize: 15.5, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 24, marginBottom: 34 }}>
+          {tr('age_minor_body')}
+        </Text>
+        <TouchableOpacity
+          onPress={() => onDone(adultAt!.toISOString().slice(0, 10), true)}
+          style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>{tr('age_minor_ok')}</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
+  const field = (
+    value: string, set: (v: string) => void, placeholder: string, len: number, flex: number,
+  ) => (
+    <View style={{ flex }}>
+      <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 6, fontWeight: '700' }}>
+        {placeholder}
+      </Text>
+      <TextInput
+        value={value}
+        onChangeText={(v) => { set(v.replace(/[^0-9]/g, '').slice(0, len)); setErr(false) }}
+        keyboardType="number-pad"
+        placeholder={'—'.repeat(len)}
+        placeholderTextColor="rgba(255,255,255,0.2)"
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, paddingVertical: 16,
+          paddingHorizontal: 14, color: '#fff', fontSize: 20, fontWeight: '800', textAlign: 'center',
+          borderWidth: 1.5, borderColor: err ? '#FF6B6B' : 'rgba(255,255,255,0.12)',
+        }}
+      />
+    </View>
+  )
+
+  const ready = d.length >= 1 && m.length >= 1 && y.length === 4
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#0E0E1C', padding: 28, paddingTop: HEADER_TOP + 40 }}>
+      <Text style={{ fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.6, marginBottom: 12 }}>
+        {tr('age_title')}
+      </Text>
+      <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 23, marginBottom: 34 }}>
+        {tr('age_why')}
+      </Text>
+
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {field(d, setD, tr('age_day'), 2, 1)}
+        {field(m, setM, tr('age_month'), 2, 1)}
+        {field(y, setY, tr('age_year'), 4, 1.6)}
+      </View>
+
+      {err && <Text style={{ color: '#FF6B6B', fontSize: 14, marginTop: 14 }}>{tr('age_invalid')}</Text>}
+
+      <TouchableOpacity
+        disabled={!ready}
+        onPress={submit}
+        style={{
+          marginTop: 30, borderRadius: 18, paddingVertical: 18, alignItems: 'center',
+          backgroundColor: ready ? '#7B6EF6' : 'rgba(255,255,255,0.12)',
+        }}>
+        <Text style={{ fontSize: 17, fontWeight: '900', color: ready ? '#fff' : 'rgba(255,255,255,0.4)' }}>
+          {tr('age_continue')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+// ════════════════════════════════════════════════════════════
 //  CONSENT
 // ════════════════════════════════════════════════════════════
 //
@@ -5546,9 +5725,18 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
   // better UX and what makes each one specific enough to be valid.
   if (phase === 8) return (
     <ConsentGate
-      onAgree={() => { DB.acceptTerms(TERMS_VERSION); setPhase(9) }}
+      onAgree={() => { DB.acceptTerms(TERMS_VERSION); setPhase(11) }}
       onDecline={() => setPhase(0)}
     />
+  )
+
+  // Phase 11 — age, before any processing begins
+  //
+  // Asked here rather than at signup because under-16s (13–16, depending on
+  // the member state) need a parental-consent route before their data is
+  // processed at all, and the conversation is processing.
+  if (phase === 11) return (
+    <AgeGate onDone={(adultAt, minor) => { DB.setAdultAt(adultAt, minor); setPhase(9) }} />
   )
 
   // Phase 9 — conversation with Soma
@@ -13166,7 +13354,7 @@ function MyProfile({ profile, onBack }: { profile: UserProfile; onBack: () => vo
               { key: 'friends', label: '😊 Friends', color: '#10B981', bg: '#10B98118' },
               { key: 'professional', label: '💼 Professional', color: '#378ADD', bg: '#378ADD18' },
               { key: 'support', label: '🤝 Support', color: '#F59E0B', bg: '#F59E0B18' },
-            ] as const).map(s => {
+            ] as const).filter(s => !DB.get().isMinor || s.key === 'friends').map(s => {
               const active = (d.connectionType || 'dating') === s.key
               return (
                 <TouchableOpacity

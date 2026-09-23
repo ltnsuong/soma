@@ -105,6 +105,27 @@ the new photo against `verified_photo_hash` and clears verification when they di
 Without that, someone verifies one face and then swaps in another — which is the exact
 impersonation the badge is supposed to prevent.
 
+**Adults and under-17s never see each other, and the server decides.** Under 17 the dating
+side is closed and only other under-17s are visible. The rule is `backend/agegate.js`, applied
+in `/users/discover`, `/dating/nearby`, `/users/find`, `/users/:id/profile` and `/dating/like` —
+the write included, because filtering the feed only keeps people apart in the UI. The client's
+`isMinor` flag hides tabs and nothing more; anyone can call the API without the app.
+
+**An unknown age fails closed.** No `adult_at` means seen by nobody and sees nobody. The
+tempting alternative — treat unknown as adult so the feed is not empty — is the bug that puts a
+14-year-old in an adult's feed the first time a write fails. An empty list is recoverable; the
+other direction is not. `agegate.test.js` pins this.
+
+**`users.adult_at` is the only source of a band.** `dating_profiles.is_minor` exists so the
+nearby RPC can filter without a join. Reading it anywhere else is a bug that has already
+happened once: accounts with an age but no connection profile read as UNKNOWN and disappeared
+from discovery entirely — every "just joined SOMA" user, erased.
+
+**Signed-out callers see seeded examples only.** `/users/discover` used to hand anonymous
+callers every real profile in the database, photos included, while the app's own banner said
+"Register to see real people". It also meant an under-17 browsed adults before anything could
+ask their age.
+
 **Consent is never one box.** There is no endpoint and no switch that grants everything
 at once. A single "I agree to share all my information" is bundled consent, which regulators
 treat as *no* consent, and it is also the weakest possible answer to "what did this person

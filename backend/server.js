@@ -10,6 +10,10 @@ import {
   decideVerification, pickGesture, readImage, grantsBadge, isChallengeFresh, CHALLENGE_TTL_MS,
 } from './faceverify.js'
 import { compareFaces, isConfigured } from './facematch.js'
+import {
+  adultDateFrom, bandOf, bandOfFlag, canSee, coerceConnectionType,
+  allowedConnectionTypes, ADULT_AGE, MINOR, UNKNOWN,
+} from './agegate.js'
 
 import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
@@ -1134,6 +1138,17 @@ app.put('/dating/profile', auth, async (req, res) => {
     // photo afterwards would leave the badge sitting next to a face nobody
     // checked — which is exactly the impersonation it exists to prevent — so
     // changing it withdraws the badge and verification has to be done again.
+    // Under 17 the dating side is closed, so a profile cannot declare itself
+    // as dating however the request was built. Coerced rather than rejected:
+    // the profile still saves, it just saves as friends.
+    const band = await bandForUser(req.user.userId)
+    row.is_minor = band === MINOR
+    const coerced = coerceConnectionType(band, row.connection_type)
+    if (coerced) row.connection_type = coerced
+    // An unknown band cannot be matched at all, so keep the profile inactive
+    // until an age is given rather than leaving it discoverable.
+    if (band === UNKNOWN) row.active = false
+
     const nextHash = photoHash(row.photo)
     const { data: prior } = await supabase.from('dating_profiles')
       .select('photo_verified, verified_photo_hash').eq('user_id', req.user.userId).maybeSingle()
@@ -1283,6 +1298,69 @@ app.post('/verify/face', auth, async (req, res) => {
 
 // Where do I stand?
 // ════════════════════════════════════════════════════════════
+// AGE BAND
+// ════════════════════════════════════════════════════════════
+//
+// Under 17, the dating side is closed and only other under-17s are visible.
+// The rule lives in agegate.js; this is the storage and the enforcement.
+//
+// Enforcement is server-side because it is a child-safety control. The client
+// also hides the dating tabs, but that is cosmetic — anyone can call these
+// routes directly, so every query that returns people filters on the band here.
+
+/** The caller's band, read fresh. Unknown when we have not asked. */
+async function bandForUser(userId) {
+  const { data } = await supabase.from('users')
+    .select('adult_at').eq('id', userId).maybeSingle()
+  return bandOf(data?.adult_at)
+}
+
+// Record a date of birth. Stores the date they turn 17, never the DOB itself.
+app.post('/age', auth, async (req, res) => {
+  try {
+    const adultAt = adultDateFrom(req.body?.dob)
+    // A date we cannot trust leaves the person unknown, which shows them
+    // nobody — deliberately not an error the client can shrug off.
+    if (!adultAt) return res.status(400).json({ error: 'invalid_date' })
+
+    const iso = adultAt.toISOString().slice(0, 10)
+    const band = bandOf(adultAt)
+
+    const { error } = await supabase.from('users')
+      .update({ adult_at: iso, age_checked_at: new Date().toISOString() })
+      .eq('id', req.user.userId)
+    if (error) return res.status(500).json({ error: error.message })
+
+    // Denormalised so the matching queries can filter without a join. If this
+    // write fails the row keeps its old value, so re-assert it rather than
+    // assuming; a stale flag here is the one that crosses the bands.
+    await supabase.from('dating_profiles')
+      .update({ is_minor: band === MINOR })
+      .eq('user_id', req.user.userId)
+
+    res.json({ band, allowedConnectionTypes: allowedConnectionTypes(band) })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/age', auth, async (req, res) => {
+  try {
+    const { data } = await supabase.from('users')
+      .select('adult_at, age_checked_at').eq('id', req.user.userId).maybeSingle()
+    const band = bandOf(data?.adult_at)
+    res.json({
+      band,
+      asked: !!data?.age_checked_at,
+      minimumAge: ADULT_AGE,
+      allowedConnectionTypes: allowedConnectionTypes(band),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
 // CONSENT
 // ════════════════════════════════════════════════════════════
 //
@@ -1410,6 +1488,12 @@ app.get('/dating/nearby', auth, async (req, res) => {
     const { data: me } = await supabase.from('dating_profiles').select('*').eq('user_id', req.user.userId).single()
     if (!me || me.lat == null) return res.status(400).json({ error: 'Set your profile and location first' })
 
+    // Age band decides who exists for this caller. Unknown sees nobody — an
+    // empty list and a prompt to give an age is recoverable; showing a child
+    // an adult because a write failed is not.
+    const myBand = await bandForUser(req.user.userId)
+    if (myBand === UNKNOWN) return res.json({ results: [], needsAge: true })
+
     // People I already liked — don't show them again
     const { data: likedRows } = await supabase.from('dating_likes').select('target_id').eq('liker_id', req.user.userId)
     const likedIds = new Set((likedRows || []).map(r => r.target_id))
@@ -1426,10 +1510,16 @@ app.get('/dating/nearby', auth, async (req, res) => {
     const sectorBiosMap = {}
     const demoIds = new Set()
     const verifiedIds = new Set()
+    const crossBandIds = new Set()
     if (nearbyIds.length) {
       const { data: photoRows } = await supabase.from('dating_profiles')
-        .select('user_id, photos, sector_bios, photo_verified').in('user_id', nearbyIds)
+        .select('user_id, photos, sector_bios, photo_verified, is_minor').in('user_id', nearbyIds)
       ;(photoRows || []).filter(r => r.photo_verified).forEach(r => verifiedIds.add(r.user_id))
+      // Anyone whose band differs from the caller's is removed outright —
+      // not ranked lower, not hidden in the client. They do not exist here.
+      ;(photoRows || []).forEach(r => {
+        if (!canSee(myBand, bandOfFlag(r.is_minor))) crossBandIds.add(r.user_id)
+      })
       ;(photoRows || []).forEach(r => {
         photosMap[r.user_id] = r.photos || []
         sectorBiosMap[r.user_id] = r.sector_bios || {}
@@ -1441,7 +1531,7 @@ app.get('/dating/nearby', auth, async (req, res) => {
     }
 
     const results = (nearbyRows || [])
-      .filter(r => !likedIds.has(r.user_id) && !demoIds.has(r.user_id))
+      .filter(r => !likedIds.has(r.user_id) && !demoIds.has(r.user_id) && !crossBandIds.has(r.user_id))
       .map(r => ({
         userId: r.user_id, name: r.name, age: r.age, photo: r.photo,
         photos: photosMap[r.user_id] || (r.photo ? [r.photo] : []),
@@ -1465,6 +1555,15 @@ app.post('/dating/like', auth, async (req, res) => {
     const { targetId } = req.body
     if (!targetId) return res.status(400).json({ error: 'targetId required' })
     if (targetId === req.user.userId) return res.status(400).json({ error: 'Cannot like yourself' })
+
+    // The write, not just the read. Filtering the feed keeps people apart in
+    // the UI; this is what stops a crafted request creating a match across the
+    // line — which is the one that ends in two people messaging each other.
+    const { data: target } = await supabase.from('users')
+      .select('adult_at').eq('id', targetId).maybeSingle()
+    if (!canSee(await bandForUser(req.user.userId), bandOf(target?.adult_at))) {
+      return res.status(404).json({ error: 'User not found' })
+    }
 
     await supabase.from('dating_likes').upsert(
       { liker_id: req.user.userId, target_id: targetId },
@@ -2034,23 +2133,44 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
   try {
     const me = req.user?.userId
     // Get all users (exclude self if authenticated), join dating_profiles if they have one
-    let query = supabase.from('users').select('id, name, email, created_at').order('created_at', { ascending: false }).limit(100)
+    let query = supabase.from('users').select('id, name, email, created_at, adult_at').order('created_at', { ascending: false }).limit(100)
     if (me) query = query.neq('id', me)
     const { data: allUsers, error } = await query
     if (error) throw error
 
-    // Signed in: real people only. Guest: examples included, clearly labelled.
-    const users = me ? (allUsers || []).filter(u => !isDemoAccount(u.email)) : (allUsers || [])
+    // Signed in: real people only. Signed out: the seeded examples and nothing
+    // else. This used to hand a guest every real profile in the database —
+    // photos included — which contradicted the app's own "Register to see real
+    // people" banner, and meant an under-17 who had not signed in was browsing
+    // adults before anything could check their age.
+    const users = me
+      ? (allUsers || []).filter(u => !isDemoAccount(u.email))
+      : (allUsers || []).filter(u => isDemoAccount(u.email))
 
     // Also fetch their dating profiles if available
     const ids = (users || []).map(u => u.id)
     const { data: profiles } = ids.length
-      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city, photo_verified').in('user_id', ids)
+      ? await supabase.from('dating_profiles').select('user_id, age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city, photo_verified, is_minor').in('user_id', ids)
       : { data: [] }
     const profileMap = {}
     ;(profiles || []).forEach(p => { profileMap[p.user_id] = p })
 
-    res.json({ results: (users || []).map(u => discoverRow(u, profileMap[u.id] || {})) })
+    // Same band only, once signed in. A guest sees examples, which are not
+    // real people and carry no band.
+    //
+    // The band comes from users.adult_at, not from the denormalised is_minor
+    // flag on dating_profiles: plenty of accounts have an age but no connection
+    // profile yet, and reading the flag made every one of them look UNKNOWN and
+    // vanish from discovery — the "just joined SOMA" case, erased.
+    const myBand = me ? await bandForUser(me) : null
+    const visible = me
+      ? (users || []).filter(u => canSee(myBand, bandOf(u.adult_at)))
+      : (users || [])
+
+    res.json({
+      results: visible.map(u => discoverRow(u, profileMap[u.id] || {})),
+      ...(me && myBand === UNKNOWN ? { needsAge: true } : {}),
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -2062,14 +2182,21 @@ app.get('/users/:id/profile', auth, async (req, res) => {
   try {
     const { id } = req.params
     const { data: u, error } = await supabase
-      .from('users').select('id, name, avatar, created_at').eq('id', id).maybeSingle()
+      .from('users').select('id, name, avatar, created_at, adult_at').eq('id', id).maybeSingle()
     if (error) throw error
     if (!u) return res.status(404).json({ error: 'User not found' })
 
     const { data: dp } = await supabase
       .from('dating_profiles')
-      .select('age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city, photo_verified')
+      .select('age, photo, photos, bio, sector_bios, interests, values, love_language, attachment, connection_type, work, city, photo_verified, is_minor')
       .eq('user_id', id).maybeSingle()
+
+    // Opening a profile directly by id must respect the band like every other
+    // route. 404 rather than 403: whether an account exists is not something a
+    // caller on the wrong side of this line needs to learn.
+    if (!canSee(await bandForUser(req.user.userId), bandOf(u.adult_at))) {
+      return res.status(404).json({ error: 'User not found' })
+    }
 
     res.json({
       userId: u.id,
@@ -2103,10 +2230,10 @@ app.get('/users/:id/profile', auth, async (req, res) => {
 // FIND USER BY INVITE CODE
 // code = first 6 chars of user UUID (uppercase)
 // ════════════════════════════════════════════════════════════
-app.get('/users/find', async (req, res) => {
+app.get('/users/find', optionalAuth, async (req, res) => {
   const { code, email } = req.query
   try {
-    let query = supabase.from('users').select('id, name, email')
+    let query = supabase.from('users').select('id, name, email, adult_at')
     if (email && typeof email === 'string' && email.includes('@')) {
       query = query.ilike('email', email.trim())
     } else if (code && typeof code === 'string' && code.length >= 4) {
@@ -2133,12 +2260,20 @@ app.get('/users/find', async (req, res) => {
     const ids = users.map(u => u.id)
     const { data: dps } = await supabase
       .from('dating_profiles')
-      .select('user_id, bio, sector_bios, interests, values, work, city, age, photo_verified')
+      .select('user_id, bio, sector_bios, interests, values, work, city, age, photo_verified, is_minor')
       .in('user_id', ids)
+
+    // A code lookup is still a way to reach a person, so the band applies here
+    // too — otherwise sharing a code around a school would route straight past
+    // the separation everywhere else enforces.
+    const myBand = req.user ? await bandForUser(req.user.userId) : UNKNOWN
+    const reachable = users.filter(u => canSee(myBand, bandOf(u.adult_at)))
+    if (!reachable.length) return res.status(404).json({ error: 'No user found' })
+
     const byUser = {}
     ;(dps || []).forEach(d => { byUser[d.user_id] = d })
 
-    const results = users.map(u => {
+    const results = reachable.map(u => {
       const dp = byUser[u.id] || {}
       return {
         name: u.name,

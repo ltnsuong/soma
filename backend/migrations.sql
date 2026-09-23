@@ -333,3 +333,35 @@ ALTER TABLE coaching_history ADD CONSTRAINT coaching_history_chat_id_fkey
 ALTER TABLE dating_chats DROP CONSTRAINT IF EXISTS dating_chats_user_a_id_fkey;
 ALTER TABLE dating_chats ADD CONSTRAINT dating_chats_user_a_id_fkey
   FOREIGN KEY (user_a_id) REFERENCES user_profiles(id) ON DELETE CASCADE;
+
+-- ════════════════════════════════════════════════════════════
+-- AGE BAND (child-safety separation)
+-- ════════════════════════════════════════════════════════════
+--
+-- Under 17 the dating side is closed and only other under-17s are visible.
+-- The rule is in backend/agegate.js; this is the storage.
+--
+-- We store the date the person turns 17, not their date of birth: same
+-- precision (the check must not be off by a year near the boundary) but the
+-- column says what it is for, and aging up happens on its own.
+--
+-- users.adult_at is the ONE source of truth for a band. dating_profiles.is_minor
+-- exists only so the nearby RPC can filter without a join, and reading it
+-- instead of adult_at is a bug — accounts with an age but no connection profile
+-- read as unknown and vanish from discovery.
+--
+-- NULL means "not asked" and fails CLOSED: seen by nobody, sees nobody.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS adult_at DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS age_checked_at TIMESTAMP;
+ALTER TABLE dating_profiles ADD COLUMN IF NOT EXISTS is_minor BOOLEAN;
+CREATE INDEX IF NOT EXISTS idx_dating_profiles_is_minor ON dating_profiles(is_minor);
+
+-- Existing accounts: the conversational age is the only signal. 17 or over is
+-- treated as adult on both sides; anything else stays NULL and gets asked,
+-- because guessing wrong in that direction is the harmful one.
+UPDATE dating_profiles SET is_minor = FALSE
+  WHERE age IS NOT NULL AND age >= 17 AND is_minor IS NULL;
+UPDATE users u SET adult_at = (CURRENT_DATE - ((dp.age - 17) * INTERVAL '1 year'))::date
+  FROM dating_profiles dp
+  WHERE dp.user_id = u.id AND u.adult_at IS NULL AND dp.age IS NOT NULL AND dp.age >= 17;
