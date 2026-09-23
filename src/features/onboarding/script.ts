@@ -239,3 +239,23 @@ export const nextBeat = (p: Progress): Beat | null => {
   // still ran to the exchange ceiling.
   return worthAsking ?? remaining.find(b => b.act === 3) ?? remaining[0] ?? null
 }
+
+/**
+ * Has Soma already said this?
+ *
+ * The acknowledgement between beats is generated from the whole conversation
+ * so far, which includes Soma's own earlier lines — so the model sometimes
+ * hands back one it already used. In a real run "Tuesday coffee is a high bar."
+ * appeared twice, two turns apart, answering two different messages. Asking the
+ * prompt not to repeat itself helps but does not hold; this decides it.
+ *
+ * Compared loosely on purpose: a repeat that differs only by trailing
+ * punctuation, case or spacing is still a repeat to the person reading it.
+ */
+export function isEcho(candidate: string, priorLines: string[]): boolean {
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim()
+  const c = norm(candidate)
+  if (!c) return false
+  return priorLines.some(p => norm(p) === c)
+}

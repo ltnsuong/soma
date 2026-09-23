@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   BEATS, MAX_EXCHANGES, TARGET_DOMAINS,
-  coveredDomains, isDone, nextBeat, type Progress,
+  coveredDomains, isDone, isEcho, nextBeat, type Progress,
 } from './script'
 import { DOMAINS, type DomainKey } from '../../shared/domains'
 import type { FactKey } from './script'
@@ -176,5 +176,43 @@ describe('coveredDomains', () => {
       { domain: 'career' }, { domain: 'nonsense' as DomainKey },
     ])
     expect([...got].sort()).toEqual(['career', 'health'])
+  })
+})
+
+describe('not saying the same thing twice', () => {
+  // The line Soma actually repeated, two turns apart, in a real onboarding run.
+  const SAID = 'Tuesday coffee is a high bar.'
+
+  it('catches the line that actually repeated', () => {
+    expect(isEcho(SAID, [
+      'That’s a weird kind of quiet.',
+      SAID,
+    ])).toBe(true)
+  })
+
+  it('ignores trailing punctuation, case and spacing', () => {
+    const prior = [SAID]
+    for (const c of ['tuesday coffee is a high bar', 'Tuesday  coffee is a high bar!', 'TUESDAY COFFEE IS A HIGH BAR...']) {
+      expect(isEcho(c, prior)).toBe(true)
+    }
+  })
+
+  it('lets a genuinely new line through', () => {
+    expect(isEcho('So the people you want to talk to are far away.', [
+      SAID,
+    ])).toBe(false)
+  })
+
+  it('does not treat a longer line containing the old one as a repeat', () => {
+    // Building on a previous thought is fine; parroting it is not.
+    expect(isEcho('Tuesday coffee is a high bar, and worth aiming for.', [
+      SAID,
+    ])).toBe(false)
+  })
+
+  it('is safe on empty input', () => {
+    expect(isEcho('', ['anything'])).toBe(false)
+    expect(isEcho('   ', ['anything'])).toBe(false)
+    expect(isEcho('something', [])).toBe(false)
   })
 })

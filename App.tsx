@@ -18,7 +18,7 @@ import * as Location from 'expo-location'
 import * as Haptics from 'expo-haptics'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
-import { BEATS, OPENING, coveredDomains, isDone, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
+import { BEATS, OPENING, coveredDomains, isDone, isEcho, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
 import QRCode from 'react-native-qrcode-svg'
@@ -5548,7 +5548,7 @@ Omit a key entirely if it was absent. Return only JSON.`,
     setFollowUpCount(0)
     const [bridge, intel] = await Promise.all([
       groq(history,
-        `${somaSystem()}\nAcknowledge what they said in ONE short sentence. Do not ask anything — the next question follows immediately.`,
+        `${somaSystem()}\nAcknowledge what they said in ONE short sentence. Do not ask anything — the next question follows immediately. Do not reuse a sentence you have already said.`,
         70),
       extract(text),
     ])
@@ -5559,7 +5559,13 @@ Omit a key entirely if it was absent. Return only JSON.`,
       const said = text.trim()
       if (said.split(/\s+/).length <= 2 && /^[\p{L}][\p{L}\s'-]{0,23}$/u.test(said)) DB.setName(said)
     }
-    if (bridge) pushSoma(bridge)
+    // The acknowledgement is generated from the whole conversation, Soma's own
+    // lines included, so the model sometimes hands back one it already used —
+    // "Tuesday coffee is a high bar." appeared twice in a real run. Asking it
+    // not to helps but does not hold, so drop a repeat rather than show it.
+    // Nothing is lost: the next question follows immediately either way.
+    const priorSoma = sectionConvoRef.current.filter(m => m.role === 'soma').map(m => m.text)
+    if (bridge && !isEcho(bridge, priorSoma)) pushSoma(bridge)
 
     if (isDone(currentProgress()) || !askNextBeat()) {
       const closing = await groq(history,
