@@ -7,16 +7,38 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "ios": { "simulator": true }
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://soma-backend-production-4a3b.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "253048533772-fcjhlr91hhps8pq73vnqvaf1ug5ksq35.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_REDIRECT_URI": "https://mysoma.site",
+        "EXPO_PUBLIC_RC_IOS_KEY": "",
+        "EXPO_PUBLIC_RC_ANDROID_KEY": ""
+      }
     },
     "production": {
       "autoIncrement": true,
-      "android": { "buildType": "app-bundle" }
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://soma-backend-production-4a3b.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "253048533772-fcjhlr91hhps8pq73vnqvaf1ug5ksq35.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_REDIRECT_URI": "https://mysoma.site",
+        "EXPO_PUBLIC_RC_IOS_KEY": "",
+        "EXPO_PUBLIC_RC_ANDROID_KEY": ""
+      }
     }
   },
   "submit": {

@@ -149,6 +149,26 @@ data, the policy is part of the change, not follow-up work.
 It is how re-consent is detected when the terms change materially: `/consent` returns
 `needsReconsent` when the stored version differs from the current one.
 
+**EAS never sees `.env`.** `.gitignore` has `.env*`, and EAS Build uploads the project
+respecting gitignore — so every `EXPO_PUBLIC_*` read at build time was empty and
+`BACKEND_URL` fell back to its `'http://localhost:3000'` default. A production build made that
+way installs, launches, and then every network call fails: no sign-in, no matching, no Soma.
+It looks like a backend outage, not a build problem. The public values now live in
+`eas.json` under `build.<profile>.env`, which is committed and cannot be forgotten. They are
+public by construction — `EXPO_PUBLIC_*` is inlined into the binary — so this is not a place
+for secrets, and `EXPO_PUBLIC_AI_KEY` is deliberately absent from it.
+
+**A Test Store RevenueCat key disables subscriptions in a release build.** `RC_USABLE` is
+`!!RC_KEY && !(RC_IS_TEST_KEY && !__DEV__)`, so a `test_` key means `purchaseApi.configured()`
+is false and SOMA+ cannot be bought at all. `eas.json` holds `EXPO_PUBLIC_RC_IOS_KEY` as an
+empty string on purpose — obviously unset beats silently wrong. It needs the `appl_` key from
+the RevenueCat dashboard before any submission.
+
+**Google sign-in is per-platform and only the web client ID exists.** `GOOGLE_ENABLED` is
+computed from *this* platform's client ID, so the button is hidden on iOS rather than shown and
+broken. Do not "fix" it by ORing the three ids together — that is what once threw from
+`useIdTokenAuthRequest` at hook-call time and rendered a red box instead of the sign-in form.
+
 **`expo-font` and `expo-asset` are required peers**, of `@expo/vector-icons` and `expo-audio`
 respectively. Without them the app builds for web and crashes on a device. `npx expo-doctor`
 catches this; run it before any native build.
