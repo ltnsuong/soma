@@ -10,6 +10,7 @@ import {
   decideVerification, pickGesture, readImage, grantsBadge, isChallengeFresh, CHALLENGE_TTL_MS,
 } from './faceverify.js'
 import { compareFaces, isConfigured } from './facematch.js'
+import { planRetry } from './airetry.js'
 import {
   adultDateFrom, bandOf, bandOfFlag, canSee, coerceConnectionType,
   allowedConnectionTypes, ADULT_AGE, MINOR, UNKNOWN,
@@ -1924,26 +1925,66 @@ const aiBudget = (req, res, next) => {
   })
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
 app.post('/ai/chat', optionalAuth, aiBudget, async (req, res) => {
   const { messages, system, maxTokens = 200, temperature = 0.85 } = req.body
   if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages required' })
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
-      body: JSON.stringify({
-        model: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
-        max_tokens: maxTokens,
-        temperature,
-        messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
-      }),
-    })
-    const data = await response.json()
-    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Groq error' })
-    res.json({ content: data.choices?.[0]?.message?.content ?? '' })
-  } catch (err) {
-    console.error('AI proxy error:', err.message)
-    res.status(500).json({ error: 'AI request failed' })
+
+  const body = JSON.stringify({
+    model: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
+    max_tokens: maxTokens,
+    temperature,
+    messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
+  })
+
+  // Groq's on-demand tier caps OUTPUT tokens per minute across the whole
+  // organisation, and a single Synergy Scan spends more than that cap on its
+  // own — conversation then report, back to back. The refusal says how long to
+  // wait, so wait, rather than handing back an error the client turns silently
+  // into canned text. See backend/airetry.js for the bounds.
+  let sleptMs = 0
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+        body,
+      })
+      const text = await response.text()
+
+      if (response.ok) {
+        const data = JSON.parse(text)
+        return res.json({ content: data.choices?.[0]?.message?.content ?? '' })
+      }
+
+      const plan = planRetry({
+        status: response.status,
+        headers: Object.fromEntries(response.headers),
+        body: text,
+        attempt,
+        sleptMs,
+      })
+      if (!plan.retry) {
+        let message = 'Groq error'
+        try {
+          message = JSON.parse(text).error?.message || message
+        } catch {
+          message = 'Groq error'   // body was not JSON; the default stands
+        }
+        if (response.status === 429) {
+          console.warn(`[ai] gave up after ${attempt} attempt(s): ${plan.reason}`)
+        }
+        return res.status(response.status).json({ error: message })
+      }
+
+      console.warn(`[ai] ${response.status}, retrying in ${plan.sleepMs}ms (attempt ${attempt})`)
+      await sleep(plan.sleepMs)
+      sleptMs += plan.sleepMs
+    } catch (err) {
+      console.error('AI proxy error:', err.message)
+      return res.status(500).json({ error: 'AI request failed' })
+    }
   }
 })
 

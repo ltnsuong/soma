@@ -180,6 +180,16 @@ computed from *this* platform's client ID, so the button is hidden on iOS rather
 broken. Do not "fix" it by ORing the three ids together — that is what once threw from
 `useIdTokenAuthRequest` at hook-call time and rendered a red box instead of the sign-in form.
 
+**Groq's on-demand tier caps OUTPUT tokens per minute at 1000 for the whole organisation**,
+and one Synergy Scan spends more than that by itself — 600 for the agent conversation, then 600
+for the report, back to back. When it is refused, `App.tsx:15546` silently shows five hardcoded
+conversation turns instead, so the product's headline feature renders as a template with no
+error anywhere. `/ai/chat` now retries on 429 using the delay Groq states in its own refusal
+(`backend/airetry.js`), which rescues a brief overage; measured in production, an ask of 3s is
+retried and succeeds, while 14.7s and 34.14s are refused fast because nobody holds a phone that
+long. The retry does not fix the ceiling. **Upgrade the Groq tier before launch** — with more
+than one person scanning at a time, this feature degrades to canned text.
+
 **`expo-font` and `expo-asset` are required peers**, of `@expo/vector-icons` and `expo-audio`
 respectively. Without them the app builds for web and crashes on a device. `npx expo-doctor`
 catches this; run it before any native build.
