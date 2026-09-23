@@ -105,6 +105,29 @@ the new photo against `verified_photo_hash` and clears verification when they di
 Without that, someone verifies one face and then swaps in another — which is the exact
 impersonation the badge is supposed to prevent.
 
+**Consent is never one box.** There is no endpoint and no switch that grants everything
+at once. A single "I agree to share all my information" is bundled consent, which regulators
+treat as *no* consent, and it is also the weakest possible answer to "what did this person
+actually agree to?". `ConsentGate` covers the terms and the privacy notice; location,
+notifications, health and face verification are each asked at the point of use and stored in
+their own column. If someone asks for a simpler one-tap version, this is why it does not exist.
+
+**Withdrawing must stay as easy as consenting** (Art. 7(3)). `Settings → Privacy & data` is one
+tap per purpose over the same endpoint that grants it — no confirmation maze, no email request.
+Withdrawing face consent also clears the badge, because the badge exists on the strength of a
+comparison the user has now told us not to make.
+
+**One privacy policy, at `web/privacy.html`.** `backend/privacy.html` used to be a second copy
+and the two drifted: the backend one still claimed "We never store your conversation content on
+our servers" long after `profiles` grew `memories`, `diary` and `circle`. A policy that
+describes the wrong product is worse than none, so `/privacy` on the API now 301s to the
+canonical page. Do not reintroduce a second copy. When you ship a feature that touches personal
+data, the policy is part of the change, not follow-up work.
+
+**`TERMS_VERSION` appears twice** — `backend/server.js` and `App.tsx` — and they must match.
+It is how re-consent is detected when the terms change materially: `/consent` returns
+`needsReconsent` when the stored version differs from the current one.
+
 **`expo-font` and `expo-asset` are required peers**, of `@expo/vector-icons` and `expo-audio`
 respectively. Without them the app builds for web and crashes on a device. `npx expo-doctor`
 catches this; run it before any native build.

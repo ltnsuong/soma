@@ -285,3 +285,29 @@ CREATE INDEX IF NOT EXISTS idx_face_verifications_user ON face_verifications(use
 -- The manual-review queue is a query, not a table: the newest row per user
 -- whose verdict is 'review' and who is not verified yet.
 CREATE INDEX IF NOT EXISTS idx_face_verifications_review ON face_verifications(verdict, created_at DESC);
+
+-- ════════════════════════════════════════════════════════════
+-- CONSENT RECORD
+-- ════════════════════════════════════════════════════════════
+--
+-- Proving consent is half of having it. GDPR Art. 7(1) puts the burden of
+-- demonstrating consent on us, so a boolean is not enough — we need to show
+-- WHICH version of the terms a person agreed to and WHEN. If the policy later
+-- changes materially, comparing `terms_version` against the current one is what
+-- tells us who still needs to be re-asked.
+--
+-- Separate from `face_consent_at`, deliberately. Art. 9 biometric processing
+-- needs its own specific yes, and bundling it in here would be the exact
+-- "blanket consent" that makes the whole thing invalid.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_consent_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT;
+
+-- Per-purpose consents that are asked at the point of use, not up front:
+-- location (matching), notifications, and health tracking (medication and mood,
+-- which is Art. 9 data). Null means never asked; false means asked and refused,
+-- which is a different thing and must not be re-prompted as if it were new.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_location BOOLEAN;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_notifications BOOLEAN;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_health BOOLEAN;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_updated_at TIMESTAMP;

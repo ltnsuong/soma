@@ -452,6 +452,50 @@ const STRINGS: Record<string, Record<string, string>> = {
     choose_photo: 'Choose a photo', finish_profile: 'Finish my profile →',
     photo_required: 'Add a photo to continue',
 
+    // ── Consent ─────────────────────────────────────────────────
+    // Shown before the first conversation, because that conversation is where
+    // collection starts — the messages go to Groq the moment they are sent,
+    // account or not. Telling someone afterwards is not informing them.
+    //
+    // Deliberately NOT one "I agree to share everything" box. Consent has to be
+    // specific per purpose to be valid, so this screen covers the terms and the
+    // privacy notice, and location, notifications, health and face are each
+    // asked where they are actually used — and withdrawable in Settings.
+    consent_title: 'Before we start',
+    consent_lede: 'Soma only works if it remembers you. Here is exactly what that means.',
+    consent_keep_title: 'What Soma keeps',
+    consent_keep_body: 'What you tell Soma — your conversations, the people you mention, how you have been feeling — is stored on our servers so it is still there tomorrow. Without that, Soma starts from nothing every time.',
+    consent_private_title: 'What nobody else sees',
+    consent_private_body: 'Your diary, your memories and the people in your Circle are never shown to another user. When you are matched, only the profile you can see yourself is compared — never the rest.',
+    consent_ai_title: 'How Soma replies',
+    consent_ai_body: 'Your messages are sent to Groq, our AI provider, to write a reply, then discarded. Your words are never used to train anyone\'s models, and never sold.',
+    consent_later_title: 'Asked separately, later',
+    consent_later_body: 'Location, notifications, health tracking and photo verification each have their own question, at the point you first use them. You can turn any of them off in Settings at any time.',
+    consent_delete_title: 'Leaving',
+    consent_delete_body: 'Settings → Delete account removes everything, permanently. Settings → Export data gives you a copy first.',
+    consent_agree: 'I have read and agree to the {terms} and {privacy}',
+    consent_terms_word: 'Terms of Use',
+    consent_privacy_word: 'Privacy Policy',
+    consent_continue: 'Agree and continue →',
+    consent_decline: 'Not now',
+    consent_must_agree: 'Tap the box above to continue.',
+    // Settings panel
+    privacy_controls: 'Privacy & data',
+    privacy_controls_sub: 'What you have agreed to, and how to undo it',
+    consent_given_on: 'Agreed {date}',
+    consent_purpose_location: 'Approximate location',
+    consent_purpose_location_sub: 'Used to suggest people near enough to meet',
+    consent_purpose_notifications: 'Notifications',
+    consent_purpose_notifications_sub: 'Reminders and messages from Soma',
+    consent_purpose_health: 'Health tracking',
+    consent_purpose_health_sub: 'Medication and mood entries you record',
+    consent_purpose_face: 'Photo verification',
+    consent_purpose_face_sub: 'Comparing a selfie with your photo',
+    consent_withdraw_face_warn: 'Turning this off removes your verified badge.',
+    consent_never_asked: 'Not set',
+    consent_read_policy: 'Read the full Privacy Policy →',
+    consent_read_terms: 'Read the Terms of Use →',
+
     // ── Photo verification ──────────────────────────────────────
     // The copy promises only what the check actually does: a live selfie
     // matched the main photo. Nothing here says "real person" or "identity
@@ -1641,6 +1685,10 @@ interface UserProfile {
   domainGoals?: Partial<Record<DomainKey, { text: string; deadline: string; progress: number }>>
   profilePhoto?: string      // user's own avatar (data URL)
   profileBio?: string        // personal tagline / about me
+  /** Which terms version was accepted, and when. Proof, not a flag — GDPR
+   *  Art. 7(1) puts the burden of demonstrating consent on us. */
+  termsVersion?: string
+  termsAcceptedAt?: string
   moments?: Moment[]         // circle moments (own + received)
   sectorProfiles?: {
     dating?:       { bio?: string; photos?: string[] }
@@ -1982,6 +2030,20 @@ const DB = {
    * The extra photos in the gallery are a different thing and are not touched:
    * this only replaces the first.
    */
+  /**
+   * Record that the terms were accepted, with the version.
+   *
+   * Stored locally first because this happens before an account exists — the
+   * conversation comes before signup. `syncConsent` pushes it the moment there
+   * is somewhere to push it to, which is what makes the record provable.
+   */
+  acceptTerms: (version: string) => {
+    const p = DB.get()
+    p.termsVersion = version
+    p.termsAcceptedAt = new Date().toISOString()
+    DB.save(p)
+  },
+
   setUserPhoto: (url: string) => {
     const p = DB.get()
     p.profilePhoto = url
@@ -2902,6 +2964,22 @@ interface NearbyUser {
   photoVerified?: boolean
 }
 
+/** Purposes a person can consent to separately. Biometrics are deliberately
+ *  not in this union — Art. 9 needs its own specific yes, on its own screen. */
+type ConsentPurpose = 'location' | 'notifications' | 'health'
+
+interface ConsentState {
+  currentVersion: string
+  termsAcceptedAt: string | null
+  termsVersion: string | null
+  /** null means never asked, which is not the same as refused. */
+  location: boolean | null
+  notifications: boolean | null
+  health: boolean | null
+  face: boolean
+  needsReconsent: boolean
+}
+
 /** What the server will say about a verification attempt. */
 type FaceVerdict = 'verified' | 'rejected' | 'retry' | 'review'
 interface FaceStatus {
@@ -2925,6 +3003,24 @@ const cloudSync = {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
         body: JSON.stringify(profile),
+      })
+    } catch {}
+    // Consent was given before the account existed, so this is the first chance
+    // to make the record durable. Separate from the profile sync on purpose: it
+    // is a legal record, and it should not be lost because a profile write
+    // happened to fail.
+    await cloudSync.pushConsent()
+  },
+
+  /** Make the local consent record durable. Safe to call repeatedly. */
+  pushConsent: async () => {
+    if (!cloudSync.enabled()) return
+    const p = DB.get()
+    if (p.termsVersion !== TERMS_VERSION) return
+    try {
+      await fetch(`${BACKEND_URL}/consent/terms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
       })
     } catch {}
   },
@@ -2980,6 +3076,35 @@ const datingApi = {
       }),
     })
     if (!res.ok) throw new Error((await res.json()).error || 'Profile save failed')
+  },
+
+  // ── Consent ─────────────────────────────────────────────────
+
+  getConsent: async (): Promise<ConsentState> => {
+    const res = await fetch(`${BACKEND_URL}/consent`, {
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Could not read consent')
+    return data
+  },
+
+  /** `granted: false` is a withdrawal, and uses the same call. */
+  setConsent: async (purpose: ConsentPurpose, granted: boolean) => {
+    const res = await fetch(`${BACKEND_URL}/consent/purpose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+      body: JSON.stringify({ purpose, granted }),
+    })
+    if (!res.ok) throw new Error('consent_failed')
+  },
+
+  withdrawFaceConsent: async () => {
+    const res = await fetch(`${BACKEND_URL}/consent/face/withdraw`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    if (!res.ok) throw new Error('withdraw_failed')
   },
 
   // ── Photo verification ──────────────────────────────────────
@@ -4673,6 +4798,117 @@ const ONBOARDING_GOALS = [
   { key: 'health',  emoji: '❤️', label: 'Take care of my health',      sub: 'Body, sleep, energy, meds' },
 ]
 
+// ════════════════════════════════════════════════════════════
+//  CONSENT
+// ════════════════════════════════════════════════════════════
+//
+// Must match TERMS_VERSION in backend/server.js. When the terms change
+// materially, bump both: the mismatch is how we find who needs re-asking.
+const TERMS_VERSION = '2026-09-23'
+
+const LEGAL_PRIVACY = 'https://mysoma.site/privacy.html'
+const LEGAL_TERMS = 'https://mysoma.site/terms.html'
+
+/**
+ * Shown once, before the first conversation.
+ *
+ * What this screen is NOT: a single "I agree to share all my information" box.
+ * Consent has to be specific to each purpose to count, so a blanket switch is
+ * treated as no consent at all — and it would be the weakest possible answer to
+ * "what did this person actually agree to?". This screen carries the terms and
+ * the privacy notice; location, notifications, health and face verification are
+ * each asked at the point they are first used, and each is withdrawable on its
+ * own in Settings.
+ *
+ * It sits before the conversation rather than after it because the first
+ * message reaches Groq the moment it is sent, account or no account. Explaining
+ * that afterwards is not informing anyone.
+ */
+function ConsentGate({ onAgree, onDecline }: { onAgree: () => void; onDecline: () => void }) {
+  const [agreed, setAgreed] = useState(false)
+  const [nudge, setNudge] = useState(false)
+
+  const sections: { title: string; body: string }[] = [
+    { title: tr('consent_keep_title'), body: tr('consent_keep_body') },
+    { title: tr('consent_private_title'), body: tr('consent_private_body') },
+    { title: tr('consent_ai_title'), body: tr('consent_ai_body') },
+    { title: tr('consent_later_title'), body: tr('consent_later_body') },
+    { title: tr('consent_delete_title'), body: tr('consent_delete_body') },
+  ]
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#0E0E1C' }}>
+      <ScrollView contentContainerStyle={{ padding: 28, paddingTop: HEADER_TOP + 8, paddingBottom: 24 }}>
+        <Text style={{ fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.6, marginBottom: 10 }}>
+          {tr('consent_title')}
+        </Text>
+        <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.62)', lineHeight: 24, marginBottom: 28 }}>
+          {tr('consent_lede')}
+        </Text>
+
+        {sections.map(sec => (
+          <View key={sec.title} style={{ marginBottom: 22 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#A89BFA', marginBottom: 6 }}>{sec.title}</Text>
+            <Text style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.78)', lineHeight: 22 }}>{sec.body}</Text>
+          </View>
+        ))}
+
+        <View style={{ flexDirection: 'row', gap: 18, marginTop: 4, marginBottom: 8 }}>
+          <TouchableOpacity onPress={() => openLink(LEGAL_PRIVACY)}>
+            <Text style={{ fontSize: 14, color: '#A89BFA', fontWeight: '700' }}>{tr('consent_read_policy')}</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity onPress={() => openLink(LEGAL_TERMS)} style={{ marginBottom: 4 }}>
+          <Text style={{ fontSize: 14, color: '#A89BFA', fontWeight: '700' }}>{tr('consent_read_terms')}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <View style={{ padding: 24, paddingTop: 16, paddingBottom: Math.max(SAFE_BOTTOM, 16) + 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', gap: 14 }}>
+        {/* An unticked box that the user must tap. Never pre-ticked: a
+            pre-ticked box is not an unambiguous affirmative action, and is the
+            single most commonly struck-down consent pattern there is. */}
+        <TouchableOpacity
+          onPress={() => { setAgreed(a => !a); setNudge(false) }}
+          activeOpacity={0.7}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+          <View style={{
+            width: 26, height: 26, borderRadius: 8, borderWidth: 2,
+            borderColor: agreed ? '#7B6EF6' : (nudge ? '#FF6B6B' : 'rgba(255,255,255,0.3)'),
+            backgroundColor: agreed ? '#7B6EF6' : 'transparent',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            {agreed && <Ionicons name="checkmark" size={17} color="#fff" />}
+          </View>
+          <Text style={{ flex: 1, fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 21 }}>
+            {tr('consent_agree')
+              .replace('{terms}', tr('consent_terms_word'))
+              .replace('{privacy}', tr('consent_privacy_word'))}
+          </Text>
+        </TouchableOpacity>
+
+        {nudge && (
+          <Text style={{ fontSize: 13, color: '#FF6B6B' }}>{tr('consent_must_agree')}</Text>
+        )}
+
+        <TouchableOpacity
+          onPress={() => (agreed ? onAgree() : setNudge(true))}
+          style={{
+            backgroundColor: agreed ? '#7B6EF6' : 'rgba(255,255,255,0.12)',
+            borderRadius: 18, paddingVertical: 18, alignItems: 'center',
+          }}>
+          <Text style={{ fontSize: 17, fontWeight: '900', color: agreed ? '#fff' : 'rgba(255,255,255,0.45)' }}>
+            {tr('consent_continue')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onDecline} style={{ alignItems: 'center', paddingVertical: 4 }}>
+          <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>{tr('consent_decline')}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
 function Onboarding({ onDone, onBrowse, onSignIn }: { onDone: () => void; onBrowse?: () => void; onSignIn?: () => void }) {
   // phase: 0=welcome, 1-3=voice interview, 4=processing, 5=done
   const { width: screenW } = useWindowDimensions()
@@ -5247,7 +5483,9 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
       </View>
 
       <View style={{ padding: 24, paddingBottom: 52, gap: 12 }}>
-        <TouchableOpacity onPress={() => setPhase(9)}
+        {/* Consent comes before the conversation, not after: the first message
+            leaves the device the moment it is sent. */}
+        <TouchableOpacity onPress={() => setPhase(8)}
           style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center', shadowColor: '#7B6EF6', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10 }}>
           <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 0.2 }}>{t('ob_meet')}</Text>
         </TouchableOpacity>
@@ -5261,6 +5499,19 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
         </TouchableOpacity>
       </View>
     </View>
+  )
+
+  // Phase 8 — consent, before anything is collected
+  //
+  // This is a transparency screen plus acceptance of the terms, NOT a blanket
+  // "share everything" switch. The per-purpose consents (location,
+  // notifications, health, face) are asked where they are used, which is both
+  // better UX and what makes each one specific enough to be valid.
+  if (phase === 8) return (
+    <ConsentGate
+      onAgree={() => { DB.acceptTerms(TERMS_VERSION); setPhase(9) }}
+      onDecline={() => setPhase(0)}
+    />
   )
 
   // Phase 9 — conversation with Soma
@@ -18587,6 +18838,131 @@ function verifyCopy(verdict: FaceVerdict, reason: string) {
   }
 }
 
+/** Before the server has answered. Null reads as "not set", never as "off". */
+const UNKNOWN_CONSENT: ConsentState = {
+  currentVersion: TERMS_VERSION, termsAcceptedAt: null, termsVersion: null,
+  location: null, notifications: null, health: null, face: false, needsReconsent: false,
+}
+
+type ConsentRowData = { key: ConsentPurpose | 'face'; label: string; sub: string; on: boolean | null }
+
+/** One consent, one switch. Split out to keep ConsentPanel inside the budgets. */
+function ConsentRow({ row, last, busy, onChange }: {
+  row: ConsentRowData; last: boolean; busy: boolean; onChange: (v: boolean) => void
+}) {
+  const { t: theme } = useT()
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16,
+      borderBottomWidth: last ? 0 : 1, borderBottomColor: theme.border }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>{row.label}</Text>
+        <Text style={{ fontSize: 13, color: theme.textSub, marginTop: 2 }}>{row.sub}</Text>
+        {row.key === 'face' && row.on && (
+          <Text style={{ fontSize: 12, color: '#F59E0B', marginTop: 4 }}>{tr('consent_withdraw_face_warn')}</Text>
+        )}
+      </View>
+      {busy && <ActivityIndicator color="#7B6EF6" />}
+      {/* Null means never asked, which is not a state a switch can show
+          honestly — an off switch would imply they declined. */}
+      {!busy && row.on === null && (
+        <Text style={{ fontSize: 13, color: theme.textTertiary }}>{tr('consent_never_asked')}</Text>
+      )}
+      {!busy && row.on !== null && (
+        <Switch
+          value={!!row.on}
+          onValueChange={onChange}
+          // Face consent can only be withdrawn here; granting it happens on the
+          // screen that explains what the selfie is for.
+          disabled={row.key === 'face' && !row.on}
+          trackColor={{ true: '#7B6EF6', false: theme.border }}
+        />
+      )}
+    </View>
+  )
+}
+
+/**
+ * Privacy & data — what has been agreed to, and how to undo it.
+ *
+ * Art. 7(3): withdrawing consent must be as easy as giving it. So every switch
+ * here is a single tap, in the same place, with no confirmation maze — and
+ * turning one off is a real withdrawal that reaches the server, not a local
+ * preference that quietly keeps processing.
+ */
+function ConsentPanel({ onBack }: { onBack: () => void }) {
+  const { t: theme } = useT()
+  const [state, setState] = useState<ConsentState | null>(null)
+  const [busy, setBusy] = useState('')
+
+  const load = useCallback(() => {
+    if (!datingApi.authed()) return
+    datingApi.getConsent().then(setState).catch(() => {})
+  }, [])
+  useEffect(load, [load])
+
+  const setPurpose = async (purpose: ConsentPurpose, granted: boolean) => {
+    setBusy(purpose)
+    try {
+      await datingApi.setConsent(purpose, granted)
+      load()
+    } catch { /* leave the switch where it was; load() re-reads the truth */ }
+    setBusy('')
+  }
+
+  const withdrawFace = async () => {
+    setBusy('face')
+    try { await datingApi.withdrawFaceConsent(); load() } catch {}
+    setBusy('')
+  }
+
+  // One fallback object rather than a `?? null` per field: the "not yet loaded"
+  // and "never asked" cases render identically, so they can share a shape.
+  const c = state || UNKNOWN_CONSENT
+  const rows: ConsentRowData[] = [
+    { key: 'location', label: tr('consent_purpose_location'), sub: tr('consent_purpose_location_sub'), on: c.location },
+    { key: 'notifications', label: tr('consent_purpose_notifications'), sub: tr('consent_purpose_notifications_sub'), on: c.notifications },
+    { key: 'health', label: tr('consent_purpose_health'), sub: tr('consent_purpose_health_sub'), on: c.health },
+    { key: 'face', label: tr('consent_purpose_face'), sub: tr('consent_purpose_face_sub'), on: c.face },
+  ]
+
+  return (
+    <ScrollView style={[g.screen, { backgroundColor: theme.bg }]} contentContainerStyle={{ paddingBottom: 80 }}>
+      <View style={[g.stgHeader, { backgroundColor: theme.bg }]}>
+        <TouchableOpacity onPress={onBack} style={[g.stgBackBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}>
+          <Ionicons name="chevron-back" size={18} color="#7B6EF6" />
+        </TouchableOpacity>
+        <Text style={[g.stgHeaderTitle, { color: theme.text }]}>{tr('privacy_controls')}</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      {c.termsAcceptedAt && (
+        <Text style={{ fontSize: 13, color: theme.textSub, paddingHorizontal: 24, marginTop: 8 }}>
+          {tr('consent_given_on').replace('{date}', new Date(c.termsAcceptedAt).toLocaleDateString())}
+        </Text>
+      )}
+
+      <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 16 }]}>
+        {rows.map((r, i) => (
+          <ConsentRow key={r.key} row={r} last={i === rows.length - 1} busy={busy === r.key}
+            onChange={(v) => {
+              if (r.key === 'face') { if (!v) void withdrawFace(); return }
+              void setPurpose(r.key as ConsentPurpose, v)
+            }} />
+        ))}
+      </View>
+
+      <View style={{ paddingHorizontal: 24, marginTop: 22, gap: 14 }}>
+        <TouchableOpacity onPress={() => openLink(LEGAL_PRIVACY)}>
+          <Text style={{ fontSize: 15, color: '#7B6EF6', fontWeight: '700' }}>{tr('consent_read_policy')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => openLink(LEGAL_TERMS)}>
+          <Text style={{ fontSize: 15, color: '#7B6EF6', fontWeight: '700' }}>{tr('consent_read_terms')}</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  )
+}
+
 /** The capture stage. Split out to keep FaceVerify inside the lint budgets. */
 function FaceCamera({ camRef, gesture, onCapture, onCancel }: {
   camRef: React.RefObject<CameraView | null>; gesture: string; onCapture: () => void; onCancel: () => void
@@ -18765,7 +19141,7 @@ function FaceVerify({ onClose, onVerified }: { onClose: () => void; onVerified: 
 
 function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemories, onSignIn }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void; onToggleDark: () => void; onMemories: () => void; onSignIn?: () => void }) {
   const { t: theme, dark } = useT()
-  type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice' | 'profile'
+  type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice' | 'profile' | 'consent'
   const [panel, setPanel] = useState<Panel>(null)
   const [faceOpen, setFaceOpen] = useState(false)
   const [faceStatus, setFaceStatus] = useState<FaceStatus | null>(null)
@@ -19028,6 +19404,9 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   // ── Sub-screen: Voice ─────────────────────────────────────
   if (panel === 'voice') return <VoiceSettingsPanel profile={profile} onBack={back} onRefresh={onRefresh} />
 
+  // ── Sub-screen: Privacy & data ────────────────────────────
+  if (panel === 'consent') return <ConsentPanel onBack={back} />
+
   // ── Sub-screen: Photo verification ────────────────────────
   // Re-reads status on close so the badge appears without a manual refresh.
   if (faceOpen) return (
@@ -19218,6 +19597,10 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
         <StgRow icon="🔔" label={t('notifications')} iconBg="rgba(245,158,11,0.12)"
           value={profile.notifSettings?.enabled ? tr('on_label') : tr('off_label')} onPress={() => setPanel('notifications')} />
         <StgRow icon="🧠" label={t('soma_memories')} iconBg="rgba(16,185,129,0.12)" value={`${profile.memories.length} ${t('remembered')}`} onPress={onMemories} />
+        {/* Withdrawal has to be as easy as consent was to give (Art. 7(3)), so
+            this sits in the same list as everything else, not buried. */}
+        <StgRow icon="🛡" label={tr('privacy_controls')} iconBg="rgba(43,182,115,0.12)"
+          value={tr('privacy_controls_sub')} onPress={() => setPanel('consent')} />
         <StgRow icon="🔒" label={t('privacyPolicy')} iconBg="rgba(107,114,128,0.12)" value={tr('privacy_row_value')} onPress={() => openLink('https://mysoma.site/privacy.html')} last />
       </View>
 

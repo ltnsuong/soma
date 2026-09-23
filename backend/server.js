@@ -1,8 +1,6 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { readFileSync } from 'fs'
-import { fileURLToPath } from 'url'
 import crypto from 'crypto'
 import { pickNudge, NUDGE_VOICE } from './nudges.js'
 import { deriveDatingProfile } from './derive.js'
@@ -12,9 +10,7 @@ import {
   decideVerification, pickGesture, readImage, grantsBadge, isChallengeFresh, CHALLENGE_TTL_MS,
 } from './faceverify.js'
 import { compareFaces, isConfigured } from './facematch.js'
-import { dirname, join } from 'path'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
@@ -1184,6 +1180,106 @@ app.post('/verify/face', auth, async (req, res) => {
 })
 
 // Where do I stand?
+// ════════════════════════════════════════════════════════════
+// CONSENT
+// ════════════════════════════════════════════════════════════
+//
+// Art. 7(1) puts the burden of *demonstrating* consent on us, so these routes
+// record a version and a time, not a boolean. Two rules they exist to keep:
+//
+//   Consent is per purpose. There is no endpoint that sets everything at once,
+//   because a single "I agree to all of it" is the bundled consent regulators
+//   treat as no consent at all. Biometrics keep their own route entirely.
+//
+//   Withdrawing is as easy as giving. Every field here accepts false, over the
+//   same endpoint, with no extra step — Art. 7(3) requires that symmetry.
+
+/** Bump when the terms change materially; it is how we find who to re-ask. */
+const TERMS_VERSION = '2026-09-23'
+
+/**
+ * Shape one users row into the consent view.
+ *
+ * Null survives on purpose for the three purposes: it means "never asked",
+ * which is a different thing from "said no" and must not be re-prompted as if
+ * it were new. Only face collapses to a boolean, because its record is a
+ * timestamp rather than a tri-state.
+ */
+function consentView(row) {
+  const r = row || {}
+  return {
+    currentVersion: TERMS_VERSION,
+    termsAcceptedAt: r.terms_consent_at || null,
+    termsVersion: r.terms_version || null,
+    location: r.consent_location ?? null,
+    notifications: r.consent_notifications ?? null,
+    health: r.consent_health ?? null,
+    face: !!r.face_consent_at,
+    needsReconsent: !!r.terms_consent_at && r.terms_version !== TERMS_VERSION,
+  }
+}
+
+app.get('/consent', auth, async (req, res) => {
+  try {
+    const { data } = await supabase.from('users')
+      .select('terms_consent_at, terms_version, consent_location, consent_notifications, consent_health, face_consent_at')
+      .eq('id', req.user.userId).maybeSingle()
+    res.json(consentView(data))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Accept the terms. Records which version, so a later change can be detected.
+app.post('/consent/terms', auth, async (req, res) => {
+  try {
+    const { error } = await supabase.from('users').update({
+      terms_consent_at: new Date().toISOString(),
+      terms_version: TERMS_VERSION,
+    }).eq('id', req.user.userId)
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ ok: true, version: TERMS_VERSION })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Set one purpose. `granted: false` is a withdrawal and is equally valid here.
+app.post('/consent/purpose', auth, async (req, res) => {
+  try {
+    const { purpose, granted } = req.body || {}
+    const column = { location: 'consent_location', notifications: 'consent_notifications', health: 'consent_health' }[purpose]
+    // Face verification is not settable here on purpose: Art. 9 needs its own
+    // specific yes, given on the screen that explains what happens to the selfie.
+    if (!column) return res.status(400).json({ error: 'unknown_purpose' })
+    if (typeof granted !== 'boolean') return res.status(400).json({ error: 'granted_must_be_boolean' })
+
+    const { error } = await supabase.from('users')
+      .update({ [column]: granted, consent_updated_at: new Date().toISOString() })
+      .eq('id', req.user.userId)
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ ok: true, purpose, granted })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Withdraw biometric consent. Clears the badge too: the badge exists because
+// of a comparison the user has now told us not to make.
+app.post('/consent/face/withdraw', auth, async (req, res) => {
+  try {
+    await Promise.all([
+      supabase.from('users').update({ face_consent_at: null }).eq('id', req.user.userId),
+      supabase.from('dating_profiles').update({
+        photo_verified: false, photo_verified_at: null, verified_photo_hash: null,
+      }).eq('user_id', req.user.userId),
+    ])
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.get('/verify/face/status', auth, async (req, res) => {
   try {
     const [{ data: profile }, { data: last }] = await Promise.all([
@@ -1965,10 +2061,15 @@ app.get('/users/find', async (req, res) => {
 })
 
 // Privacy policy
-app.get('/privacy', (req, res) => {
-  res.setHeader('Content-Type', 'text/html')
-  res.send(readFileSync(join(__dirname, 'privacy.html'), 'utf8'))
-})
+// One canonical privacy policy, at web/privacy.html, served by Vercel.
+//
+// This used to serve its own copy from backend/privacy.html, and the two drifted:
+// the backend copy still claimed "We never store your conversation content on our
+// servers" long after `profiles` grew memories, diary and circle columns. A policy
+// that describes the wrong product is worse than no policy, so there is now one
+// document and this redirects to it rather than keeping a second one in sync.
+app.get('/privacy', (req, res) => res.redirect(301, 'https://mysoma.site/privacy.html'))
+app.get('/terms', (req, res) => res.redirect(301, 'https://mysoma.site/terms.html'))
 
 // HEALTH (also serves "/" for Railway/uptime root checks)
 // ════════════════════════════════════════════════════════════
