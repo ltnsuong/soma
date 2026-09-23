@@ -149,14 +149,25 @@ data, the policy is part of the change, not follow-up work.
 It is how re-consent is detected when the terms change materially: `/consent` returns
 `needsReconsent` when the stored version differs from the current one.
 
-**EAS never sees `.env`.** `.gitignore` has `.env*`, and EAS Build uploads the project
-respecting gitignore — so every `EXPO_PUBLIC_*` read at build time was empty and
-`BACKEND_URL` fell back to its `'http://localhost:3000'` default. A production build made that
-way installs, launches, and then every network call fails: no sign-in, no matching, no Soma.
-It looks like a backend outage, not a build problem. The public values now live in
-`eas.json` under `build.<profile>.env`, which is committed and cannot be forgotten. They are
-public by construction — `EXPO_PUBLIC_*` is inlined into the binary — so this is not a place
-for secrets, and `EXPO_PUBLIC_AI_KEY` is deliberately absent from it.
+**`.env` never reaches EAS, and the two build profiles were configured differently.**
+`.gitignore` has `.env*` and EAS Build uploads the project respecting gitignore, so nothing in
+`.env` is available at build time. What fills the gap is **EAS environment variables**, set
+server-side (`eas env:list --environment production`). Production had `EXPO_PUBLIC_BACKEND_URL`
+there and built correctly; **preview had only `AI_KEY` and `AI_PROVIDER`**, so a preview build
+fell back to `'http://localhost:3000'` and every network call in it failed — an app that
+installs, launches and then does nothing, which reads as a backend outage rather than a build
+problem. The public values now also live in `eas.json` under `build.<profile>.env`, which is
+committed and reviewable; when both exist the `eas.json` values win.
+
+**`eas.json` rejects empty-string env values.** `"EXPO_PUBLIC_RC_IOS_KEY": ""` fails
+validation and takes down every `eas` command, `build:list` included, with `is not allowed to
+be empty`. To leave a variable unset, omit the key — `App.tsx` reads it as
+`process.env.X ?? ''`, so absent and empty behave identically.
+
+**`EXPO_PUBLIC_AI_KEY` is still configured on EAS** (production and preview), holding the real
+Groq key. It is referenced nowhere in source, so nothing inlines it today — but the invariant
+above exists because a single reference is enough to bake it into every binary. It should be
+deleted from EAS rather than left as a loaded gun.
 
 **A Test Store RevenueCat key disables subscriptions in a release build.** `RC_USABLE` is
 `!!RC_KEY && !(RC_IS_TEST_KEY && !__DEV__)`, so a `test_` key means `purchaseApi.configured()`
