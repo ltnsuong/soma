@@ -30,11 +30,18 @@ npm run cycles        # dependency-cruiser — circular imports must stay 0
 npm run deadcode      # knip
 ```
 
-Deploy web — **all four steps, in order**:
+Deploy web — **`npm run deploy:web`, and nothing else**:
 
 ```bash
-cd ~/soma && npx expo export -p web && bash scripts/postbuild-web.sh && npx vercel build --prod && npx vercel deploy --prebuilt --prod
+cd ~/soma && npm run deploy:web
 ```
+
+That wraps the four required steps and then verifies the result. Running a
+subset has taken the site down three times: Vercel serves the repo instead of
+the build, so `mysoma.site` returns the raw text of `index.ts` with a 200 and
+`privacy.html`/`terms.html` 404. A 200 on the root is therefore not proof of
+anything — the script checks the body is actually HTML. A missing privacy
+policy is an App Store rejection, not just a broken page.
 
 Both deploys have a trap that looks like something else:
 

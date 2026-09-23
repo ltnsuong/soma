@@ -57,7 +57,8 @@
     "test": "vitest run",
     "verify": "node scripts/quality-gate.mjs",
     "verify:accept": "node scripts/quality-gate.mjs --accept",
-    "cycles:graph": "depcruise --output-type dot App.tsx index.ts src | dot -T svg > dependency-graph.svg"
+    "cycles:graph": "depcruise --output-type dot App.tsx index.ts src | dot -T svg > dependency-graph.svg",
+    "deploy:web": "bash scripts/deploy-web.sh"
   },
   "private": true
 }
