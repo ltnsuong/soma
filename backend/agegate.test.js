@@ -158,3 +158,27 @@ describe('the shipped threshold', () => {
     expect(ADULT_AGE).toBe(17)
   })
 })
+
+describe('a code lookup is not the matching engine', () => {
+  // Regression: applying canSee() symmetrically to /users/find meant an
+  // anonymous scanner (no band) could reach nobody, so every QR scan answered
+  // "no one in SOMA has this code" — including for a plainly adult account.
+  // Scanning before signing up is the normal way that feature is used.
+  //
+  // The rule the route implements: an anonymous caller sees known adults and
+  // nothing else. These pin the halves of it that live in this module.
+  it('still refuses to surface a minor to a bandless caller', () => {
+    expect(canSee(UNKNOWN, MINOR)).toBe(false)
+    expect(bandOfFlag(true)).toBe(MINOR)
+  })
+
+  it('identifies an adult target from a real adult_at date', () => {
+    // What the route compares against ADULT for an anonymous caller.
+    expect(bandOf('2014-09-23', on('2026-09-24'))).toBe(ADULT)
+  })
+
+  it('leaves an ageless account unidentifiable, so it stays hidden', () => {
+    expect(bandOf(null, TODAY)).toBe(UNKNOWN)
+    expect(UNKNOWN).not.toBe(ADULT)
+  })
+})

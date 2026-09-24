@@ -13,7 +13,7 @@ import { compareFaces, isConfigured } from './facematch.js'
 import { planRetry } from './airetry.js'
 import {
   adultDateFrom, bandOf, bandOfFlag, canSee, coerceConnectionType,
-  allowedConnectionTypes, ADULT_AGE, MINOR, UNKNOWN,
+  allowedConnectionTypes, ADULT_AGE, ADULT, MINOR, UNKNOWN,
 } from './agegate.js'
 
 import { createClient } from '@supabase/supabase-js'
@@ -2307,8 +2307,22 @@ app.get('/users/find', optionalAuth, async (req, res) => {
     // A code lookup is still a way to reach a person, so the band applies here
     // too — otherwise sharing a code around a school would route straight past
     // the separation everywhere else enforces.
-    const myBand = req.user ? await bandForUser(req.user.userId) : UNKNOWN
-    const reachable = users.filter(u => canSee(myBand, bandOf(u.adult_at)))
+    // A code lookup is not the matching engine. Someone has physically handed
+    // over a six-character code, and the scanner is often not signed in yet —
+    // scanning before you have an account is the normal way this feature is
+    // used. Requiring a band on both sides broke that completely: an anonymous
+    // caller has no band, canSee(UNKNOWN, …) is false, and every scan answered
+    // "no one in SOMA has this code".
+    //
+    // The asymmetry is what matters. Surfacing a MINOR to an anonymous caller
+    // is the harm worth preventing, so that stays closed. Surfacing an adult to
+    // someone holding their code is the entire point of the feature.
+    const myBand = req.user ? await bandForUser(req.user.userId) : null
+    const reachable = users.filter(u => {
+      const theirBand = bandOf(u.adult_at)
+      if (myBand === null) return theirBand === ADULT
+      return canSee(myBand, theirBand)
+    })
     if (!reachable.length) return res.status(404).json({ error: 'No user found' })
 
     const byUser = {}

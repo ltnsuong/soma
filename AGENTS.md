@@ -123,6 +123,14 @@ tempting alternative — treat unknown as adult so the feed is not empty — is 
 14-year-old in an adult's feed the first time a write fails. An empty list is recoverable; the
 other direction is not. `agegate.test.js` pins this.
 
+**A code lookup is not the matching engine.** `/users/find` applies the band rule
+asymmetrically on purpose: an anonymous caller — no band — may reach known adults and nobody
+else. Applying `canSee()` symmetrically there broke QR scanning outright, because
+`canSee(UNKNOWN, …)` is false, so every scan answered "no one in SOMA has this code" including
+for plainly adult accounts. Scanning before you have an account is the normal way that feature
+is used. The half that must not move is the other direction: a minor is never surfaced to a
+bandless caller.
+
 **`users.adult_at` is the only source of a band.** `dating_profiles.is_minor` exists so the
 nearby RPC can filter without a join. Reading it anywhere else is a bug that has already
 happened once: accounts with an age but no connection profile read as UNKNOWN and disappeared
