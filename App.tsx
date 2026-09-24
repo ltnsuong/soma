@@ -4451,10 +4451,17 @@ export default function App() {
         setScreen('verifyemail')
         return
       }
-      // Check for add-to-circle invite link: ?add=CODE
-      const addCode = params.get('add')
-      if (addCode) {
-        setPendingAddCode(addCode)
+      // Connect link: ?add=CODE[&for=intent]. This is the same payload the
+      // in-app scanner reads, and it arrives here whenever someone scans the QR
+      // with their phone's own camera app rather than inside SOMA — which is how
+      // most people scan a QR at all.
+      //
+      // Parsed with codeFromScan rather than params.get('add') so both routes
+      // agree: it validates the shape and normalises case, where the raw read
+      // would happily carry "notacode" or a foreign site's ?add= into a lookup.
+      const target = codeFromScan(window.location.href)
+      if (target) {
+        setPendingAddCode(target.code)
         window.history.replaceState({}, '', window.location.pathname)
       }
     }
