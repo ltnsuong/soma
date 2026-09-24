@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build:web",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/:filename",

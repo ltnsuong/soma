@@ -30,6 +30,15 @@ npm run cycles        # dependency-cruiser — circular imports must stay 0
 npm run deadcode      # knip
 ```
 
+**A deploy without `--prebuilt` can no longer take the site down.** `vercel.json` now sets
+`buildCommand` and `outputDirectory`, which does NOT make a source build work — `.vercelignore`
+excludes `*.png` and `scripts/`, so Vercel has neither `assets/icon.png` nor
+`postbuild-web.sh` and the build fails on the icon. That is the point. Without those two keys
+Vercel treated the repo root as the site and served `index.ts` as text with a 200 while the
+legal pages 404'd; with them the deploy errors, production is left on the last good
+deployment, and the site stays up. A loud no-op instead of a silent outage. `.vercelignore`
+does not apply to `--prebuilt` uploads, so the supported path is unaffected.
+
 Deploy web — **`npm run deploy:web`, and nothing else**:
 
 ```bash
