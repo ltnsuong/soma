@@ -8300,7 +8300,14 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
   // ─── Chat view ───
   if (openChat) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      // KeyboardAvoidingView, not a plain View: the composer sits at the bottom
+      // of a flex column, so without this iOS puts the keyboard straight over
+      // it — you could see the conversation and type blind, but not the field
+      // you were typing into. Android resizes the window itself, hence 'height'.
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: theme.bg }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: HEADER_TOP, paddingBottom: 12, borderBottomWidth: 0.5, borderBottomColor: theme.border, backgroundColor: theme.bg }}>
           <TouchableOpacity onPress={closeChat} style={{ padding: 4 }}>
@@ -8554,7 +8561,7 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
             </View>
           </View>
         )}
-      </View>
+      </KeyboardAvoidingView>
     )
   }
 
