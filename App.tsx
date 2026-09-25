@@ -4774,7 +4774,7 @@ export default function App() {
     if (screen === 'insights')    return <Insights profile={profile} onBack={() => go('home')} />
     if (screen === 'relinsights') return <RelationshipInsights profile={profile} onBack={() => go('circle')} onRefresh={refresh} onStartJourney={(id) => { setBondPersonId(id); go('bondjourney') }} />
     if (screen === 'checkin')     return <DailyCheckinScreen profile={profile} onDone={() => { refresh(); go('home') }} onBack={() => go('home')} />
-    if (screen === 'settings')    return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('language') }} onToggleDark={() => { DB.setDarkMode(!dark); refresh() }} onMemories={() => go('memories')} onSignIn={() => go('login')} />
+    if (screen === 'settings')    return <Settings profile={profile} onBack={() => go('home')} onRefresh={refresh} onReset={() => { DB.reset(); go('language') }} onToggleDark={() => { DB.setDarkMode(!dark); refresh() }} onMemories={() => go('memories')} onSignIn={() => go('login')} onSignOut={() => { auth.clearTokens(); DB.reset(); go('language') }} />
     if (screen === 'gratitude')   return <ThankfulDiary profile={profile} onBack={() => go('home')} onRefresh={refresh} />
     if (screen === 'loveyourself')return <LoveYourself profile={profile} onBack={() => go('home')} onRefresh={refresh} />
     if (screen === 'medication')    return <MedicationTracker profile={profile} onBack={() => go('healthhub')} onRefresh={refresh} />
@@ -19420,7 +19420,7 @@ function FaceVerify({ onClose, onVerified }: { onClose: () => void; onVerified: 
   return <FaceIntro consent={consent} onToggle={() => setConsent(c => !c)} error={error} onStart={begin} onClose={onClose} />
 }
 
-function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemories, onSignIn }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void; onToggleDark: () => void; onMemories: () => void; onSignIn?: () => void }) {
+function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemories, onSignIn, onSignOut }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void; onToggleDark: () => void; onMemories: () => void; onSignIn?: () => void; onSignOut?: () => void }) {
   const { t: theme, dark } = useT()
   type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice' | 'profile' | 'consent'
   const [panel, setPanel] = useState<Panel>(null)
@@ -19950,7 +19950,21 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
       <Text style={[g.stgSec, { color: theme.textSub }]}>{t('account')}</Text>
       <View style={[g.stgGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {auth.getToken() ? (
-          <StgRow icon="🚪" label={t('signOut')} value="Signed in" iconBg="rgba(107,114,128,0.12)" onPress={() => { auth.clearTokens(); onSignIn?.() }} />
+          <StgRow icon="🚪" label={t('signOut')} value="Signed in" iconBg="rgba(107,114,128,0.12)"
+            onPress={async () => {
+              // Push before anything is cleared. The sync is debounced by four
+              // seconds, so a diary entry written just now may still be local
+              // only — and the next step throws the local copy away. This needs
+              // the token, so it has to run before clearTokens().
+              try { await cloudSync.push() } catch { /* offline: the server copy is simply older */ }
+              // Sign out returns to the language screen, not the login form, so
+              // the next person on this phone starts clean rather than looking
+              // at the previous user's name and diary. DB.reset() replaces the
+              // whole profile, which drops languageChosen and onboarding — the
+              // two flags the startup gate routes on. Nothing is lost that the
+              // account cannot restore: signing back in pulls it all down again.
+              onSignOut?.()
+            }} />
         ) : (
           <StgRow icon="🔑" label={t('signIn')} value="Save your data & meet people" iconBg="rgba(123,110,246,0.12)" onPress={onSignIn} />
         )}
