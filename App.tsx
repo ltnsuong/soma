@@ -11,7 +11,7 @@ import * as Font from 'expo-font'
 import * as WebBrowser from 'expo-web-browser'
 import * as ImagePicker from 'expo-image-picker'
 import * as AppleAuthentication from 'expo-apple-authentication'
-import { AudioModule, RecordingPresets, useAudioRecorder } from 'expo-audio'
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio'
 import * as Google from 'expo-auth-session/providers/google'
 import * as Notifications from 'expo-notifications'
 import * as Location from 'expo-location'
@@ -3801,6 +3801,12 @@ function listenNative(
   const run = async () => {
     const perm = await AudioModule.requestRecordingPermissionsAsync()
     if (!perm.granted) { alert('SOMA needs the microphone to hear you.'); onEnd(); return }
+    // iOS defaults allowsRecording to FALSE, so the audio session is not in a
+    // recording category and record() captures nothing — permission granted,
+    // no error, no audio. This was the mic "not working" on a real iPhone;
+    // the simulator never showed it. playsInSilentMode matters too, or Soma's
+    // spoken replies are silent whenever the ring switch is off.
+    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
     await recorder.prepareToRecordAsync()
     recorder.record()
     onInterim?.('Listening…')
@@ -3824,6 +3830,9 @@ function listenNative(
       } catch (e) {
         console.warn('[voice] native capture failed:', e instanceof Error ? e.message : e)
       } finally {
+        // Leave the recording category. Staying in it makes iOS route playback
+        // quietly, so Soma's reply would be near-inaudible after every answer.
+        try { await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }) } catch { /* playback still works, just quieter */ }
         onEnd()
       }
     })()
