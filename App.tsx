@@ -2836,6 +2836,33 @@ function detectCrisis(text: string): boolean {
 const appleFullName = (n?: { givenName?: string | null; familyName?: string | null } | null): string =>
   `${n?.givenName ?? ''} ${n?.familyName ?? ''}`.trim()
 
+/**
+ * What to tell someone when Sign in with Apple fails.
+ *
+ * Apple's own message is a Swift exception — a real user saw
+ * "RequestUnknownException: The authorization attempt failed for an unknown
+ * reason (at ExpoAppleAuthentication/AppleAuthenticationExceptions.swift:61)"
+ * in an alert. That is a stack trace, not a sentence, and it tells them
+ * nothing they can act on.
+ *
+ * ERR_REQUEST_UNKNOWN is Apple's catch-all and is almost always the device
+ * rather than the app: not signed into iCloud, or an Apple ID without
+ * two-factor, which Sign in with Apple requires. So the message names the two
+ * things worth checking, and the real code still goes to the log for us.
+ */
+const APPLE_MESSAGES: Record<string, string> = {
+  // Apple's catch-all codes. Both mean "ask about the device", not "retry".
+  ERR_REQUEST_UNKNOWN: 'Apple could not complete the sign-in.\n\nCheck that you are signed into iCloud on this device, and that your Apple ID has two-factor authentication turned on — Sign in with Apple needs both.\n\nYou can also use email or Telegram.',
+  ERR_REQUEST_NOT_HANDLED: 'Apple could not complete the sign-in.\n\nCheck that you are signed into iCloud on this device, and that your Apple ID has two-factor authentication turned on — Sign in with Apple needs both.\n\nYou can also use email or Telegram.',
+  ERR_REQUEST_NOT_INTERACTIVE: 'Apple sign-in could not open. Try again.',
+}
+
+function appleSignInMessage(e: any): string {
+  const code = typeof e?.code === 'string' ? e.code : ''
+  console.warn('[apple] sign-in failed:', code || 'no code', e?.message || e)
+  return APPLE_MESSAGES[code] || 'Apple sign-in did not work. You can use email or Telegram instead.'
+}
+
 async function signInWithApple(): Promise<{ accessToken: string; refreshToken: string; name: string } | null> {
   const cred = await AppleAuthentication.signInAsync({
     requestedScopes: [
@@ -6784,7 +6811,7 @@ function Register({ onDone, onSignIn }: { onDone: (name: string) => void; onSign
                 onDone(r.name)
               } catch (e: any) {
                 // The user cancelling is not an error worth shouting about.
-                if (e?.code !== 'ERR_REQUEST_CANCELED') alert(e?.message || 'Apple sign-in failed')
+                if (e?.code !== 'ERR_REQUEST_CANCELED') alert(appleSignInMessage(e))
               }
             }}
           />
@@ -7042,7 +7069,7 @@ function LoginScreen({ onDone, onRegister, onForgot }: { onDone: (name: string) 
                 onDone(r.name)
               } catch (e: any) {
                 // The user cancelling is not an error worth shouting about.
-                if (e?.code !== 'ERR_REQUEST_CANCELED') alert(e?.message || 'Apple sign-in failed')
+                if (e?.code !== 'ERR_REQUEST_CANCELED') alert(appleSignInMessage(e))
               }
             }}
           />
