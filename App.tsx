@@ -4311,7 +4311,7 @@ function NotifInbox({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
   )
 }
 
-type Screen = 'splash' | 'language' | 'onboarding' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'synergy' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'forgotpassword' | 'resetpassword' | 'verifyemail' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy' | 'healthhub' | 'moodanalytics' | 'breathing' | 'memories' | 'asksoma' | 'timeline' | 'bondjourney' | 'relinsights' | 'checkin' | 'notifs'
+type Screen = 'splash' | 'language' | 'agecheck' | 'onboarding' | 'try' | 'register' | 'home' | 'aura' | 'diary' | 'circle' | 'lifebalance' | 'meetpeople' | 'myprofile' | 'synergy' | 'connections' | 'likedyou' | 'diaryhistory' | 'insights' | 'settings' | 'login' | 'forgotpassword' | 'resetpassword' | 'verifyemail' | 'gratitude' | 'loveyourself' | 'medication' | 'therapy' | 'healthhub' | 'moodanalytics' | 'breathing' | 'memories' | 'asksoma' | 'timeline' | 'bondjourney' | 'relinsights' | 'checkin' | 'notifs'
 
 // ════════════════════════════════════════════════════════════
 //  ROOT
@@ -4548,7 +4548,17 @@ export default function App() {
         // is almost always a returning user on a fresh device or cleared browser —
         // sending them to onboarding locks them out of an account they already have.
         const needsOnboarding = !DB.onboardingDone() && !auth.getToken()
-        setScreen(!p.languageChosen ? 'language' : needsOnboarding ? 'onboarding' : 'home')
+        // Accounts that predate the age gate have no adultAt, which makes their
+        // band UNKNOWN — and UNKNOWN is invisible to everyone by design. That
+        // silently hid 22 of 25 real users from each other. They were never
+        // asked, so ask them, rather than guessing an age or failing open.
+        const needsAge = !!auth.getToken() && !p.adultAt
+        setScreen(
+          !p.languageChosen ? 'language'
+          : needsOnboarding ? 'onboarding'
+          : needsAge ? 'agecheck'
+          : 'home',
+        )
       })
     }, 1900)
     return () => clearTimeout(t)
@@ -4763,6 +4773,9 @@ export default function App() {
     if (screen === 'notifs') return <NotifInbox onBack={() => { setNotifBadge(0); go('home') }} onNavigate={(s) => go(s as Screen)} />
     if (screen === 'splash')      return <Splash />
     if (screen === 'language')    return <LanguageSelect onDone={() => go('onboarding')} />
+    // Asked once, of people who already had an account when the age gate
+    // shipped. Answering makes them visible again; the same screen onboarding uses.
+    if (screen === 'agecheck')    return <AgeGate onDone={(adultAt, minor) => { DB.setAdultAt(adultAt, minor); void cloudSync.pushAge(); go('home') }} />
     if (screen === 'onboarding')  return <Onboarding onDone={() => { go('home') }} onBrowse={() => go('meetpeople')} onSignIn={() => go('login')} />
     if (screen === 'try')         return <SomaChat mode="try" profile={profile} onRefresh={refresh} onDone={() => go('register')} title="Meet Soma" autoStart={fromOnboarding} />
     if (screen === 'register')    return (
