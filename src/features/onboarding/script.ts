@@ -147,22 +147,27 @@ export const BEATS: Beat[] = [
 /**
  * Domains we want covered before the conversation can end early.
  *
- * Five, not seven. Soma needs enough to derive a profile worth showing, not a
- * complete life audit before the user has agreed to anything. The other five
- * domains fill in through ordinary use, which is the product's whole premise —
- * asking for all of them up front contradicts it and made the first
+ * Four, down from seven and then five. Soma needs enough to derive a profile
+ * worth showing, not a complete life audit before the user has agreed to
+ * anything. The rest fill in through ordinary use, which is the product's whole
+ * premise — asking for all of them up front contradicts it and made the first
  * conversation feel like a questionnaire, which is exactly what it exists to
- * replace.
+ * replace. Users still called it too long at five, hence four.
  */
-export const TARGET_DOMAINS = 5
+export const TARGET_DOMAINS = 4
 /**
  * Hard ceiling. Someone who gives short answers still gets out in time.
  *
- * Eight, not twelve. Twelve exchanges with a stranger before you have an
- * account is a lot to ask, and the last few added the least: by then the rich
- * beats have already been asked and what remains is the filling-in.
+ * Five, not eight, and not the original twelve. Users said the first
+ * conversation was "not interesting and too long", and the tail is where that
+ * is earned: by exchange six the rich beats have all been asked and what is
+ * left is filling in, which is precisely what ordinary use is for.
+ *
+ * Cutting this trades profile completeness for the chance that someone reaches
+ * the app at all. An incomplete profile improves every time they talk to Soma;
+ * an abandoned onboarding never does.
  */
-export const MAX_EXCHANGES = 8
+export const MAX_EXCHANGES = 5
 
 /**
  * Facts that only a direct question will ever produce.

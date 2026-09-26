@@ -461,6 +461,7 @@ const STRINGS: Record<string, Record<string, string>> = {
     age_title: 'How old are you?',
     age_why: 'SOMA works differently under 17 — you can meet people as friends, and the dating side stays closed. We ask once.',
     age_day: 'Day', age_month: 'Month', age_year: 'Year',
+    age_inline_why: 'Your date of birth — SOMA works differently under 17.',
     age_continue: 'Continue →',
     age_invalid: "That date doesn't look right. Check it and try again.",
     age_minor_title: 'You\'re all set',
@@ -5123,9 +5124,84 @@ const LEGAL_TERMS = 'https://mysoma.site/terms.html'
  * message reaches Groq the moment it is sent, account or no account. Explaining
  * that afterwards is not informing anyone.
  */
-function ConsentGate({ onAgree, onDecline }: { onAgree: () => void; onDecline: () => void }) {
+const DIM_WHITE = 'rgba(255,255,255,0.45)'
+
+/** Day / month / year, in one row. Split out to keep ConsentGate in budget. */
+function BirthDateFields({ d, m, y, setD, setM, setY, bad, onEdit }: {
+  d: string; m: string; y: string
+  setD: (v: string) => void; setM: (v: string) => void; setY: (v: string) => void
+  bad: boolean; onEdit: () => void
+}) {
+  const fields = [
+    { val: d, set: setD, label: tr('age_day'), len: 2, flex: 1 },
+    { val: m, set: setM, label: tr('age_month'), len: 2, flex: 1 },
+    { val: y, set: setY, label: tr('age_year'), len: 4, flex: 1.6 },
+  ]
+  return (
+    <>
+      <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 19 }}>{tr('age_inline_why')}</Text>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {fields.map(f => (
+          <View key={f.label} style={{ flex: f.flex }}>
+            <Text style={{ fontSize: 11, color: DIM_WHITE, marginBottom: 5, fontWeight: '700' }}>{f.label}</Text>
+            <TextInput
+              value={f.val}
+              onChangeText={(v) => { f.set(v.replace(/[^0-9]/g, '').slice(0, f.len)); onEdit() }}
+              keyboardType="number-pad"
+              placeholder={'—'.repeat(f.len)}
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, paddingVertical: 13,
+                paddingHorizontal: 12, color: '#fff', fontSize: 17, fontWeight: '800', textAlign: 'center',
+                borderWidth: 1.5, borderColor: bad ? '#FF6B6B' : 'rgba(255,255,255,0.12)',
+              }}
+            />
+          </View>
+        ))}
+      </View>
+      {bad && <Text style={{ fontSize: 13, color: '#FF6B6B' }}>{tr('age_invalid')}</Text>}
+    </>
+  )
+}
+
+function ConsentGate({ onAgree, onDecline }: { onAgree: (adultAt: string, minor: boolean) => void; onDecline: () => void }) {
   const [agreed, setAgreed] = useState(false)
   const [nudge, setNudge] = useState(false)
+  // Age asked here rather than on its own screen. Users called onboarding "too
+  // long"; a separate screen for three number fields was the cheapest step to
+  // remove, and nothing legal depends on them being apart — age is not consent,
+  // they merely share a surface.
+  const [d, setD] = useState('')
+  const [m, setM] = useState('')
+  const [y, setY] = useState('')
+  const [badDate, setBadDate] = useState(false)
+  const [minorNotice, setMinorNotice] = useState<string | null>(null)
+
+  const submit = () => {
+    if (!agreed) { setNudge(true); return }
+    const adultAt = adultDateFrom(Number(y), Number(m), Number(d))
+    if (!adultAt) { setBadDate(true); return }
+    const iso = adultAt.toISOString().slice(0, 10)
+    if (isMinorOn(iso)) { setMinorNotice(iso); return }
+    onAgree(iso, false)
+  }
+
+  if (minorNotice) return (
+    <View style={{ flex: 1, backgroundColor: '#0E0E1C', padding: 28, justifyContent: 'center' }}>
+      <Text style={{ fontSize: 46, textAlign: 'center', marginBottom: 20 }}>👋</Text>
+      <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', textAlign: 'center', marginBottom: 14 }}>
+        {tr('age_minor_title')}
+      </Text>
+      <Text style={{ fontSize: 15.5, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 24, marginBottom: 34 }}>
+        {tr('age_minor_body')}
+      </Text>
+      <TouchableOpacity
+        onPress={() => onAgree(minorNotice, true)}
+        style={{ backgroundColor: '#7B6EF6', borderRadius: 18, paddingVertical: 18, alignItems: 'center' }}>
+        <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>{tr('age_minor_ok')}</Text>
+      </TouchableOpacity>
+    </View>
+  )
 
   const sections: { title: string; body: string }[] = [
     { title: tr('consent_keep_title'), body: tr('consent_keep_body') },
@@ -5189,8 +5265,13 @@ function ConsentGate({ onAgree, onDecline }: { onAgree: () => void; onDecline: (
           <Text style={{ fontSize: 13, color: '#FF6B6B' }}>{tr('consent_must_agree')}</Text>
         )}
 
+        {/* Age, on the same screen. The separate screen this replaces carried
+            the same content and cost a whole extra step. */}
+        <BirthDateFields d={d} m={m} y={y} setD={setD} setM={setM} setY={setY}
+          bad={badDate} onEdit={() => setBadDate(false)} />
+
         <TouchableOpacity
-          onPress={() => (agreed ? onAgree() : setNudge(true))}
+          onPress={submit}
           style={{
             backgroundColor: agreed ? '#7B6EF6' : 'rgba(255,255,255,0.12)',
             borderRadius: 18, paddingVertical: 18, alignItems: 'center',
@@ -5814,18 +5895,9 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
   // better UX and what makes each one specific enough to be valid.
   if (phase === 8) return (
     <ConsentGate
-      onAgree={() => { DB.acceptTerms(TERMS_VERSION); setPhase(11) }}
+      onAgree={(adultAt, minor) => { DB.acceptTerms(TERMS_VERSION); DB.setAdultAt(adultAt, minor); setPhase(9) }}
       onDecline={() => setPhase(0)}
     />
-  )
-
-  // Phase 11 — age, before any processing begins
-  //
-  // Asked here rather than at signup because under-16s (13–16, depending on
-  // the member state) need a parental-consent route before their data is
-  // processed at all, and the conversation is processing.
-  if (phase === 11) return (
-    <AgeGate onDone={(adultAt, minor) => { DB.setAdultAt(adultAt, minor); setPhase(9) }} />
   )
 
   // Phase 9 — conversation with Soma
