@@ -7661,41 +7661,6 @@ function getRomanticPartner(profile: UserProfile) {
 }
 
 // Demo feed posts generated from circle member data
-function getCircleFeedPosts(circle: CirclePerson[]): Array<{ id: string; authorId: string; authorName: string; relationship: string; type: string; text: string; postedAt: string; reactions: { emoji: string; count: number }[]; myReaction?: string }> {
-  const templates = [
-    { type: 'friend',   texts: ["Just got back from a long walk — sometimes that's all you need 🌿", "Coffee hit different this morning ☕ Grateful for slow mornings.", "Can't stop thinking about that conversation we had last week. You always make me think.", "Good news: the thing I was nervous about went really well 🙌", "Reading a book that's genuinely changing how I see things. Will share when I'm done."] },
-    { type: 'family',   texts: ["Made grandma's recipe tonight. Turned out exactly right. Miss her.", "Had the best Sunday lunch with the whole crew 🥰", "Little moments at home are everything lately.", "Cleaned the whole house, feeling weirdly proud of myself lol", "Just realized how fast time is moving. Trying to slow down and notice more."] },
-    { type: 'romantic', texts: ["The simplest days with you feel like the best ones 💜", "Morning walks > everything. Especially when you're there.", "I think I finally feel settled. Like, truly settled.", "Making dinner tonight — trying that new recipe. Fingers crossed 🤞", "Watched the sunset from the balcony. Perfect."] },
-    { type: 'work',     texts: ["Wrapped a project that took forever. Finally exhaling.", "Best team meeting I've had in months — people really showed up.", "Remember to rest, not just recharge. Big difference.", "Crossed something big off my list today. Small wins matter.", "Got some feedback that actually helped instead of just landing hard."] },
-    { type: 'default',  texts: ["Feeling good today. Hope you are too 🌸", "Some days just click, you know?", "Grateful for the people I get to trust. That's rare.", "Taking it one step at a time. It's working.", "Checked in with myself today. Highly recommend."] },
-  ]
-  const reactionSets = [
-    [{ emoji: '❤️', count: 3 }, { emoji: '🙌', count: 1 }],
-    [{ emoji: '😊', count: 2 }],
-    [{ emoji: '❤️', count: 5 }, { emoji: '😂', count: 2 }, { emoji: '🙌', count: 1 }],
-    [{ emoji: '🔥', count: 1 }, { emoji: '❤️', count: 4 }],
-    [{ emoji: '😊', count: 3 }, { emoji: '🥰', count: 2 }],
-  ]
-  const now = Date.now()
-  const posts: ReturnType<typeof getCircleFeedPosts> = []
-  circle.slice(0, 8).forEach((person, idx) => {
-    const bucket = templates.find(t => t.type === person.type) || templates[4]
-    const text = bucket.texts[idx % bucket.texts.length]
-    const hoursAgo = [1, 3, 6, 10, 14, 20, 26, 34][idx] || 48
-    posts.push({
-      id: `feed_${person.id}`,
-      authorId: person.id,
-      authorName: person.name,
-      relationship: person.relationship || person.type,
-      type: 'text',
-      text,
-      postedAt: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
-      reactions: reactionSets[idx % reactionSets.length],
-    })
-  })
-  return posts.sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime())
-}
-
 function fmtAgo(iso: string) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000
   if (diff < 60) return 'just now'
@@ -7769,8 +7734,13 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
     setReacted(prev => prev[postId] === emoji ? { ...prev, [postId]: '' } : { ...prev, [postId]: emoji })
   }
 
-  const demoPosts = profile.circle.length > 0 ? getCircleFeedPosts(profile.circle) : []
-  const allFeedPosts = [...myPosts.map(p => ({ ...p, authorId: 'me', authorName: profile.name || 'You', relationship: 'You', type: 'text' as const, mediaUrl: p.mediaUrl, mediaType: p.mediaType })), ...demoPosts]
+  // Only real posts. This used to mix in generated ones attributed to the
+  // people in the user's Circle — their mother, their partner — with invented
+  // reaction counts and "3h ago" timestamps, unlabelled and indistinguishable
+  // from the user's own. Those people are not users and never wrote anything;
+  // one of the family templates had a named relative saying "Made grandma's
+  // recipe tonight. Miss her."
+  const allFeedPosts = myPosts.map(p => ({ ...p, authorId: 'me', authorName: profile.name || 'You', relationship: 'You', type: 'text' as const, mediaUrl: p.mediaUrl, mediaType: p.mediaType }))
 
   return (
     <>
@@ -7871,6 +7841,14 @@ function MyCircleTab({ profile, go, onPersonChat, onOpenJourney }: { profile: Us
             </View>
 
             {/* Feed */}
+            {allFeedPosts.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24 }}>
+                <Text style={{ fontSize: 34, marginBottom: 10 }}>💬</Text>
+                <Text style={{ fontSize: 15, color: theme.textSub, textAlign: 'center', lineHeight: 22 }}>
+                  {tr('circle_feed_empty')}
+                </Text>
+              </View>
+            )}
             {allFeedPosts.map((post, idx) => {
               const isMe = post.authorId === 'me'
               const color = AVATAR_COLORS[idx % AVATAR_COLORS.length]
