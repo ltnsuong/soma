@@ -270,9 +270,24 @@ The chain, in order — each step needs the one before it:
    banking + tax forms complete. Without it the products stay in a state
    RevenueCat cannot read, and this is the step that takes days, not minutes.
    Start it now even if you do nothing else on this list.
-3. **RevenueCat** → attach the App Store app, add the App Store Connect shared
-   secret, map each product into an entitlement.
+3. **RevenueCat** → Apps → + New → App Store. Bundle ID `site.mysoma.app`,
+   ASC App ID `6815187221`, paste the App-Specific Shared Secret, upload the
+   `.p8` In-App Purchase key (App Store Connect → Users and Access →
+   Integrations → In-App Purchase; one download only). Copy the Server
+   Notifications URL it gives you into BOTH the Production and Sandbox fields in
+   App Store Connect, Version 2 — without it, refunds and cancellations never
+   reach RevenueCat and a refunded user keeps premium.
+
+   **Three identifiers must match the code exactly. Each fails silently.**
+
+   | Thing | Must be | Read at | If wrong |
+   |---|---|---|---|
+   | Entitlement | `premium` (lowercase) | [App.tsx:3446](App.tsx#L3446) | Purchase succeeds, app still says not premium |
+   | Offering | marked **Default** | `offerings.current` | Paywall shows nothing |
+   | Packages | standard **Monthly** / **Annual** types (`$rc_monthly`, `$rc_annual`) | `cur.monthly`, `cur.annual` | `getOffering` returns null, no price |
+
 4. **Copy the `appl_` public SDK key** from RevenueCat → Project → API keys.
+   The public one, not the secret key.
 5. Set it on EAS and in `eas.json`:
    ```bash
    cd ~/soma && eas env:create --environment production \
