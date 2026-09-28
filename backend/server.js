@@ -2504,6 +2504,28 @@ app.post('/notifications/opened', auth, async (req, res) => {
 // for the same reason the age band is enforced there: a filter applied only in
 // the client is a suggestion.
 
+/**
+ * Tell a human a report has arrived.
+ *
+ * Falls back to the address published in terms.html, because the commitment
+ * there is only as real as the thing that delivers it. Urgent reasons say so in
+ * the subject line so they are answerable from a phone without opening
+ * anything.
+ */
+async function notifyModerator(reason, reportedId, reporterId, detail) {
+  const to = process.env.MODERATION_EMAIL || 'lethinhutsuong@gmail.com'
+  const urgent = isUrgent(reason)
+  await sendEmail({
+    to,
+    subject: `${urgent ? '[URGENT] ' : ''}SOMA report: ${reason}`,
+    html: `<p><strong>Reason:</strong> ${reason}${urgent ? ' — review first' : ''}</p>
+      <p><strong>Reported user:</strong> ${reportedId}</p>
+      <p><strong>Reported by:</strong> ${reporterId}</p>
+      <p><strong>Detail:</strong> ${detail ? detail.replace(/[<>]/g, '') : '(none given)'}</p>
+      <p>The reporter has already been blocked from this account automatically.</p>`,
+  })
+}
+
 /** How many reports this person has filed in the last 24 hours. */
 async function reportsToday(userId) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -2628,9 +2650,14 @@ app.post('/reports', auth, async (req, res) => {
 
     await blockQuietly(req.user.userId, reportedId)
 
-    if (isUrgent(check.normalized)) {
-      console.warn(`[reports] URGENT ${check.normalized}: ${reportedId} reported by ${req.user.userId}`)
-    }
+    // terms.html promises a person reads every report within 24 hours. A
+    // console.warn does not reach a person — and `railway logs` shows the last
+    // SUCCESSFUL deploy, so a warning can sit unread indefinitely. Email is
+    // what makes that promise true. Never let it fail the report: the row is
+    // already saved and the block already applied.
+    notifyModerator(check.normalized, reportedId, req.user.userId, normalizeDetail(detail))
+      .catch(e => console.warn('[reports] moderator email failed:', e?.message))
+
     res.json({ reported: true, blocked: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
