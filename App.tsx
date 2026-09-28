@@ -1723,6 +1723,44 @@ type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<Dom
 const FREE_DAILY_LIKES = 999
 const PREMIUM_DAILY_LIKES = 999
 
+const SCRIM_H = 200
+const SCRIM_BANDS = 40
+
+/**
+ * The dark scrim under a profile photo, so the name and chips stay readable
+ * over a bright image.
+ *
+ * Web gets a real CSS gradient. It used to ALSO draw the native fallback on top
+ * of it — seven flat bands 30px tall at 28px intervals — which read as visible
+ * horizontal stripes across the lower third of every photo, in the App Store
+ * screenshots included. The bands are native-only now, and fine enough (5px,
+ * edge to edge, no overlap) that the steps do not resolve.
+ *
+ * React Native has no gradient primitive without a new native module, and one
+ * scrim does not justify adding one to the iOS build.
+ */
+function PhotoScrim() {
+  return (
+    <View style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, height: SCRIM_H,
+      background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)' as any,
+      backgroundColor: 'transparent' as any,
+    }}>
+      {!IS_WEB && Array.from({ length: SCRIM_BANDS }, (_, i) => {
+        const up = i / (SCRIM_BANDS - 1)   // 0 at the photo's edge, 1 at the top of the ramp
+        return (
+          <View key={i} style={{
+            position: 'absolute', left: 0, right: 0,
+            bottom: i * (SCRIM_H / SCRIM_BANDS),
+            height: SCRIM_H / SCRIM_BANDS,
+            backgroundColor: `rgba(0,0,0,${(0.85 * (1 - up) ** 1.5).toFixed(3)})`,
+          }} />
+        )
+      })}
+    </View>
+  )
+}
+
 const EMPTY_DATING: DatingProfile = {
   complete: false, age: '', location: '', photo: '', photos: [], bio: '',
   loveLanguage: '', attachment: '', relationshipValues: [], lookingFor: '', connectionType: 'dating' as const,
@@ -14644,19 +14682,18 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
                     </View>
                   </View>
 
-                  {/* Bottom gradient overlay */}
-                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 200,
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)' as any,
-                    backgroundColor: 'transparent' as any,
-                  }}>
-                    <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 200,
-                      backgroundColor: 'rgba(0,0,0,0.001)' }}>
-                      {[0.85,0.7,0.55,0.38,0.22,0.1,0].map((o, i) => (
-                        <View key={i} style={{ position: 'absolute', left: 0, right: 0, bottom: i * 28, height: 30,
-                          backgroundColor: `rgba(0,0,0,${o})` }} />
-                      ))}
-                    </View>
-                  </View>
+                  {/* Bottom gradient overlay, so the name and chips stay readable
+                      over a light photo.
+
+                      Web has a real CSS gradient. It used to ALSO draw the native
+                      fallback on top of it — seven solid bands 30px tall at 28px
+                      intervals — which read as visible horizontal stripes across
+                      the lower third of every photo, App Store screenshots
+                      included. The bands are native-only now, and fine enough
+                      (5px, edge to edge, no overlap) that the steps do not
+                      resolve. There is no gradient primitive in React Native
+                      without a new native module, which this does not justify. */}
+                  <PhotoScrim />
 
                   {/* Says what it is, on the photo, where it cannot be missed or
                       scrolled past. A guest browsing before signup meets seeded
