@@ -365,3 +365,48 @@ UPDATE dating_profiles SET is_minor = FALSE
 UPDATE users u SET adult_at = (CURRENT_DATE - ((dp.age - 17) * INTERVAL '1 year'))::date
   FROM dating_profiles dp
   WHERE dp.user_id = u.id AND u.adult_at IS NULL AND dp.age IS NOT NULL AND dp.age >= 17;
+
+-- ── BLOCKS AND REPORTS ─────────────────────────────────────
+-- Guideline 1.2 requires both for an app carrying user-generated content, and
+-- SOMA puts strangers into one-to-one conversations at a 13+ rating, so they
+-- matter here more than the guideline does. The rule is backend/moderation.js;
+-- these are the storage.
+--
+-- Both cascade on user deletion, like every other table referencing users —
+-- DELETE /auth/account relies on it, and a table that does not declare it
+-- silently orphans a person's data after they were told it was erased.
+
+CREATE TABLE IF NOT EXISTS blocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  -- One row per direction. Blocking twice is not an error, it is a no-op.
+  UNIQUE (blocker_id, blocked_id),
+  -- Blocking yourself is meaningless and would hide you from your own feed.
+  CHECK (blocker_id <> blocked_id)
+);
+
+-- A block is read from BOTH sides on every visibility check, so both columns
+-- are indexed. Without the second index the symmetric half is a sequential
+-- scan on every discover call.
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker ON blocks(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked_id);
+
+CREATE TABLE IF NOT EXISTS reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reported_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  detail TEXT DEFAULT '',
+  -- 'open' until a human looks at it. Nothing closes it automatically.
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at TIMESTAMP DEFAULT NOW(),
+  CHECK (reporter_id <> reported_id)
+);
+
+-- Triage reads open reports newest first; the reported_id index answers
+-- "has anyone else reported this person", which is the question that matters.
+CREATE INDEX IF NOT EXISTS idx_reports_status_created ON reports(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter_created ON reports(reporter_id, created_at DESC);

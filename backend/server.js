@@ -15,6 +15,11 @@ import {
   adultDateFrom, bandOf, bandOfFlag, canSee, coerceConnectionType,
   allowedConnectionTypes, ADULT_AGE, ADULT, MINOR, UNKNOWN,
 } from './agegate.js'
+import {
+  blockedIds, canInteract, filterBlocked,
+  validateBlock, validateReport, normalizeDetail,
+  isUrgent, underReportLimit,
+} from './moderation.js'
 
 import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
@@ -1292,6 +1297,23 @@ async function bandForUser(userId) {
   return bandOf(data?.adult_at)
 }
 
+/**
+ * Everyone this caller must not see, in either direction.
+ *
+ * THROWS rather than returning an empty set when the read fails. An empty set
+ * means "nobody is blocked", which would serve a blocked person straight back
+ * into the feed of whoever blocked them the first time the database hiccups.
+ * A 500 is the honest answer; the rule in moderation.js fails closed and so
+ * does its storage.
+ */
+async function blockedForUser(userId) {
+  const { data, error } = await supabase.from('blocks')
+    .select('blocker_id, blocked_id')
+    .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
+  if (error) throw error
+  return blockedIds(data || [], userId)
+}
+
 // Record a date of birth. Stores the date they turn 17, never the DOB itself.
 app.post('/age', auth, async (req, res) => {
   try {
@@ -1507,8 +1529,10 @@ app.get('/dating/nearby', auth, async (req, res) => {
       ;(emailRows || []).forEach(u => { if (isDemoAccount(u.email)) demoIds.add(u.id) })
     }
 
+    const blockedHere = await blockedForUser(req.user.userId)
     const results = (nearbyRows || [])
       .filter(r => !likedIds.has(r.user_id) && !demoIds.has(r.user_id) && !crossBandIds.has(r.user_id))
+      .filter(r => canInteract(r.user_id, blockedHere))
       .map(r => ({
         userId: r.user_id, name: r.name, age: r.age, photo: r.photo,
         photos: photosMap[r.user_id] || (r.photo ? [r.photo] : []),
@@ -1539,6 +1563,13 @@ app.post('/dating/like', auth, async (req, res) => {
     const { data: target } = await supabase.from('users')
       .select('adult_at').eq('id', targetId).maybeSingle()
     if (!canSee(await bandForUser(req.user.userId), bandOf(target?.adult_at))) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Likewise the write side of a block. Without this, someone who has been
+    // blocked can still like their way into a match and a message thread, which
+    // is precisely the contact the block was meant to end.
+    if (!canInteract(targetId, await blockedForUser(req.user.userId))) {
       return res.status(404).json({ error: 'User not found' })
     }
 
@@ -2180,8 +2211,12 @@ app.get('/users/discover', optionalAuth, async (req, res) => {
     // profile yet, and reading the flag made every one of them look UNKNOWN and
     // vanish from discovery — the "just joined SOMA" case, erased.
     const myBand = me ? await bandForUser(me) : null
+    const blocked = me ? await blockedForUser(me) : null
     const visible = me
-      ? (users || []).filter(u => canSee(myBand, bandOf(u.adult_at)))
+      ? filterBlocked(
+          (users || []).filter(u => canSee(myBand, bandOf(u.adult_at))),
+          blocked, u => u.id,
+        )
       : (users || [])
 
     res.json({
@@ -2212,6 +2247,13 @@ app.get('/users/:id/profile', auth, async (req, res) => {
     // route. 404 rather than 403: whether an account exists is not something a
     // caller on the wrong side of this line needs to learn.
     if (!canSee(await bandForUser(req.user.userId), bandOf(u.adult_at))) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    // A block hides the profile the same way, and 404s for the same reason:
+    // "this account exists but you may not see it" tells the blocked person
+    // they were blocked, which is an invitation to make another account.
+    if (!canInteract(id, await blockedForUser(req.user.userId))) {
       return res.status(404).json({ error: 'User not found' })
     }
 
@@ -2294,11 +2336,18 @@ app.get('/users/find', optionalAuth, async (req, res) => {
     // is the harm worth preventing, so that stays closed. Surfacing an adult to
     // someone holding their code is the entire point of the feature.
     const myBand = req.user ? await bandForUser(req.user.userId) : null
-    const reachable = users.filter(u => {
+    const bandReachable = users.filter(u => {
       const theirBand = bandOf(u.adult_at)
       if (myBand === null) return theirBand === ADULT
       return canSee(myBand, theirBand)
     })
+
+    // A block applies to a code lookup too — handing over a code does not undo
+    // one. There is nothing to apply for an anonymous caller, who has no blocks.
+    const blockedFind = req.user ? await blockedForUser(req.user.userId) : null
+    const reachable = req.user
+      ? filterBlocked(bandReachable, blockedFind, u => u.id)
+      : bandReachable
     if (!reachable.length) return res.status(404).json({ error: 'No user found' })
 
     const byUser = {}
@@ -2441,6 +2490,148 @@ app.post('/notifications/opened', auth, async (req, res) => {
       .order('sent_at', { ascending: false }).limit(1).maybeSingle()
     if (last) await supabase.from('nudges').update({ opened_at: new Date().toISOString() }).eq('id', last.id)
     res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// BLOCKING AND REPORTING
+// ════════════════════════════════════════════════════════════
+// The rule is backend/moderation.js; this is the storage and the routes. The
+// enforcement lives with each query that returns people — /users/discover,
+// /users/find, /users/:id/profile, /dating/nearby and the /dating/like write —
+// for the same reason the age band is enforced there: a filter applied only in
+// the client is a suggestion.
+
+/** How many reports this person has filed in the last 24 hours. */
+async function reportsToday(userId) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count } = await supabase.from('reports')
+    .select('id', { count: 'exact', head: true })
+    .eq('reporter_id', userId).gte('created_at', since)
+  return count ?? 0
+}
+
+/**
+ * Block, best effort.
+ *
+ * Used when a block accompanies something else that matters more — reporting
+ * someone you then have to keep seeing is not much of a remedy, but the report
+ * is the part that must land. A failure here is recoverable from the profile.
+ */
+async function blockQuietly(blockerId, blockedId) {
+  try {
+    await supabase.from('blocks').upsert(
+      { blocker_id: blockerId, blocked_id: blockedId },
+      { onConflict: 'blocker_id,blocked_id' })
+  } catch (e) {
+    console.warn('[moderation] auto-block failed:', e?.message)
+  }
+}
+
+// Who I have blocked, so the client can show a list and offer to undo it. Only
+// my own outgoing blocks: who blocked ME is not mine to know.
+app.get('/blocks', auth, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('blocks')
+      .select('blocked_id, created_at')
+      .eq('blocker_id', req.user.userId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+
+    const ids = (data || []).map(b => b.blocked_id)
+    const names = {}
+    if (ids.length) {
+      const { data: users } = await supabase.from('users').select('id, name, avatar').in('id', ids)
+      ;(users || []).forEach(u => { names[u.id] = u })
+    }
+    res.json({
+      blocks: (data || []).map(b => ({
+        userId: b.blocked_id,
+        name: names[b.blocked_id]?.name || 'Someone',
+        avatar: names[b.blocked_id]?.avatar || null,
+        createdAt: b.created_at,
+      })),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/blocks', auth, async (req, res) => {
+  try {
+    const targetId = req.body?.userId
+    const check = validateBlock(req.user.userId, targetId)
+    if (!check.ok) return res.status(400).json({ error: check.reason })
+
+    const { data: target } = await supabase.from('users').select('id').eq('id', targetId).maybeSingle()
+    if (!target) return res.status(404).json({ error: 'User not found' })
+
+    // Idempotent: blocking someone already blocked is a no-op, not an error.
+    // The client may be retrying, and the person still wants them blocked.
+    const { error } = await supabase.from('blocks')
+      .upsert({ blocker_id: req.user.userId, blocked_id: targetId },
+        { onConflict: 'blocker_id,blocked_id' })
+    if (error) throw error
+
+    // A block ends the relationship, it does not just hide it — a live match or
+    // a like left behind would keep surfacing them in threads and notifications
+    // that do not consult the block list.
+    const [a, b] = [req.user.userId, targetId].sort()
+    await supabase.from('dating_matches').delete().eq('user_a', a).eq('user_b', b)
+    await supabase.from('dating_likes').delete()
+      .or(`and(liker_id.eq.${req.user.userId},target_id.eq.${targetId}),` +
+          `and(liker_id.eq.${targetId},target_id.eq.${req.user.userId})`)
+
+    res.json({ blocked: true, userId: targetId })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Unblocking removes only my own block. If they also blocked me, that one
+// stands — it was never mine to lift.
+app.delete('/blocks/:userId', auth, async (req, res) => {
+  try {
+    const { error } = await supabase.from('blocks').delete()
+      .eq('blocker_id', req.user.userId).eq('blocked_id', req.params.userId)
+    if (error) throw error
+    res.json({ blocked: false, userId: req.params.userId })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/reports', auth, async (req, res) => {
+  try {
+    const { userId: reportedId, reason, detail } = req.body || {}
+    const check = validateReport(req.user.userId, reportedId, reason)
+    if (!check.ok) return res.status(400).json({ error: check.reason })
+
+    const { data: target } = await supabase.from('users').select('id').eq('id', reportedId).maybeSingle()
+    if (!target) return res.status(404).json({ error: 'User not found' })
+
+    // Someone filing reports all day is themselves the abuse, and a flood
+    // buries the reports that matter.
+    if (!underReportLimit(await reportsToday(req.user.userId))) {
+      return res.status(429).json({ error: 'too_many_reports' })
+    }
+
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: req.user.userId,
+      reported_id: reportedId,
+      reason: check.normalized,
+      detail: normalizeDetail(detail),
+    })
+    if (error) throw error
+
+    await blockQuietly(req.user.userId, reportedId)
+
+    if (isUrgent(check.normalized)) {
+      console.warn(`[reports] URGENT ${check.normalized}: ${reportedId} reported by ${req.user.userId}`)
+    }
+    res.json({ reported: true, blocked: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
