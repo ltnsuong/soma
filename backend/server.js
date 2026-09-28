@@ -922,45 +922,21 @@ app.put('/profile/sync', auth, async (req, res) => {
 // PREMIUM / SUBSCRIPTION
 // ════════════════════════════════════════════════════════════
 
-// Check premium status
-app.get('/premium/status', auth, async (req, res) => {
-  try {
-    const { data: user } = await supabase.from('users').select('premium').eq('id', req.user.userId).single()
-    res.json({ premium: user?.premium || false })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Upgrade to premium (mock implementation - would connect to Stripe in production)
-app.post('/premium/upgrade', auth, async (req, res) => {
-  try {
-    const { paymentMethodId } = req.body
-    if (!paymentMethodId) return res.status(400).json({ error: 'Payment method required' })
-
-    // In production: verify with Stripe, create subscription, etc
-    // For now: just mark user as premium
-    await supabase.from('users').update({ premium: true }).eq('id', req.user.userId)
-
-    res.json({
-      message: 'Upgraded to premium!',
-      premium: true,
-      features: ['Unlimited matches', 'See who liked you', 'Voice calls', 'Advanced matching', 'Life balance reports']
-    })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Cancel premium
-app.post('/premium/cancel', auth, async (req, res) => {
-  try {
-    await supabase.from('users').update({ premium: false }).eq('id', req.user.userId)
-    res.json({ message: 'Premium cancelled', premium: false })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
+// There are deliberately no /premium/* endpoints.
+//
+// `POST /premium/upgrade` used to set users.premium = true for any authenticated
+// caller who sent a non-empty paymentMethodId, with a comment promising Stripe
+// verification "in production". It shipped to production without it, so a single
+// authenticated curl bought SOMA+ for free, permanently. /premium/cancel and
+// /premium/status were its equally unused siblings — nothing in App.tsx, the bot
+// or the web pages ever called any of the three.
+//
+// Entitlement belongs to RevenueCat, which is the only thing that sees a real
+// receipt. When users.premium is reintroduced it must be writable ONLY by a
+// verified RevenueCat webhook, never by a request carrying the user's own token:
+// a client that can grant itself premium is not a paywall. Enforce the gates
+// that carry revenue server-side, for the same reason the age band is enforced
+// there — anyone can call the API without the app.
 
 // Get insights (premium feature)
 app.get('/insights', auth, async (req, res) => {
