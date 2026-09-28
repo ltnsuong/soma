@@ -14927,23 +14927,32 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
             backgroundColor: t.bg,
             borderTopWidth: 0.5, borderTopColor: t.border,
           }}>
+            {/* One hue on this row, not four.
+                It used to run amber rewind, red X, category-accent like and
+                blue star — Tinder's palette, none of it SOMA's. Four saturated
+                colours at once say everything is equally urgent, and the
+                loudest thing on screen ended up being whichever hue happened to
+                be biggest. Now the category accent is the only colour: filled
+                for the primary action, outlined for the rarer one, and
+                everything else neutral. Rank reads from size and fill. */}
             <PressButton onPress={rewind} style={{
               width: 46, height: 46, borderRadius: 23,
-              backgroundColor: passedStack.length > 0 ? '#FFF8E7' : t.card2,
+              backgroundColor: t.card2,
               alignItems: 'center', justifyContent: 'center',
-              borderWidth: 1, borderColor: passedStack.length > 0 ? '#F5C54230' : t.border,
+              borderWidth: 1, borderColor: passedStack.length > 0 ? `${cfg.accentColor}40` : t.border,
             }}>
-              <Ionicons name="arrow-undo" size={18} color={passedStack.length > 0 ? '#F5A623' : t.textSub} />
+              <Ionicons name="arrow-undo" size={18} color={passedStack.length > 0 ? cfg.accentColor : t.textSub} />
             </PressButton>
 
+            {/* Passing is the commonest action here and it is not a punishment,
+                so it no longer shouts in red. The icon carries the meaning. */}
             <PressButton onPress={() => flyCard('nope')} style={{
               width: 62, height: 62, borderRadius: 31,
-              backgroundColor: '#fff',
+              backgroundColor: t.card,
               alignItems: 'center', justifyContent: 'center',
-              borderWidth: 1.5, borderColor: '#FF445830',
-              shadowColor: '#FF4458', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+              borderWidth: 1.5, borderColor: t.border,
             }}>
-              <Ionicons name="close" size={26} color="#FF4458" />
+              <Ionicons name="close" size={26} color={t.textSub} />
             </PressButton>
 
             <PressButton onPress={() => flyCard('like')} style={{
@@ -14957,12 +14966,11 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
 
             <PressButton onPress={() => flyCard('super')} style={{
               width: 62, height: 62, borderRadius: 31,
-              backgroundColor: '#fff',
+              backgroundColor: t.card,
               alignItems: 'center', justifyContent: 'center',
-              borderWidth: 1.5, borderColor: '#1AA3FF30',
-              shadowColor: '#1AA3FF', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+              borderWidth: 1.5, borderColor: `${cfg.accentColor}55`,
             }}>
-              <Ionicons name="star" size={22} color="#1AA3FF" />
+              <Ionicons name="star" size={22} color={cfg.accentColor} />
             </PressButton>
 
             <PressButton onPress={() => setShowFilters(true)} style={{
