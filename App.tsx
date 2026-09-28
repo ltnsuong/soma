@@ -9664,12 +9664,15 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
 
   // Labels come from domLabel, not literals: these four tiles sit at the top of
   // Home and were the most visible English left in a translated app.
-  const domainTiles = [
-    { key: 'mind' as DomainKey,         label: domLabel('mind'),         icon: '🧘', color: '#A89BFA' },
-    { key: 'health' as DomainKey,       label: domLabel('health'),       icon: '❤️', color: '#F66E8E' },
-    { key: 'growth' as DomainKey,       label: domLabel('growth'),       icon: '🌱', color: '#10B981' },
-    { key: 'relationship' as DomainKey, label: domLabel('relationship'), icon: '💞', color: '#7B6EF6' },
-  ]
+  // Icons come from DOMAIN_ICONS so a domain looks the same everywhere. These
+  // four were emoji, which meant Home showed a different picture of "health"
+  // than the Wheel of Life did, in whatever style the OS happened to ship.
+  const domainTiles = ([
+    { key: 'mind',         color: '#A89BFA' },
+    { key: 'health',       color: '#F66E8E' },
+    { key: 'growth',       color: '#10B981' },
+    { key: 'relationship', color: '#7B6EF6' },
+  ] as const).map(d => ({ ...d, key: d.key as DomainKey, label: domLabel(d.key), icon: DOMAIN_ICONS[d.key] }))
 
   return (
     // 8pt worked only because the guest banner sat above and absorbed the status
@@ -9761,7 +9764,7 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
           return (
             <TouchableOpacity key={d.key} onPress={() => go('lifebalance')}
               style={{ flex: 1, backgroundColor: t.card, borderRadius: 18, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: t.border }}>
-              <Text style={{ fontSize: 22, marginBottom: 4 }}>{d.icon}</Text>
+              <Ionicons name={d.icon} size={22} color={d.color} style={{ marginBottom: 4 }} />
               {score > 0 && <Text style={{ fontSize: 20, fontWeight: '800', color: d.color }}>{score}</Text>}
               <Text style={{ fontSize: 10, fontWeight: '600', color: t.textSub, marginTop: score > 0 ? 2 : 0 }}>{d.label}</Text>
               {score > 0 && (
@@ -9857,12 +9860,12 @@ function Home({ profile, go, onReset }: { profile: UserProfile; go: (s: Screen) 
           <Text style={{ fontSize: 12, fontWeight: '700', color: t.textSub, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr('your_streaks')}</Text>
           <View style={{ flexDirection: 'row', gap: 0 }}>
             {[
-              { icon: '🔥', label: tr('activity'), days: streak },
-              { icon: '📖', label: tr('diary'), days: (() => { let s = 0; const sorted = [...profile.diary].sort((a,b) => (b.date||'').localeCompare(a.date||'')); const today = new Date(); for (const e of sorted) { const d = new Date(e.date||0); if (Math.floor((today.getTime()-d.getTime())/86400000) <= s+1) s++; else break; } return s })() },
-              { icon: '🌿', label: 'Gratitude', days: (profile.gratitudeEntries||[]).length },
+              { icon: 'flame-outline' as const, label: tr('activity'), days: streak },
+              { icon: 'book-outline' as const, label: tr('diary'), days: (() => { let s = 0; const sorted = [...profile.diary].sort((a,b) => (b.date||'').localeCompare(a.date||'')); const today = new Date(); for (const e of sorted) { const d = new Date(e.date||0); if (Math.floor((today.getTime()-d.getTime())/86400000) <= s+1) s++; else break; } return s })() },
+              { icon: 'sunny-outline' as const, label: 'Gratitude', days: (profile.gratitudeEntries||[]).length },
             ].map((s2, i, arr) => (
               <View key={s2.label} style={{ flex: 1, alignItems: 'center', borderRightWidth: i < arr.length-1 ? 1 : 0, borderRightColor: t.border, paddingVertical: 4 }}>
-                <Text style={{ fontSize: 24 }}>{s2.icon}</Text>
+                <Ionicons name={s2.icon} size={24} color="#7B6EF6" />
                 <Text style={{ fontSize: 22, fontWeight: '900', color: t.text, marginTop: 4 }}>{s2.days}</Text>
                 <Text style={{ fontSize: 11, color: t.textSub, fontWeight: '600' }}>{s2.label}</Text>
                 <Text style={{ fontSize: 10, color: t.textTertiary }}>{s2.days === 1 ? 'day' : 'days'}</Text>
