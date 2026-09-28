@@ -3395,6 +3395,243 @@ const datingApi = {
 }
 
 // ════════════════════════════════════════════════════════════
+// BLOCKING AND REPORTING
+// ════════════════════════════════════════════════════════════
+/**
+ * The client half of backend/moderation.js.
+ *
+ * Every one of these is a thin call to the server, deliberately. The block
+ * itself is applied server-side on every query that returns people; nothing
+ * here hides anyone locally, because a local filter is undone by reinstalling
+ * the app and never protected anyone who could use curl.
+ *
+ * These throw on failure rather than swallowing it. A block that silently did
+ * not happen is worse than an error message — the person believes they are
+ * safe from someone who can still reach them.
+ */
+export const REPORT_REASONS = [
+  { key: 'harassment',            label: 'Harassment or bullying' },
+  { key: 'inappropriate_content', label: 'Inappropriate content' },
+  { key: 'fake_profile',          label: 'Fake profile or impersonation' },
+  { key: 'spam',                  label: 'Spam or scam' },
+  { key: 'underage',              label: 'They appear to be under 17' },
+  { key: 'safety_concern',        label: 'Safety concern' },
+  { key: 'other',                 label: 'Something else' },
+] as const
+
+type BlockedPerson = { userId: string; name: string; avatar: string | null; createdAt: string }
+
+const moderationApi = {
+  authed: () => !!auth.getToken() && !!BACKEND_URL && !BACKEND_URL.includes('localhost'),
+
+  block: async (userId: string): Promise<void> => {
+    const res = await fetch(`${BACKEND_URL}/blocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+      body: JSON.stringify({ userId }),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'block_failed')
+  },
+
+  unblock: async (userId: string): Promise<void> => {
+    const res = await fetch(`${BACKEND_URL}/blocks/${userId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'unblock_failed')
+  },
+
+  list: async (): Promise<BlockedPerson[]> => {
+    const res = await fetch(`${BACKEND_URL}/blocks`, {
+      headers: { Authorization: `Bearer ${auth.getToken()}` },
+    })
+    if (!res.ok) throw new Error('blocks_failed')
+    return (await res.json()).blocks || []
+  },
+
+  /** Reporting blocks them too — the server does that, not us. */
+  report: async (userId: string, reason: string, detail = ''): Promise<void> => {
+    const res = await fetch(`${BACKEND_URL}/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.getToken()}` },
+      body: JSON.stringify({ userId, reason, detail }),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'report_failed')
+  },
+}
+
+/**
+ * Block or report someone. The same sheet everywhere it is offered, so the
+ * action is in the same place with the same words whether you are looking at a
+ * profile or in the middle of a conversation.
+ *
+ * Reporting blocks as well — the server does that. Someone who has just told us
+ * they are being harassed should not then have to find a second control to make
+ * it stop.
+ */
+function ReportBlockSheet({ userId, name, visible, onClose, onDone }: {
+  userId: string; name: string; visible: boolean; onClose: () => void; onDone: () => void
+}) {
+  const { t } = useT()
+  const [mode, setMode] = useState<'menu' | 'reasons'>('menu')
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+
+  const close = () => { setMode('menu'); setErr(''); setBusy(''); onClose() }
+
+  const run = async (label: string, fn: () => Promise<void>) => {
+    setBusy(label); setErr('')
+    try { await fn(); haptic.success(); close(); onDone() } catch (e: any) {
+      // Never close on failure. A sheet that dismisses itself after a failed
+      // block tells the person they are safe when they are not.
+      setErr(e?.message === 'too_many_reports'
+        ? 'You have filed a lot of reports today. Try again tomorrow.'
+        : 'That did not go through. Check your connection and try again.')
+      haptic.error()
+    } finally { setBusy('') }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      <TouchableOpacity activeOpacity={1} onPress={close}
+        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}}
+          style={{ backgroundColor: t.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: Math.max(SAFE_BOTTOM, 20) + 8 }}>
+          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: t.border, alignSelf: 'center', marginBottom: 16 }} />
+
+          {mode === 'menu' ? (
+            <>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: t.text, marginBottom: 4 }}>{name}</Text>
+              <Text style={{ fontSize: 13, color: t.textSub, marginBottom: 18 }}>
+                They will not be told, and they will not be able to see or message you.
+              </Text>
+
+              <TouchableOpacity onPress={() => setMode('reasons')} disabled={!!busy}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
+                <Ionicons name="flag-outline" size={20} color={t.text} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: t.text }}>Report {name}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => run('block', () => moderationApi.block(userId))} disabled={!!busy}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
+                <Ionicons name="remove-circle-outline" size={20} color="#F66E8E" />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#F66E8E' }}>
+                  {busy === 'block' ? 'Blocking…' : `Block ${name}`}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: t.text, marginBottom: 4 }}>Why are you reporting?</Text>
+              <Text style={{ fontSize: 13, color: t.textSub, marginBottom: 12 }}>
+                This also blocks them. A person reviews every report.
+              </Text>
+              {REPORT_REASONS.map(r => (
+                <TouchableOpacity key={r.key} disabled={!!busy}
+                  onPress={() => run(r.key, () => moderationApi.report(userId, r.key))}
+                  style={{ paddingVertical: 13, borderBottomWidth: 0.5, borderBottomColor: t.border }}>
+                  <Text style={{ fontSize: 15, color: t.text }}>
+                    {busy === r.key ? 'Sending…' : r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+
+          {!!err && <Text style={{ fontSize: 13, color: '#F66E8E', marginTop: 12 }}>{err}</Text>}
+
+          <TouchableOpacity onPress={close} disabled={!!busy}
+            style={{ marginTop: 16, paddingVertical: 14, alignItems: 'center', backgroundColor: t.card, borderRadius: 14 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.textSub }}>Cancel</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  )
+}
+
+/**
+ * Everyone this person has blocked, with a way to undo it.
+ *
+ * Reachable from Settings for the same reason withdrawing consent is: a control
+ * you can only ever apply, never lift, is a trap rather than a setting. It lists
+ * only outgoing blocks — who blocked ME is not mine to know, and the server does
+ * not tell us.
+ */
+function BlockedPanel({ onBack }: { onBack: () => void }) {
+  const { t } = useT()
+  const [rows, setRows] = useState<BlockedPerson[] | null>(null)
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+
+  const load = useCallback(async () => {
+    setErr('')
+    try {
+      setRows(await moderationApi.list())
+    } catch {
+      // Deliberately NOT setRows([]). An empty list renders "You have not
+      // blocked anyone", which is a claim we cannot make when the request
+      // failed — and reassuring someone their block list is empty when we do
+      // not know is the same mistake as an unreadable block failing open.
+      setErr('Could not load your blocked list.')
+    }
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  const unblock = async (userId: string) => {
+    setBusy(userId); setErr('')
+    try { await moderationApi.unblock(userId); await load(); haptic.success() } catch {
+      setErr('That did not go through. Try again.'); haptic.error()
+    } finally { setBusy('') }
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: HEADER_TOP, paddingBottom: 12 }}>
+        <TouchableOpacity onPress={onBack} style={{ padding: 4 }}>
+          <Ionicons name="arrow-back" size={24} color={t.text} />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>Blocked people</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
+        <Text style={{ fontSize: 13, color: t.textSub, lineHeight: 20, marginBottom: 16 }}>
+          Blocked people cannot see your profile or message you, and you will not see them.
+          They are never told.
+        </Text>
+
+        {rows === null ? (
+          err ? (
+            <TouchableOpacity onPress={() => void load()} style={{ marginTop: 28, alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#7B6EF6' }}>Try again</Text>
+            </TouchableOpacity>
+          ) : <ActivityIndicator color="#7B6EF6" style={{ marginTop: 24 }} />
+        ) : rows.length === 0 ? (
+          <Text style={{ fontSize: 14, color: t.textSub, textAlign: 'center', marginTop: 32 }}>
+            You have not blocked anyone.
+          </Text>
+        ) : rows.map(r => (
+          <View key={r.userId} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: t.border }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#7B6EF620', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#7B6EF6' }}>{(r.name || '?').slice(0, 1).toUpperCase()}</Text>
+            </View>
+            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: t.text }}>{r.name}</Text>
+            <TouchableOpacity onPress={() => unblock(r.userId)} disabled={!!busy}
+              style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: t.border }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: t.text }}>
+                {busy === r.userId ? '…' : 'Unblock'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {!!err && <Text style={{ fontSize: 13, color: '#F66E8E', marginTop: 14 }}>{err}</Text>}
+      </ScrollView>
+    </View>
+  )
+}
+
+// ════════════════════════════════════════════════════════════
 // REVENUECAT — real subscriptions (safe wrapper, no-op on web/Expo Go)
 // ════════════════════════════════════════════════════════════
 const RC_IOS_KEY     = process.env.EXPO_PUBLIC_RC_IOS_KEY ?? ''
@@ -8144,6 +8381,9 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
   const [convos, setConvos] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [openChat, setOpenChat] = useState<Conversation | null>(null)
+  // Block/report is offered from inside the conversation, not only from a
+  // profile screen — the moment someone needs it is usually mid-thread.
+  const [moderate, setModerate] = useState<{ userId: string; name: string } | null>(null)
   const [msgs, setMsgs] = useState<{ id: string; from_user_id: string; content: string; created_at: string }[]>([])
   const [msgLoading, setMsgLoading] = useState(false)
   const [input, setInput] = useState('')
@@ -8388,7 +8628,20 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.textSub} />
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setModerate({ userId: openChat.userId, name: displayName(openChat.name) })}
+            style={{ padding: 6 }} accessibilityLabel="Report or block">
+            <Ionicons name="ellipsis-horizontal" size={20} color={theme.textSub} />
+          </TouchableOpacity>
         </View>
+
+        {!!moderate && (
+          <ReportBlockSheet
+            userId={moderate.userId} name={moderate.name} visible
+            onClose={() => setModerate(null)}
+            onDone={() => { setModerate(null); closeChat() }}
+          />
+        )}
         {/* Messages */}
         {msgLoading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -8614,6 +8867,16 @@ function MessagesTab({ profile, initialChat, pendingMatchChat }: { profile: User
                     </>
                   )}
                 </View>
+
+                {/* Quiet, but present on every real person's profile. Guideline
+                    1.2 wants reporting reachable from the content itself, and
+                    somebody looking for this control is usually not in the mood
+                    to go hunting for it in Settings. */}
+                <TouchableOpacity
+                  onPress={() => { const v = viewProfile; setViewProfile(null); setModerate({ userId: v.userId, name: v.name }) }}
+                  style={{ marginTop: 4, paddingVertical: 12, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textSub }}>Report or block</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity onPress={() => setViewProfile(null)}
                   style={{ marginTop: 4, backgroundColor: theme.card, borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}>
@@ -19494,7 +19757,7 @@ function FaceVerify({ onClose, onVerified }: { onClose: () => void; onVerified: 
 
 function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemories, onSignIn, onSignOut }: { profile: UserProfile; onBack: () => void; onRefresh: () => void; onReset: () => void; onToggleDark: () => void; onMemories: () => void; onSignIn?: () => void; onSignOut?: () => void }) {
   const { t: theme, dark } = useT()
-  type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice' | 'profile' | 'consent'
+  type Panel = null | 'language' | 'companion' | 'safety' | 'notifications' | 'voice' | 'profile' | 'consent' | 'blocked'
   const [panel, setPanel] = useState<Panel>(null)
   const [faceOpen, setFaceOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -19504,6 +19767,13 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
     datingApi.faceStatus().then(setFaceStatus).catch(() => {})
   }, [])
   useEffect(loadFaceStatus, [loadFaceStatus])
+  // null while unknown, so the row shows nothing rather than a misleading 0.
+  const [blockCount, setBlockCount] = useState<number | null>(null)
+  const refreshBlockCount = useCallback(async () => {
+    if (!moderationApi.authed()) return
+    try { setBlockCount((await moderationApi.list()).length) } catch { /* leave it unknown */ }
+  }, [])
+  useEffect(() => { void refreshBlockCount() }, [refreshBlockCount])
   const [showPaywall, setShowPaywall] = useState(false)
   const [aiName, setAiName] = useState(profile.aiName || 'Soma')
   const [tcName, setTcName] = useState(profile.trustedContact?.name || '')
@@ -19790,6 +20060,9 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
   // ── Sub-screen: Privacy & data ────────────────────────────
   if (panel === 'consent') return <ConsentPanel onBack={back} />
 
+  // ── Sub-screen: Blocked people ────────────────────────────
+  if (panel === 'blocked') return <BlockedPanel onBack={() => { setPanel(null); void refreshBlockCount() }} />
+
   // ── Sub-screen: Photo verification ────────────────────────
   // Re-reads status on close so the badge appears without a manual refresh.
   if (faceOpen) return (
@@ -19986,6 +20259,9 @@ function Settings({ profile, onBack, onRefresh, onReset, onToggleDark, onMemorie
             this sits in the same list as everything else, not buried. */}
         <StgRow icon="🛡" label={tr('privacy_controls')} iconBg="rgba(43,182,115,0.12)"
           value={tr('privacy_controls_sub')} onPress={() => setPanel('consent')} />
+        {/* Undoing a block has to be as reachable as making one. */}
+        <StgRow icon="🚫" label="Blocked people" iconBg="rgba(246,110,142,0.12)"
+          value={blockCount === null ? '' : String(blockCount)} onPress={() => setPanel('blocked')} />
         <StgRow icon="🔒" label={t('privacyPolicy')} iconBg="rgba(107,114,128,0.12)" value={tr('privacy_row_value')} onPress={() => openLink('https://mysoma.site/privacy.html')} last />
       </View>
 
