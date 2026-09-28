@@ -351,3 +351,34 @@ Still outstanding outside App Store Connect:
   address. That is not a code problem and I cannot sign it off.
 - **Nobody has finished a first conversation.** 12 real signups, zero memories.
   Worth understanding before you pay to send more people at it.
+
+---
+
+## 9. Review Notes — moderation paragraph
+
+Guideline 1.2 asks how reporting works. Paste this into App Review
+Information → Notes, after the sign-in instructions in §6:
+
+```
+MODERATION (guideline 1.2)
+
+Every profile and every conversation carries a "Report or block" control.
+On a profile it is at the bottom of the profile sheet; in a conversation
+it is the ⋯ button in the header.
+
+Blocking is immediate and symmetric — enforced server-side in discovery,
+search, profile lookup and the like/match write, not only hidden in the
+UI. Any existing match and likes between the two accounts are deleted.
+
+Reporting offers seven reasons and blocks the person as well. Reports
+email a moderator immediately; those flagging a safety concern or a
+possibly under-17 account are marked urgent. A person acts within 24
+hours: removing content, warning, suspending or deleting the account.
+
+Blocks can be undone at Settings > Privacy > Blocked people. The policy
+is published at https://mysoma.site/terms.html under "Reporting and
+blocking", with a contact address.
+
+To test: sign in with the review account, open any profile from Explore,
+and use "Report or block" at the bottom of the profile sheet.
+```
