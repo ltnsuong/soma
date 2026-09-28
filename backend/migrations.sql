@@ -410,3 +410,35 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE INDEX IF NOT EXISTS idx_reports_status_created ON reports(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);
 CREATE INDEX IF NOT EXISTS idx_reports_reporter_created ON reports(reporter_id, created_at DESC);
+
+-- RLS on, no policies. The API reaches these with SUPABASE_SERVICE_KEY, which
+-- bypasses RLS; every other caller gets nothing. Moderation data is the last
+-- thing that should be readable with the public anon key — a blocked list says
+-- who is avoiding whom, and a report names the person who filed it.
+ALTER TABLE blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
+
+-- ── RLS ON EVERYTHING ELSE ─────────────────────────────────
+-- These seven shipped with RLS off, which meant the PUBLIC anon key — the one
+-- inlined into every web bundle and native binary — could read and write every
+-- row. direct_messages held 44 real private messages between real people, and
+-- face_verifications holds biometric verdicts.
+--
+-- No policies, on purpose. Every deployed client reaches Postgres with
+-- SUPABASE_SERVICE_KEY, which bypasses RLS, so the API is unaffected and
+-- everyone else gets nothing. Adding permissive policies would reopen the hole.
+-- The eleven tables that already had RLS on are the proof this is safe: the API
+-- has been reading them all along.
+--
+-- bot/bot.js is the one anon-key client in the repo (chat_messages,
+-- dating_chats, user_profiles). It has no Railway config, the project runs a
+-- single service, and the backend registers the Telegram webhook to itself, so
+-- it is not deployed. If that is ever wrong, DISABLE ROW LEVEL SECURITY on
+-- those three undoes it in a second.
+ALTER TABLE direct_messages    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dating_chats       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coaching_history   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nudges             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE face_verifications ENABLE ROW LEVEL SECURITY;
