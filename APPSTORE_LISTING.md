@@ -6,6 +6,38 @@ Version 1.0, build 8. Status: "1.0 Подготовка к отправке".
 Fill the pages in this order. The first two block submission; the last one blocks
 the build from being *worth* submitting.
 
+## Status — 2026-09-29
+
+**Done since this file was written:**
+- Age rating questionnaire completed → **13+** (§2)
+- Block and report: built, tested, migration applied, backend deployed (§8)
+- Moderation commitment published and live at mysoma.site/terms.html
+- Review Notes paragraph drafted (§9)
+- 16 screenshots captured, including the paywall review shot
+- RLS enabled on every table (7 were readable with the public anon key)
+
+**Not done. In critical-path order:**
+
+| # | What | Who | Blocks |
+|---|---|---|---|
+| 1 | **Agreements, Tax & Banking** active | you | everything monetary — days of waiting, start first |
+| 2 | Subscription products complete in ASC | you | RevenueCat |
+| 3 | RevenueCat: .p8 key, products, entitlement `premium`, Default offering | you | the `appl_` key |
+| 4 | `appl_` key → EAS + `eas.json` | either | build 9 |
+| 5 | **Build 9** | me | submission — the key is inlined at build time, so build 8 can never carry it |
+| 6 | App Privacy questionnaire (§3) | you | submission |
+| 7 | App Information + version page (§1, §4, §5, §6) | you | submission |
+| 8 | Remove `NSUserTrackingUsageDescription` | me | nothing, but it contradicts §3 |
+| 9 | Push 13 commits, deploy web | me | nothing, but the age-gate card is not live |
+
+**Decisions only you can make:**
+- **DSA trader status** — without it the app is not distributed in the EU at all
+- **Free-tier caps** — the paywall still lists features that do not exist (§7 note)
+
+Apple's own note on the subscription page: *the first auto-renewable subscription
+must be submitted with a new app version*. So the subscription and build 9 go to
+review together, as one submission.
+
 ---
 
 ## 1. App Information (`/distribution/info`) — the page in your screenshot
