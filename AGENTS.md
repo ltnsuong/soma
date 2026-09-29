@@ -140,6 +140,25 @@ for plainly adult accounts. Scanning before you have an account is the normal wa
 is used. The half that must not move is the other direction: a minor is never surfaced to a
 bandless caller.
 
+**The 2026-09-29 age backfill was an attestation, and it is not in `migrations.sql`.**
+19 of 24 real accounts had no `adult_at`, so `agegate.js` read them as UNKNOWN and
+the product had five visible people. The operator confirmed every existing account
+is 18+, and that was recorded as data: `adult_at = '2020-01-01'` (a sentinel, not a
+birthday) for real users who had none. `age_checked_at` was deliberately left NULL,
+because that column is what `/age/status` reports as `asked` — these people still
+have not been asked, and should be.
+
+It is **deliberately not in `migrations.sql`**. That file is re-runnable, and a
+re-run would silently mark every future ageless account as an adult — which is the
+exact failure `agegate.js` exists to prevent, arriving later and quieter. The rule
+did not change: unknown still fails closed, `agegate.test.js` still pins it, and
+anyone signing up now with no age is still invisible until they answer.
+
+The real fix is still outstanding: the age gate only fires on
+`screen === 'meetpeople'`, so someone who never opens a dating category is never
+asked. Onboarding is meant to capture age in the `body` beat and has done so once
+in 19 completed conversations.
+
 **`users.adult_at` is the only source of a band.** `dating_profiles.is_minor` exists so the
 nearby RPC can filter without a join. Reading it anywhere else is a bug that has already
 happened once: accounts with an age but no connection profile read as UNKNOWN and disappeared
