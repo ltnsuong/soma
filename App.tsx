@@ -3302,6 +3302,37 @@ const cloudSync = {
     } catch {}
   },
 
+  /**
+   * Bring the band back down from the server.
+   *
+   * The age only ever travelled upward: pushAge() sent it, pull() never read it
+   * and nothing called GET /age at all. So a band written anywhere other than
+   * this device — a second phone, a cleared browser, a backfill — was invisible
+   * to the client, which went on showing "Not visible yet" to people the server
+   * already knew were adults, forever.
+   *
+   * The server wins, because the server is what actually enforces the band. But
+   * a null answer never clears a local value: someone who answered the gate
+   * while offline still has the only copy, and this must not wipe it before
+   * pushAge() gets a chance to send it.
+   */
+  pullAge: async () => {
+    if (!cloudSync.enabled()) return
+    try {
+      const res = await fetch(`${BACKEND_URL}/age`, {
+        headers: { Authorization: `Bearer ${auth.getToken()}` },
+      })
+      if (!res.ok) return
+      const d = await res.json()
+      if (!d?.adultAt) return
+      const p = DB.get()
+      if (p.adultAt === d.adultAt) return
+      p.adultAt = d.adultAt
+      p.isMinor = d.band === 'minor'
+      DB.save(p)
+    } catch { /* offline is not an answer; leave whatever is local */ }
+  },
+
   /** Make the local consent record durable. Safe to call repeatedly. */
   pushConsent: async () => {
     if (!cloudSync.enabled()) return
@@ -4952,8 +4983,14 @@ export default function App() {
 
     // If user is already logged in, pull latest cloud data before routing
     const token = auth.getToken()
+    // pullAge runs alongside the profile pull, not after it: the band decides
+    // whether Home shows "Not visible yet", and that card should never appear
+    // for someone the server already has an age for.
     const startupSync = token
-      ? cloudSync.pull().then(pulled => { if (pulled) refresh() }).catch(() => {})
+      ? Promise.all([
+          cloudSync.pull().then(pulled => { if (pulled) refresh() }),
+          cloudSync.pullAge(),
+        ]).catch(() => {})
       : Promise.resolve()
 
     const t = setTimeout(() => {

@@ -1350,6 +1350,11 @@ app.get('/age', auth, async (req, res) => {
     const band = bandOf(data?.adult_at)
     res.json({
       band,
+      // The date itself, so a client that has lost its local copy — new device,
+      // cleared browser, a band written server-side — can restore it instead of
+      // asking a question this account already answered. It is the caller's own
+      // data and nobody else's: `auth` has already pinned this to one user.
+      adultAt: data?.adult_at ?? null,
       asked: !!data?.age_checked_at,
       minimumAge: ADULT_AGE,
       allowedConnectionTypes: allowedConnectionTypes(band),
