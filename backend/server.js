@@ -2678,7 +2678,6 @@ app.listen(PORT, async () => {
   console.log(`🔐 Auth endpoints ready`)
   console.log(`📧 Email via Resend (set RESEND_API_KEY in env)`)
   console.log(`🔑 OAuth ready to wire (add provider SDKs)`)
-  console.log(`💎 Premium endpoints ready`)
   // Auto-register Telegram bot webhook
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
   // Must be THIS server's own public URL, never APP_URL — APP_URL is the web app,
