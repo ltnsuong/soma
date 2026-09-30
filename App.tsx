@@ -1645,6 +1645,9 @@ interface UserProfile {
   premiumTrial?: string  // ISO date when 7-day trial ends
   likesToday: number
   likesDate: string
+  /** ISO week the scan counter belongs to, and how many were used in it. */
+  scansWeek?: string
+  scansUsed?: number
   connections: Connection[]
   likedYou: string[]          // names of people who liked you first
   aiName: string              // user's chosen name for their companion (e.g. Soma, Maya, Abuelo)
@@ -1720,8 +1723,38 @@ interface UserProfile {
 }
 type WheelSnapshot = { date: string; overall: number; scores: Partial<Record<DomainKey, number>> }
 
-const FREE_DAILY_LIKES = 999
+// Free has to mean something for SOMA+ to mean anything. These were both 999,
+// so the paywall advertised "999 likes/day" with "Free plan: 999 likes/day"
+// directly underneath — the one row on the page arguing against paying.
+const FREE_DAILY_LIKES = 25
 const PREMIUM_DAILY_LIKES = 999
+
+/**
+ * Synergy Scans a free account gets per week.
+ *
+ * This is the feature worth gating: it is the thing nothing else does, and it
+ * is the thing that costs real money — one scan spends ~1200 Groq output
+ * tokens against an org-wide ceiling of 1000/minute. Charging for the expensive
+ * feature is how the subscription stops fighting the infrastructure bill.
+ */
+const FREE_WEEKLY_SCANS = 3
+
+/**
+ * Which week a scan belongs to, as a sortable key.
+ *
+ * Deliberately not "seven days since your first scan": that makes the reset
+ * time a different moment for every person and impossible to explain. This is
+ * the calendar week, so "3 a week" means the same thing to everyone.
+ */
+function weekKey(d = new Date()): string {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  // Thursday of the current week decides the ISO year, which is what stops
+  // 29 December and 2 January landing in different-looking weeks.
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7))
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1))
+  const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+  return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+}
 
 const SCRIM_H = 200
 const SCRIM_BANDS = 40
@@ -2114,6 +2147,21 @@ const DB = {
     const today = new Date().toLocaleDateString()
     if (p.likesDate !== today) { p.likesToday = 0; p.likesDate = today }
     p.likesToday += 1
+    DB.save(p)
+  },
+  /** Scans left this week. Premium is uncapped. */
+  scansLeft: (): number => {
+    const p = DB.get()
+    if (p.premium) return Infinity
+    const wk = weekKey()
+    const used = p.scansWeek === wk ? (p.scansUsed || 0) : 0
+    return Math.max(0, FREE_WEEKLY_SCANS - used)
+  },
+  useScan: () => {
+    const p = DB.get()
+    const wk = weekKey()
+    if (p.scansWeek !== wk) { p.scansUsed = 0; p.scansWeek = wk }
+    p.scansUsed = (p.scansUsed || 0) + 1
     DB.save(p)
   },
   goPremium: () => { const p = DB.get(); p.premium = true; p.premiumTrial = undefined; DB.save(p) },
@@ -13918,14 +13966,29 @@ function MyProfile({ profile, onBack }: { profile: UserProfile; onBack: () => vo
 // ════════════════════════════════════════════════════════════
 // SOMA+ PAYWALL — real RevenueCat or graceful mock fallback
 // ════════════════════════════════════════════════════════════
-const SOMA_PLUS_FEATURES = [
-  { icon: '✦', label: 'Unlimited AI conversations', sub: 'No daily cap — Soma is always there' },
-  { icon: '👀', label: 'See who liked you', sub: 'Know before they do' },
-  { icon: '⚡', label: 'Instant AI connection', sub: `Like someone → your AIs talk immediately (free: wait for mutual like)` },
-  { icon: '♾️', label: `${PREMIUM_DAILY_LIKES} likes/day`, sub: `Free plan: ${FREE_DAILY_LIKES} likes/day` },
-  { icon: '🧠', label: 'Extended memory', sub: 'Soma remembers everything, forever' },
-  { icon: '🖼️', label: 'AI profile photo', sub: 'Let Soma pick your best shot' },
-  { icon: '📊', label: 'Premium weekly insights', sub: 'Deeper reflection & growth tips' },
+/**
+ * What SOMA+ actually buys, and nothing else.
+ *
+ * The old list had seven rows and sold four things that did not exist: "AI
+ * profile photo" and "Premium weekly insights" have no implementation at all,
+ * "Unlimited AI conversations — no daily cap" describes the free tier because
+ * no cap was ever written, and "999 likes/day" sat directly above the words
+ * "Free plan: 999 likes/day". Charging for absent features is a guideline 3.1.2
+ * problem and, more plainly, it is taking money for something not delivered.
+ *
+ * Five rows, every one true, every one verifiable in this file. Five also fits
+ * above the fold, which the seven did not — the button and the auto-renew
+ * disclosure were being pushed off the bottom of the screen.
+ *
+ * Icons are Ionicons like the rest of the app. Emoji here mixed flat glyphs
+ * with full-colour illustrations, so the column had no consistent weight.
+ */
+const SOMA_PLUS_FEATURES: { icon: keyof typeof Ionicons.glyphMap; label: string; sub: string }[] = [
+  { icon: 'flash-outline',        label: 'Unlimited Synergy Scans',  sub: `Free: ${FREE_WEEKLY_SCANS} a week` },
+  { icon: 'eye-outline',          label: 'See who liked you',        sub: 'Names, not a blurred count' },
+  { icon: 'heart-outline',        label: 'Unlimited likes',          sub: `Free: ${FREE_DAILY_LIKES} a day` },
+  { icon: 'videocam-outline',     label: 'Video moments',            sub: 'Share more than a photo with your Circle' },
+  { icon: 'images-outline',       label: 'Post as often as you like', sub: 'Free: one moment a day' },
 ]
 
 function SomaPlusPaywall({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
@@ -13996,7 +14059,7 @@ function SomaPlusPaywall({ onClose, onSuccess }: { onClose: () => void; onSucces
           </View>
           <Text style={{ fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: 1 }}>SOMA+</Text>
           <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.72)', marginTop: 4, textAlign: 'center' }}>
-            Your full life OS. No limits.
+            Keep meeting people worth meeting.
           </Text>
           <View style={{ marginTop: 10, backgroundColor: '#F6D66E', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 }}>
             <Text style={{ fontSize: 12, fontWeight: '800', color: '#2A1F00', letterSpacing: 0.4 }}>7-DAY FREE TRIAL</Text>
@@ -14054,7 +14117,7 @@ function SomaPlusPaywall({ onClose, onSuccess }: { onClose: () => void; onSucces
           {SOMA_PLUS_FEATURES.map(f => (
             <View key={f.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 16 }}>{f.icon}</Text>
+                <Ionicons name={f.icon} size={18} color="#fff" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{f.label}</Text>
@@ -15450,7 +15513,7 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
           style={[g.primaryBtn, { width: '100%', marginBottom: 12 }]}
           onPress={() => setShowPaywall(true)}
         >
-          <Text style={g.primaryBtnTxt}>⚡ Get SOMA+ — {PREMIUM_DAILY_LIKES} likes/day, instant match</Text>
+          <Text style={g.primaryBtnTxt}>⚡ Get SOMA+ — unlimited likes and Synergy Scans</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => { setStep('browse'); setPhotoIdx(0); if (index < safeActive.length - 1) setIndex(index + 1); else setIndex(0) }} style={{ paddingVertical: 10 }}>
           <Text style={{ color: t.textSub, fontSize: 14 }}>Keep browsing →</Text>
@@ -15879,6 +15942,7 @@ function SynergyScan({ profile, onBack }: { profile: UserProfile; onBack: () => 
   // same invitation and must not produce the same report.
   const [myIntent, setMyIntent] = useState<ScanIntent>('dating')
   const [scanIntent, setScanIntent] = useState<ScanIntent | null>(null)
+  const [showPaywall, setShowPaywall] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
 
   // Must match /users/find (first 6 of the user id) or the code won't resolve.
@@ -15983,6 +16047,13 @@ function SynergyScan({ profile, onBack }: { profile: UserProfile; onBack: () => 
   }[intent ?? 'professional'])
 
   const runSynergy = async (persona: SynergyPersona, intent: ScanIntent | null = null) => {
+    // Gated here, at the single point every route into a scan passes through —
+    // the QR camera, a typed code and the demo personas all arrive at this
+    // function. Gating the buttons instead would mean three places to keep in
+    // step, and one of them would eventually be missed.
+    if (DB.scansLeft() <= 0) { setStep('home'); setShowPaywall(true); haptic.error(); return }
+    DB.useScan()
+
     setStep('connecting'); setTurns([]); setVisibleCount(0); setReport(null)
 
     const myValues = profile.memories.filter(m => m.domain === 'purpose' || m.domain === 'relationship').map(m => m.content).join(', ') || profile.onboarding?.goals?.join(', ') || 'growth, connection, authenticity'
@@ -16048,6 +16119,14 @@ JSON only:` }], 'You write thoughtful synergy reports. Return only JSON.', 400)
 
   if (step === 'home') return (
     <View style={[g.screen, { backgroundColor: t.bg }]}>
+      {/* Every route into a scan ends up back on this step when the weekly
+          allowance is gone, so the sheet only needs to exist here. */}
+      {showPaywall && (
+        <SomaPlusPaywall
+          onClose={() => setShowPaywall(false)}
+          onSuccess={() => setShowPaywall(false)}
+        />
+      )}
       <View style={[g.header, { paddingTop: HEADER_TOP }]}>
         <TouchableOpacity onPress={onBack}><Text style={g.backLink}>{tr('back')}</Text></TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
@@ -16796,7 +16875,7 @@ function LikedYou({ profile, onBack, onUpgrade }: { profile: UserProfile; onBack
         {!profile.premium && (
           <View style={[g.likedUpsell, { backgroundColor: t.card }]}>
             <Text style={g.likedUpsellTitle}>★ See who likes you</Text>
-            <Text style={g.likedUpsellSub}>Premium reveals everyone who liked you, plus {PREMIUM_DAILY_LIKES} likes a day and unlimited chats.</Text>
+            <Text style={g.likedUpsellSub}>SOMA+ shows you everyone who liked you, plus unlimited likes and Synergy Scans.</Text>
             <TouchableOpacity style={g.paywallBtn} onPress={() => setShowPaywall(true)}>
               <Text style={g.paywallBtnTxt}>★  Unlock with SOMA+</Text>
             </TouchableOpacity>
