@@ -324,3 +324,39 @@ export function isEcho(candidate: string, priorLines: string[]): boolean {
   if (!c) return false
   return priorLines.some(p => norm(p) === c)
 }
+
+/**
+ * Read back a generated "acknowledge, then ask" turn.
+ *
+ * The questions are written carefully and then spoken verbatim, which makes
+ * the seam audible: Soma reacts to what you just said in one sentence and then
+ * asks something that could have been asked of anybody. Letting the model
+ * re-word the question in context closes that seam — but it also hands it the
+ * chance to ask something else entirely, and a beat that stops asking for what
+ * it was written to ask for breaks the thing quietly.
+ *
+ * So the canonical wording is the fallback at every failure: unparseable JSON,
+ * a missing field, an empty string, or a "question" that is not a question.
+ * A slightly stiff question that asks the right thing beats a natural one that
+ * does not.
+ */
+export function parseBeatLine(
+  raw: unknown, fallbackQuestion: string,
+): { ack: string; question: string } {
+  const fallback = { ack: '', question: fallbackQuestion }
+  if (typeof raw !== 'string') return fallback
+  const match = raw.replace(/```json|```/g, '').match(/\{[\s\S]*\}/)
+  if (!match) return fallback
+  let parsed: unknown
+  try { parsed = JSON.parse(match[0]) } catch { return fallback }
+  if (!parsed || typeof parsed !== 'object') return fallback
+
+  const obj = parsed as Record<string, unknown>
+  const ack = typeof obj.ack === 'string' ? obj.ack.trim() : ''
+  const question = typeof obj.question === 'string' ? obj.question.trim() : ''
+
+  // A rewrite that lost its question mark has usually lost the question too —
+  // models drift into statements when they are asked to sound natural.
+  if (!question || !question.includes('?')) return { ack, question: fallbackQuestion }
+  return { ack, question }
+}

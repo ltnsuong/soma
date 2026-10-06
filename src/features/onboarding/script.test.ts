@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   BEATS, MAX_EXCHANGES, TARGET_DOMAINS,
-  coveredDomains, isDone, isEcho, nextBeat, type Progress,
+  coveredDomains, isDone, isEcho, nextBeat, parseBeatLine, type Progress,
 } from './script'
 import { DOMAINS, type DomainKey } from '../../shared/domains'
 import type { FactKey } from './script'
@@ -269,5 +269,45 @@ describe('what someone is looking for', () => {
     const work = BEATS.find(b => b.id === 'work')
     expect(work?.ask).toMatch(/want to be doing/i)
     expect(work?.covers).toContain('purpose')
+  })
+})
+
+describe('reading back a re-worded question', () => {
+  const FALLBACK = 'What do you do?'
+  const parse = (raw: unknown) => parseBeatLine(raw, FALLBACK)
+
+  it('takes the acknowledgement and the question', () => {
+    expect(parse('{"ack":"That sounds relentless.","question":"What pulls you there?"}'))
+      .toEqual({ ack: 'That sounds relentless.', question: 'What pulls you there?' })
+  })
+
+  it('reads it out of a fenced block', () => {
+    expect(parse('```json\n{"ack":"Nice.","question":"And then?"}\n```').question).toBe('And then?')
+  })
+
+  it('reads it out of surrounding chatter', () => {
+    expect(parse('Sure!\n{"ack":"Mm.","question":"Why that one?"}\nHope that helps')
+      .question).toBe('Why that one?')
+  })
+
+  it('keeps the written question when the model returns nothing usable', () => {
+    for (const bad of ['', 'not json at all', '{', '{"ack":"hi"}', null, undefined, 42, {}]) {
+      expect(parse(bad).question).toBe(FALLBACK)
+    }
+  })
+
+  it('keeps the written question when the rewrite stopped being a question', () => {
+    // Models drift into statements when told to sound natural, and a beat that
+    // stops asking for what it was written to ask for fails silently.
+    expect(parse('{"ack":"Got it.","question":"Tell me about your work."}').question).toBe(FALLBACK)
+  })
+
+  it('keeps a usable acknowledgement even when the question is discarded', () => {
+    expect(parse('{"ack":"That is a long week.","question":"no question here"}'))
+      .toEqual({ ack: 'That is a long week.', question: FALLBACK })
+  })
+
+  it('never returns an empty question', () => {
+    expect(parse('{"ack":"x","question":"   "}').question).toBe(FALLBACK)
   })
 })

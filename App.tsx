@@ -18,7 +18,7 @@ import * as Location from 'expo-location'
 import * as Haptics from 'expo-haptics'
 import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
-import { BEATS, OPENING, coveredDomains, isDone, isEcho, nextBeat, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
+import { BEATS, OPENING, coveredDomains, isDone, isEcho, nextBeat, parseBeatLine, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { isEngineFailure, isPermanentFailure } from './src/shared/speech'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
@@ -6004,14 +6004,64 @@ Omit a key entirely if it was absent. Return only JSON.`,
     }
   }
 
-  const askNextBeat = (): boolean => {
+  /** Soma's own lines so far. The acknowledgement is generated from a history
+   *  that contains them, so it repeats itself given the chance. */
+  const priorSoma = () => sectionConvoRef.current.filter(m => m.role === 'soma').map(m => m.text)
+
+  /**
+   * Ask the next beat, in the words this conversation has earned.
+   *
+   * `history` is absent for the very first beat — there is nothing to react to
+   * yet, so it is spoken as written. Every beat after that is re-worded from
+   * what the person just said, which is the difference between a conversation
+   * and a form that replies.
+   *
+   * The canonical wording is the anchor AND the fallback. parseBeatLine()
+   * returns it whenever the model gives back something unusable, and the prompt
+   * forbids changing what is being asked for — a beat that quietly stops asking
+   * for someone's age takes their visibility with it.
+   */
+  const askNextBeat = async (history?: { role: string; content: string }[]): Promise<boolean> => {
     const beat = nextBeat(currentProgress())
     if (!beat) return false
     askedRef.current = [...askedRef.current, beat.id]
     beatRef.current = beat
+
     const opener = say(beat, 'opener')
+    const written = say(beat, 'ask')
+
+    if (!history) {
+      if (opener) pushSoma(opener)
+      pushSoma(written)
+      return true
+    }
+
+    let line = { ack: '', question: written }
+    try {
+      const raw = await groq(history, `${somaSystem()}
+Reply with exactly two things, as JSON.
+
+"ack": ONE short sentence reacting to what they just said. Never one you have
+already used. Never a question.
+
+"question": the next question. It must ask for the SAME thing as this:
+"${written}"
+
+Re-word it so it follows from what they just said — use their own words where
+that helps. You may NOT change what is being asked for, add a second question,
+or roll anything else into it. If the original names specific details — an age,
+a height, a name — your version must still ask for them outright. If their
+answer gives you no natural way in, use the original exactly as written.
+
+Return only {"ack": "...", "question": "..."}`, 220, 0.6)
+      line = parseBeatLine(raw, written)
+    } catch { /* the written question stands */ }
+
+    // Same echo rule as before: the acknowledgement is generated from a history
+    // containing Soma's own lines, so it repeats itself given the chance.
+    if (line.ack && !isEcho(line.ack, priorSoma())) pushSoma(line.ack)
     if (opener) pushSoma(opener)
-    pushSoma(say(beat, 'ask'))
+    pushSoma(line.question)
     return true
   }
 
@@ -6025,7 +6075,7 @@ Omit a key entirely if it was absent. Return only JSON.`,
     await translateScript()
     setSomaGenerating(false)
     pushSoma(beatLines.current['__opening']?.ask || OPENING)
-    askNextBeat()
+    await askNextBeat()
   }
 
   // Start or stop listening. Lifted out of the old send button, which had to be
@@ -6086,12 +6136,11 @@ Omit a key entirely if it was absent. Return only JSON.`,
     // the stop rule reads covered domains, so extracting after the decision would
     // make the conversation blind to everything it just heard.
     setFollowUpCount(0)
-    const [bridge, intel] = await Promise.all([
-      groq(history,
-        `${somaSystem()}\nAcknowledge what they said in ONE short sentence. Do not ask anything — the next question follows immediately. Do not reuse a sentence you have already said.`,
-        70),
-      extract(text),
-    ])
+    // Extraction first, alone. The next beat depends on what they just said, and
+    // the question is now written from that beat — so the two cannot run in
+    // parallel any more. One extra round trip, and it is why the question stops
+    // sounding like it was written for somebody else.
+    const intel = await extract(text)
     absorb(intel)
     // Extraction is prompted for the name, but a bare "Sofia" sometimes reads as
     // no introduction at all. Only trust a one- or two-word reply to this beat.
@@ -6104,10 +6153,7 @@ Omit a key entirely if it was absent. Return only JSON.`,
     // "Tuesday coffee is a high bar." appeared twice in a real run. Asking it
     // not to helps but does not hold, so drop a repeat rather than show it.
     // Nothing is lost: the next question follows immediately either way.
-    const priorSoma = sectionConvoRef.current.filter(m => m.role === 'soma').map(m => m.text)
-    if (bridge && !isEcho(bridge, priorSoma)) pushSoma(bridge)
-
-    if (isDone(currentProgress()) || !askNextBeat()) {
+    if (isDone(currentProgress()) || !(await askNextBeat(history))) {
       const closing = await groq(history,
         `${somaSystem()}\nThis is your last message: warmly acknowledge what they shared and say you have enough to start. Do NOT ask a question.`,
         110)
