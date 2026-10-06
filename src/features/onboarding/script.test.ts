@@ -66,7 +66,9 @@ describe('nextBeat', () => {
 
   it('still asks a beat that carries facts, even when its domains are covered', () => {
     // Age and height are asked outright; no amount of talking reveals them.
-    const p = progress({ asked: ['name', 'why', 'yesterday'], knownFacts: ['name'], covered: ['health', 'mind'] })
+    // The intent beats are listed as asked because they are `always` and would
+    // otherwise come first — that rule has its own test below.
+    const p = progress({ asked: ['name', 'why', 'yesterday', 'partner', 'friends', 'work'], knownFacts: ['name', 'job'], covered: ['health', 'mind', 'career', 'purpose'] })
     expect(nextBeat(p)?.id).toBe('body')
   })
 
@@ -80,8 +82,22 @@ describe('nextBeat', () => {
   })
 
   it('still asks for age and height, which talking never reveals', () => {
-    const p = progress({ asked: ['name', 'why', 'yesterday'], knownFacts: ['name'], covered: ['health', 'mind'] })
+    const p = progress({ asked: ['name', 'why', 'yesterday', 'partner', 'friends', 'work'], knownFacts: ['name', 'job'], covered: ['health', 'mind', 'career', 'purpose'] })
     expect(nextBeat(p)?.id).toBe('body')
+  })
+
+  it('still asks what someone wants, however full the wheel is', () => {
+    // The whole point of `always`. Describing your Tuesday fills the
+    // relationship domain without saying anything about who you hope to meet,
+    // and that answer is the one an introduction is actually built from — so a
+    // covered wheel must not retire it.
+    const all = DOMAINS.map(d => d.key)
+    const p = progress({
+      asked: ['name', 'why', 'yesterday', 'body'],
+      knownFacts: ['name', 'age', 'heightCm'],
+      covered: all,
+    })
+    expect(nextBeat(p)?.id).toBe('partner')
   })
 
   it('goes to the closing question when nothing new is left to reach', () => {
@@ -89,7 +105,7 @@ describe('nextBeat', () => {
     // conversation with nothing left to learn still ran to the ceiling.
     const all = DOMAINS.map(d => d.key)
     const p = progress({
-      asked: ['name', 'why', 'yesterday', 'body'],
+      asked: ['name', 'why', 'yesterday', 'body', 'partner', 'friends', 'work'],
       knownFacts: ['name', 'age', 'heightCm'],
       covered: all,
     })
@@ -104,7 +120,7 @@ describe('nextBeat', () => {
   })
 
   it('still asks when only some of its facts are known', () => {
-    const p = progress({ asked: ['name', 'why', 'yesterday'], covered: ['health', 'mind'], knownFacts: ['name', 'age'] })
+    const p = progress({ asked: ['name', 'why', 'yesterday', 'partner', 'friends', 'work'], covered: ['health', 'mind', 'career', 'purpose'], knownFacts: ['name', 'job', 'age'] })
     expect(nextBeat(p)?.id).toBe('body')   // height still missing
   })
 
@@ -214,5 +230,44 @@ describe('not saying the same thing twice', () => {
     expect(isEcho('', ['anything'])).toBe(false)
     expect(isEcho('   ', ['anything'])).toBe(false)
     expect(isEcho('something', [])).toBe(false)
+  })
+})
+
+describe('what someone is looking for', () => {
+  // These beats are the reason the app can introduce anyone to anyone. They
+  // were unreachable before: twelve beats competed for five exchanges and the
+  // intent questions sat at positions ten to twelve, so in a normal run nobody
+  // was ever asked who they hoped to meet.
+  it('asks about a partner and about friends separately', () => {
+    const ids = BEATS.map(b => b.id)
+    expect(ids).toContain('partner')
+    expect(ids).toContain('friends')
+  })
+
+  it('marks both so a covered wheel cannot skip them', () => {
+    for (const id of ['partner', 'friends']) {
+      expect(BEATS.find(b => b.id === id)?.always).toBe(true)
+    }
+  })
+
+  it('reaches them inside the exchange budget', () => {
+    // The failure this pins: at MAX_EXCHANGES = 5 the run was name, why,
+    // yesterday, one more, then the closing question — and 'partner' was never
+    // among them. Walk the real selector and check it comes up.
+    const asked: string[] = []
+    let covered: DomainKey[] = []
+    for (let i = 0; i < MAX_EXCHANGES; i++) {
+      const b = nextBeat({ covered, knownFacts: [], exchanges: i, asked })
+      if (!b) break
+      asked.push(b.id)
+      covered = [...new Set([...covered, ...b.covers])]
+    }
+    expect(asked).toContain('partner')
+  })
+
+  it('asks what work someone wants, not only what they do', () => {
+    const work = BEATS.find(b => b.id === 'work')
+    expect(work?.ask).toMatch(/want to be doing/i)
+    expect(work?.covers).toContain('purpose')
   })
 })

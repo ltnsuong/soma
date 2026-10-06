@@ -24,6 +24,17 @@ export interface Beat {
    *  Asking "what should I call you?" and replying "that's brief, tell me more"
    *  is the single most obviously robotic thing this could do. */
   terse?: boolean
+  /**
+   * Ask this one regardless of what the wheel already covers.
+   *
+   * The skip rule exists so a rich answer about yesterday can retire three
+   * later questions. That is right for facts about your life, and wrong for
+   * what you WANT: describing your Tuesday fills the relationship domain
+   * without saying one word about who you are hoping to meet. Those beats are
+   * the matching data — the whole reason someone is here — so they are not
+   * allowed to be inferred away.
+   */
+  always?: boolean
 }
 
 export const OPENING =
@@ -60,6 +71,50 @@ export const BEATS: Beat[] = [
     followUp: 'Which part of that was actually yours? The bit where nobody needed anything.',
     covers: ['career', 'health', 'environment', 'hobby', 'mind'],
   },
+  // ── Who you want ─────────────────────────────────────────
+  // These three are the matching data. Everything else describes the life
+  // someone already has; this is the only part that says what they are looking
+  // for, which is what the introductions are built from. All marked `always`,
+  // because the relationship domain fills up the moment anyone mentions their
+  // sister — and then the question that matters would never get asked.
+  {
+    id: 'partner',
+    act: 1,
+    opener: 'The part I am actually here for.',
+    ask: 'When you picture meeting someone — what are you hoping they are like?',
+    followUp: 'And what would make you feel safe enough to actually be yourself with them?',
+    covers: ['relationship'],
+    always: true,
+  },
+  {
+    // Deliberately separate from the romantic one. People want very different
+    // things from a friend than from a partner, and a single "what kind of
+    // connection are you missing" question gets answered for one and not the
+    // other — usually whichever the person assumes an app like this means.
+    id: 'friends',
+    act: 1,
+    ask: 'And friends — what kind of people do you want more of around you?',
+    covers: ['relationship', 'hobby'],
+    always: true,
+  },
+
+  {
+    // Both halves in one beat, because "what do you do" on its own is the
+    // question everyone has answered a thousand times and nobody enjoys. The
+    // second half is the one that produces something worth matching on — and
+    // the one people are usually waiting to be asked.
+    id: 'work',
+    act: 1,
+    ask: 'What do you do — and is it the thing you actually want to be doing?',
+    followUp: 'What would you be doing if nothing was in the way?',
+    covers: ['career', 'purpose'],
+    facts: ['job'],
+    // The first half is skippable — describing yesterday usually reveals the
+    // job. The second half never is: whether someone WANTS the work they do is
+    // not deducible from the fact that they do it, and it is the half worth
+    // matching on.
+    always: true,
+  },
   {
     // Age and height ride along here, exactly as the old ob_q1 did it. In a body
     // frame height reads as health; on a form next to "looking for" it reads as a
@@ -71,13 +126,6 @@ export const BEATS: Beat[] = [
     followUp: 'Is that normal for you, or is this a rough patch?',
     covers: ['health', 'mind'],
     facts: ['age', 'heightCm'],
-  },
-  {
-    id: 'work',
-    act: 1,
-    ask: 'What do you actually do? And what does that look like day to day?',
-    covers: ['career'],
-    facts: ['job'],
   },
   {
     // "Just for you" is doing the work — it separates real interests from
@@ -158,16 +206,25 @@ export const TARGET_DOMAINS = 4
 /**
  * Hard ceiling. Someone who gives short answers still gets out in time.
  *
- * Five, not eight, and not the original twelve. Users said the first
- * conversation was "not interesting and too long", and the tail is where that
- * is earned: by exchange six the rich beats have all been asked and what is
- * left is filling in, which is precisely what ordinary use is for.
+ * Twelve, then eight, then five, now eight — and the climb back is deliberate.
  *
- * Cutting this trades profile completeness for the chance that someone reaches
- * the app at all. An incomplete profile improves every time they talk to Soma;
- * an abandoned onboarding never does.
+ * "Not interesting and too long" was read as a length complaint and answered by
+ * cutting, which removed the wrong end. At five, the budget was spent on name,
+ * why, yesterday and one more, and the conversation ended before it ever asked
+ * what the person actually wanted — the only part that feeds an introduction.
+ * What was left was the inventory: your job, your height, whether money is a
+ * worry. Shorter, and more boring, which is how you get a complaint about
+ * length from a five-question form.
+ *
+ * Eight buys room for `partner`, `friends`, the second half of `work`, and age.
+ * Those
+ * are not more questions of the same kind; they are the ones people are waiting
+ * to be asked. Interest, not brevity, is what makes a conversation feel short.
+ *
+ * Someone who talks a lot still leaves early: isDone() ends the moment the
+ * wheel has TARGET_DOMAINS filled and the closing question has been asked.
  */
-export const MAX_EXCHANGES = 5
+export const MAX_EXCHANGES = 8
 
 /**
  * Facts that only a direct question will ever produce.
@@ -235,6 +292,9 @@ export const nextBeat = (p: Progress): Beat | null => {
   const known = new Set(p.knownFacts ?? [])
   const worthAsking = remaining.find(b =>
     b.act === 3
+    // What someone WANTS is never revealed by describing what they have, so a
+    // covered domain must not retire it. See the `always` note on Beat.
+    || b.always
     || b.covers.some(d => !covered.has(d))
     || b.facts?.some(f => ASK_ONLY_FACTS.includes(f) && !known.has(f))
   )
