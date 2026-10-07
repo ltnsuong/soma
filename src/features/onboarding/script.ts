@@ -48,16 +48,23 @@ export interface Beat {
  * "AI building relationships", "AI finding new connections", which name a
  * category rather than explain anything.
  *
- * So it now says what the answers are FOR before asking for any. Someone who
- * knows a profile is being written from this, and that it is what gets compared
- * when they meet someone, has a reason to answer properly. Someone who does not
- * is being interviewed by a stranger.
+ * So it now says what the answers are FOR before asking for any: that values —
+ * not just facts — are what gets remembered, and that they are matched across
+ * all four connection types, not only romance. The old wording said "when
+ * someone new turns up", which reads as a dating app and is three quarters
+ * wrong: friends, professional and support are the same engine.
+ *
+ * Someone who knows a profile is being written from this, and what it is
+ * compared against, has a reason to answer properly. Someone who does not is
+ * being interviewed by a stranger.
  */
 export const OPENING =
-  "I'm Soma. Before I ask you anything — here is what this actually is.\n\n" +
-  "You talk, I remember, and your profile gets written from that. You never fill one in. " +
-  "Later, when someone new turns up, my notes and their Soma's notes get compared privately — " +
-  "so what you get is a real introduction, with reasons, instead of a bio to judge.\n\n" +
+  "I'm Soma. Before I ask you anything — here is what this is for.\n\n" +
+  "You talk, I remember. Not just the facts — what you actually value, and what you are " +
+  "trying to build. Your profile gets written from that; you never fill one in.\n\n" +
+  "Then I look for people who hold the same things you do — for a relationship, a friendship, " +
+  "work, or someone who simply gets what you are going through. Their Soma and I compare notes " +
+  "privately, and what reaches you is a real introduction with reasons, not a bio to judge.\n\n" +
   "So this first bit is me getting to know you. Skip anything you'd rather not answer. I mean that."
 
 export const BEATS: Beat[] = [
