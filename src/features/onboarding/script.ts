@@ -37,10 +37,28 @@ export interface Beat {
   always?: boolean
 }
 
+/**
+ * The first thing anyone reads.
+ *
+ * It used to explain the FORMAT — this is a conversation, not a form, skip what
+ * you like — and never the point. A user testing the app stopped here and said
+ * so: "I want to understand what this app is and what it can do, but it is
+ * already asking me for information while it has not told me anything about
+ * itself." Before this they had seen three chips reading "AI that listens",
+ * "AI building relationships", "AI finding new connections", which name a
+ * category rather than explain anything.
+ *
+ * So it now says what the answers are FOR before asking for any. Someone who
+ * knows a profile is being written from this, and that it is what gets compared
+ * when they meet someone, has a reason to answer properly. Someone who does not
+ * is being interviewed by a stranger.
+ */
 export const OPENING =
-  "I'm Soma. I'll be straight with you — I'm not much use until I actually know you, " +
-  "so this first bit is me getting to know you rather than a form. Skip anything you " +
-  "don't feel like answering. I mean that."
+  "I'm Soma. Before I ask you anything — here is what this actually is.\n\n" +
+  "You talk, I remember, and your profile gets written from that. You never fill one in. " +
+  "Later, when someone new turns up, my notes and their Soma's notes get compared privately — " +
+  "so what you get is a real introduction, with reasons, instead of a bio to judge.\n\n" +
+  "So this first bit is me getting to know you. Skip anything you'd rather not answer. I mean that."
 
 export const BEATS: Beat[] = [
   // ── ACT I — You ──────────────────────────────────────────
