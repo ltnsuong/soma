@@ -14540,11 +14540,12 @@ function MeetPeople({ profile, category = 'romantic', startAtName, onBack, onMat
     (profile.agentPicks || []).filter(p => p.category === category)
   )
   const [agentPicksLoading, setAgentPicksLoading] = useState(false)
-  const [genderPref, setGenderPref] = useState<'male' | 'female' | 'both' | null>(() => {
-    if (category !== 'romantic') return 'both'
-    const saved = DB.get().dating?.genderPref as any
-    return saved || null
-  })
+  // There is no "who are you interested in?" step any more. It stood between a
+  // guest and the first thing they came to look at, asked for an orientation
+  // before showing them anything, and offered three boxes for something people
+  // do not reliably fit. A preference already saved is still honoured; nothing
+  // sets a new one, so the default is that everybody is shown everybody.
+  const genderPref = (category === 'romantic' ? (DB.get().dating?.genderPref as string | undefined) : 'both') || null
   const [userLocation] = useState({ lat: 34.0522, lng: -118.2437 }) // Mock LA location
   // Real users from the backend (live when logged in + backend deployed)
   const [realNearby, setRealNearby] = useState<NearbyUser[]>([])
@@ -15057,39 +15058,6 @@ JSON only:` }], `You write dialogue between two AI agents acting as ${category} 
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    )
-  }
-
-  if (step === 'browse' && category === 'romantic' && genderPref === null) {
-    return (
-      <View style={[g.screen, { backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
-        <TouchableOpacity onPress={onBack} style={{ position: 'absolute', top: HEADER_TOP, left: 20 }}>
-          <Text style={{ color: t.accent, fontSize: 15, fontWeight: '600' }}>{tr('back').replace('←', '‹')}</Text>
-        </TouchableOpacity>
-        <Text style={{ fontSize: 32, marginBottom: 16 }}>💜</Text>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 8 }}>{tr('interested_in')}</Text>
-        <Text style={{ fontSize: 15, color: t.textSub, textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>{tr('interested_sub')}</Text>
-        {([
-          { label: tr('pref_women'), value: 'female' as const, emoji: '👩' },
-          { label: tr('pref_men'), value: 'male' as const, emoji: '👨' },
-          { label: tr('pref_everyone'), value: 'both' as const, emoji: '🫂' },
-        ]).map(opt => (
-          <TouchableOpacity
-            key={opt.value}
-            onPress={() => {
-              const p = DB.get()
-              if (!p.dating) p.dating = {} as any
-              ;(p.dating as any).genderPref = opt.value
-              DB.save(p)
-              setGenderPref(opt.value)
-            }}
-            style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: t.card, borderRadius: 18, padding: 20, marginBottom: 12, borderWidth: 1.5, borderColor: t.border }}>
-            <Text style={{ fontSize: 28 }}>{opt.emoji}</Text>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: t.text }}>{opt.label}</Text>
-            <Text style={{ marginLeft: 'auto', color: t.textSub, fontSize: 18 }}>›</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
     )
   }
 
