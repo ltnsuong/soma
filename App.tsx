@@ -20,6 +20,7 @@ import { SchedulableTriggerInputTypes } from 'expo-notifications'
 import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { BEATS, OPENING, coveredDomains, isDone, isEcho, nextBeat, parseBeatLine, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { isEngineFailure, isPermanentFailure } from './src/shared/speech'
+import { grantsPremium, type PurchaseOutcome } from './src/shared/purchaseGate'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
 import QRCode from 'react-native-qrcode-svg'
@@ -14183,13 +14184,13 @@ function SomaPlusPaywall({ onClose, onSuccess }: { onClose: () => void; onSucces
   const subscribe = async () => {
     setErr(''); setPurchasing(true); haptic.medium()
     try {
-      let success = false
-      if (currentPkg) {
-        success = await purchaseApi.purchase(currentPkg)
-      } else {
-        success = true // sandbox / no RC configured
-      }
-      if (success) { DB.goPremium(); haptic.success(); onSuccess() }
+      const outcome: PurchaseOutcome = currentPkg
+        ? (await purchaseApi.purchase(currentPkg) ? { kind: 'purchased' } : { kind: 'refused' })
+        // No package means purchases are not configured in this build. See
+        // src/shared/purchaseGate.ts for why that must never read as a sale.
+        : { kind: 'unavailable' }
+      if (grantsPremium(outcome, __DEV__)) { DB.goPremium(); haptic.success(); onSuccess() }
+      else if (outcome.kind === 'unavailable') setErr('Subscriptions are unavailable in this build. Please try again later.')
       else setErr('Purchase cancelled.')
     } catch (e: any) {
       setErr(e.message || 'Purchase failed. Please try again.')
