@@ -17020,17 +17020,29 @@ function WhoLikesMe({ profile, onMeetPeople }: { profile: UserProfile; onMeetPeo
 function LikedYou({ profile, onBack, onUpgrade }: { profile: UserProfile; onBack: () => void; onUpgrade: () => void }) {
   const { t } = useT()
   const [showPaywall, setShowPaywall] = useState(false)
+  // Only real likes. This used to fall back to three seeded candidates when
+  // nobody had liked you — under a heading that then read "3 people liked you
+  // first" — so a brand-new account was told it had admirers, shown blurred
+  // strangers, and asked to pay to see them. That is selling something that
+  // does not exist, and it is the same fallback the inline WhoLikesMe section
+  // in Explore already had removed.
   const likers = CANDIDATES.filter(c => (profile.likedYou ?? []).includes(c.name))
-  const list = likers.length ? likers : CANDIDATES.slice(0, 3)
   return (
     <View style={[g.screen, { backgroundColor: t.bg }]}>
       <ScrollView contentContainerStyle={g.homePad}>
         <View style={g.homeHeader}><TouchableOpacity onPress={onBack}><Text style={g.backLink}>{tr('back')}</Text></TouchableOpacity></View>
         <Text style={g.logo}>{tr('who_likes_me')}</Text>
-        <Text style={g.logoSub}>{list.length} people liked you first.</Text>
+        <Text style={g.logoSub}>{likers.length} {tr('likes_you_count')}</Text>
         <View style={{ height: 16 }} />
+        {likers.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 36, backgroundColor: t.card, borderRadius: 16, borderWidth: 1, borderColor: t.border }}>
+            <Ionicons name="heart-outline" size={32} color="#F66E8E" style={{ marginBottom: 10 }} />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{tr('no_likes_yet')}</Text>
+            <Text style={{ fontSize: 13, color: t.textSub, marginTop: 4 }}>{tr('keep_exploring')}</Text>
+          </View>
+        ) : (
         <View style={g.likedGrid}>
-          {list.map((c, i) => (
+          {likers.map(c => (
             <View key={c.name} style={[g.likedCard, { backgroundColor: t.card }]}>
               <Image source={{ uri: c.photo }} style={[g.likedPhoto, !profile.premium && g.blurred]} blurRadius={profile.premium ? 0 : 18} />
               <View style={g.likedInfo}>
@@ -17040,12 +17052,15 @@ function LikedYou({ profile, onBack, onUpgrade }: { profile: UserProfile; onBack
             </View>
           ))}
         </View>
-        {!profile.premium && (
+        )}
+        {/* No upsell with nothing behind it: paying unlocks names, and with zero
+            likers there are no names to unlock. */}
+        {!profile.premium && likers.length > 0 && (
           <View style={[g.likedUpsell, { backgroundColor: t.card }]}>
-            <Text style={g.likedUpsellTitle}>★ See who likes you</Text>
-            <Text style={g.likedUpsellSub}>SOMA+ shows you everyone who liked you, plus unlimited likes and Synergy Scans.</Text>
+            <Text style={g.likedUpsellTitle}>★ {tr('see_who_likes')}</Text>
+            <Text style={g.likedUpsellSub}>{tr('unlock_all')}</Text>
             <TouchableOpacity style={g.paywallBtn} onPress={() => setShowPaywall(true)}>
-              <Text style={g.paywallBtnTxt}>★  Unlock with SOMA+</Text>
+              <Text style={g.paywallBtnTxt}>★  {tr('upgrade_arrow')}</Text>
             </TouchableOpacity>
           </View>
         )}
