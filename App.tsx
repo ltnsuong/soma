@@ -16844,16 +16844,68 @@ function Connections({ profile, onBack, onRefresh }: { profile: UserProfile; onB
 // ════════════════════════════════════════════════════════════
 //  WHO LIKES ME — inline section in Explore, 4 sectors
 // ════════════════════════════════════════════════════════════
+// Icons, not emoji: 💜😊💼🤝 render as four different art styles at four
+// different optical weights depending on the platform's emoji font, and the
+// rest of the app is Ionicons. The label keys are the ct_* set the category
+// pickers already use, so these four words are translated everywhere rather
+// than being the only English left on the screen.
 const WHO_LIKES_SECTORS = [
-  { key: 'dating',       label: 'Daters',     emoji: '💜', color: '#F66E8E' },
-  { key: 'friends',      label: 'Friends',    emoji: '😊', color: '#10B981' },
-  { key: 'professional', label: 'Pro',        emoji: '💼', color: '#378ADD' },
-  { key: 'support',      label: 'Support',    emoji: '🤝', color: '#F59E0B' },
+  { key: 'dating',       labelKey: 'ct_dating',       icon: 'heart',     color: '#F66E8E' },
+  { key: 'friends',      labelKey: 'ct_friends',      icon: 'people',    color: '#10B981' },
+  { key: 'professional', labelKey: 'ct_professional', icon: 'briefcase', color: '#378ADD' },
+  { key: 'support',      labelKey: 'ct_support',      icon: 'hand-left', color: '#F59E0B' },
 ] as const
+
+type WhoLikesSector = typeof WHO_LIKES_SECTORS[number]['key']
+
+// Selection is the app's own accent, not the sector's. Dating is the default
+// tab, so colouring the selected pill by sector meant the first thing anyone
+// saw in Explore was a block of pink in an otherwise purple app. The sector
+// colour still identifies the tab — it just lives on the icon and the count,
+// where it is a touch of colour rather than a slab.
+//
+// The count is the point of the redesign. Without it all four tabs look
+// identical whatever is behind them, and the only way to find the one holding
+// anything is to tap all four.
+function WhoLikesTabs({ active, onPick, countOf }: {
+  active: WhoLikesSector; onPick: (k: WhoLikesSector) => void; countOf: (k: WhoLikesSector) => number
+}) {
+  const { t } = useT()
+  return (
+    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+      {WHO_LIKES_SECTORS.map(s => {
+        const on = s.key === active
+        const n = countOf(s.key)
+        return (
+          <TouchableOpacity
+            key={s.key}
+            onPress={() => onPick(s.key)}
+            style={{
+              flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 3,
+              backgroundColor: on ? 'rgba(123,110,246,0.10)' : t.card,
+              borderWidth: 1,
+              borderColor: on ? '#7B6EF6' : t.border,
+            }}
+          >
+            <View>
+              <Ionicons name={(on ? s.icon : `${s.icon}-outline`) as any} size={17} color={on ? s.color : t.textSub} />
+              {n > 0 && (
+                <View style={{ position: 'absolute', top: -5, right: -9, minWidth: 15, height: 15, borderRadius: 8, paddingHorizontal: 4, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>{n}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: on ? t.text : t.textSub }} numberOfLines={1}>{tr(s.labelKey)}</Text>
+          </TouchableOpacity>
+        )
+      })}
+    </View>
+  )
+}
 
 function WhoLikesMe({ profile, onMeetPeople }: { profile: UserProfile; onMeetPeople: (cat: 'romantic' | 'friends' | 'professional' | 'support', startAt?: string) => void }) {
   const { t } = useT()
-  const [activeTab, setActiveTab] = useState<'dating' | 'friends' | 'professional' | 'support'>('dating')
+  const [activeTab, setActiveTab] = useState<WhoLikesSector>('dating')
   const [showPaywall, setShowPaywall] = useState(false)
   const [isPremium, setIsPremium] = useState(profile.premium)
 
@@ -16890,27 +16942,7 @@ function WhoLikesMe({ profile, onMeetPeople }: { profile: UserProfile; onMeetPeo
         )}
       </View>
 
-      {/* Sector tabs */}
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-        {WHO_LIKES_SECTORS.map(s => {
-          const active = s.key === activeTab
-          return (
-            <TouchableOpacity
-              key={s.key}
-              onPress={() => setActiveTab(s.key)}
-              style={{
-                flex: 1, paddingVertical: 9, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: active ? s.color + '20' : t.card,
-                borderWidth: 1.5,
-                borderColor: active ? s.color : t.border,
-              }}
-            >
-              <Text style={{ fontSize: 16 }}>{s.emoji}</Text>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: active ? s.color : t.textSub, marginTop: 2 }}>{s.label}</Text>
-            </TouchableOpacity>
-          )
-        })}
-      </View>
+      <WhoLikesTabs active={activeTab} onPick={setActiveTab} countOf={k => sectorLikers(k).length} />
 
       {/* Liker cards */}
       {likers.length > 0 ? (
@@ -16934,8 +16966,8 @@ function WhoLikesMe({ profile, onMeetPeople }: { profile: UserProfile; onMeetPeo
                     <Text style={{ fontSize: 28 }}>🔒</Text>
                   </View>
                 )}
-                <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: current.color, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{current.emoji}</Text>
+                <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: current.color, borderRadius: 11, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={current.icon as any} size={12} color="#fff" />
                 </View>
               </View>
               <View style={{ padding: 10 }}>
@@ -16951,8 +16983,8 @@ function WhoLikesMe({ profile, onMeetPeople }: { profile: UserProfile; onMeetPeo
         </View>
       ) : (
         <View style={{ alignItems: 'center', paddingVertical: 32, backgroundColor: t.card, borderRadius: 16, borderWidth: 1, borderColor: t.border }}>
-          <Text style={{ fontSize: 36, marginBottom: 8 }}>{current.emoji}</Text>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>No {current.label} likes yet</Text>
+          <Ionicons name={`${current.icon}-outline` as any} size={32} color={current.color} style={{ marginBottom: 10 }} />
+          <Text style={{ fontSize: 15, fontWeight: '700', color: t.text }}>{tr('no_likes_yet')}</Text>
           <Text style={{ fontSize: 13, color: t.textSub, marginTop: 4 }}>{tr('keep_exploring')}</Text>
         </View>
       )}
