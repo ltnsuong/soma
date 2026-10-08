@@ -214,9 +214,19 @@ deleted from EAS rather than left as a loaded gun.
 
 **A Test Store RevenueCat key disables subscriptions in a release build.** `RC_USABLE` is
 `!!RC_KEY && !(RC_IS_TEST_KEY && !__DEV__)`, so a `test_` key means `purchaseApi.configured()`
-is false and SOMA+ cannot be bought at all. `eas.json` holds `EXPO_PUBLIC_RC_IOS_KEY` as an
-empty string on purpose — obviously unset beats silently wrong. It needs the `appl_` key from
-the RevenueCat dashboard before any submission.
+is false and SOMA+ cannot be bought at all. `eas.json` therefore **omits**
+`EXPO_PUBLIC_RC_IOS_KEY` rather than setting it — obviously unset beats silently wrong, and an
+empty string takes down every `eas` command (see the validation note below). It needs the
+`appl_` key from the RevenueCat dashboard before any submission.
+
+**A sale we could not make is never a sale.** With no key inlined there is no package, and the
+paywall's old answer to that was `success = true` — permanent SOMA+, no payment, for anyone who
+tapped the button. Every build up to and including **9** ships that way. The rule now lives in
+`src/shared/purchaseGate.ts`: `unavailable` grants only in a dev client, never in a release
+build, whatever the reason the store is missing. Relaxing it does not just lose revenue, it is
+an Apple 3.1.1 rejection for unlocking paid features outside in-app purchase. The tests under
+"a sale we could not make is never a sale" exist to hold this; do not loosen them to make a
+refactor pass.
 
 **Google sign-in is per-platform and only the web client ID exists.** `GOOGLE_ENABLED` is
 computed from *this* platform's client ID, so the button is hidden on iOS rather than shown and
