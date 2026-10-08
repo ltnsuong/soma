@@ -14209,17 +14209,25 @@ function SomaPlusPaywall({ onClose, onSuccess }: { onClose: () => void; onSucces
 
   const busy = purchasing || restoring
 
+  // A Modal, not a bare absolute View. `position: absolute` resolves against
+  // the nearest positioned ancestor, and this paywall is opened from inside
+  // Explore's scroll content as well as from full-screen pages — so from the
+  // Who Likes Me section it was laid out inside that section's box, which made
+  // it a dark panel sitting in the middle of the page, cut off below the price
+  // and scrolling away with the feed behind it. A Modal always renders at the
+  // root, so every call site gets a full-screen sheet whatever it is nested in.
   return (
-    <View style={g.paywall}>
+    <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose() }}>
+      <View style={g.paywall}>
+      {/* Outside the ScrollView: pinned to the sheet, not to the top of the
+          content, so it stays reachable when the features list overflows. */}
+      <TouchableOpacity onPress={onClose} disabled={busy} style={{ position: 'absolute', top: Math.max(SAFE_TOP, 12), right: 12, zIndex: 10, padding: 10 }}>
+        <Text style={{ fontSize: 22, color: 'rgba(255,255,255,0.5)' }}>✕</Text>
+      </TouchableOpacity>
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingVertical: 32, paddingHorizontal: 20 }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingTop: Math.max(SAFE_TOP, 32) + 20, paddingBottom: Math.max(SAFE_BOTTOM, 32), paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Close */}
-        <TouchableOpacity onPress={onClose} disabled={busy} style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, padding: 8 }}>
-          <Text style={{ fontSize: 22, color: 'rgba(255,255,255,0.5)' }}>✕</Text>
-        </TouchableOpacity>
-
         {/* Hero */}
         <View style={{ alignItems: 'center', marginBottom: 28 }}>
           <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
@@ -14331,7 +14339,8 @@ function SomaPlusPaywall({ onClose, onSuccess }: { onClose: () => void; onSucces
           {'Subscriptions auto-renew unless cancelled 24h before renewal.\nManage in App Store / Google Play settings.'}
         </Text>
       </ScrollView>
-    </View>
+      </View>
+    </Modal>
   )
 }
 
@@ -21644,7 +21653,9 @@ const g = StyleSheet.create({
   secondaryBtn: { width: '100%', height: 52, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#7B6EF640', alignItems: 'center', justifyContent: 'center', marginBottom: 4, ...shadowSm },
   secondaryBtnTxt: { color: '#7B6EF6', fontSize: 15, fontWeight: '700' },
   matchPhoto: { width: 100, height: 100, borderRadius: 50, marginBottom: 14 },
-  paywall: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0F0A2E', zIndex: 50 },
+  // Inside a Modal, so this fills the modal root rather than whatever happened
+  // to be the nearest positioned ancestor at the call site.
+  paywall: { flex: 1, backgroundColor: '#0F0A2E' },
   paywallCard: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: '#F6D66E50', ...shadowLg },
   paywallTitle: { color: '#222540', fontSize: 24, fontWeight: '800', marginTop: 10, textAlign: 'center', letterSpacing: 0.5 },
   paywallSub: { color: '#6E7191', fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 10, marginBottom: 18 },
