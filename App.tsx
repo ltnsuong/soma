@@ -1966,11 +1966,23 @@ const DB = {
         if (!p.dating) p.dating = { ...EMPTY_DATING }
         if (!p.dating.photos) p.dating.photos = p.dating.photo ? [p.dating.photo] : []
         if (p.premium === undefined) p.premium = false
-        // Gift 7-day trial to every user (runs once — sets premiumTrial if not already set)
-        if (!p.premiumTrial && !p.premium) {
-          p.premiumTrial = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        }
-        // Auto-compute premium from trial window
+        // No client-side trial is granted any more. This used to hand every
+        // profile seven days of SOMA+ the first time it was read, which did
+        // three things, all bad: the App Store reviewer installed the app, was
+        // premium, and could not reach the paywall at all — "we were unable to
+        // locate the in-app purchases" is the rejection that follows; the real
+        // 7-day free trial, the StoreKit introductory offer on both products,
+        // was never started by anyone, so no subscription was ever created and
+        // we learned nothing about willingness to pay; and the free tier was
+        // never actually experienced, so its limits went untested.
+        //
+        // The trial now lives where it belongs: on the App Store products, with
+        // a payment method attached. Premium is reached by purchase or restore
+        // only, synced from the RevenueCat `premium` entitlement.
+        //
+        // The line below stays so that profiles already carrying a trial from
+        // the old behaviour keep it until it expires, rather than losing it
+        // mid-week on upgrade. It grants nothing new.
         if (p.premiumTrial) p.premium = new Date(p.premiumTrial) > new Date()
         if (p.likesToday === undefined) { p.likesToday = 0; p.likesDate = '' }
         if (!p.connections) p.connections = []
@@ -6706,11 +6718,9 @@ Do not ask a question. Never mention a journey, a path, or being excited.`
             try {
               await auth.signup(regEmail.trim(), userName.trim(), regPassword.trim())
               DB.setName(userName.trim())
-              // Grant 7-day SOMA+ trial
-              const _p = DB.get()
-              _p.premiumTrial = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-              _p.premium = true
-              DB.save(_p)
+              // No trial granted at signup. See DB.get() — the 7 days now live
+              // on the App Store products as a StoreKit introductory offer,
+              // which is the one that can turn into a subscription.
               alert(`✉️ Almost there!\n\nWe sent a confirmation link to ${regEmail.trim()}. Click it to activate your account, then sign in.`)
               onDone()
             } catch (err: any) {

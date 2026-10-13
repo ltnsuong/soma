@@ -228,6 +228,17 @@ an Apple 3.1.1 rejection for unlocking paid features outside in-app purchase. Th
 "a sale we could not make is never a sale" exist to hold this; do not loosen them to make a
 refactor pass.
 
+**The trial is Apple's, not ours.** `DB.get()` used to hand every profile seven days of SOMA+
+the first time it was read, and the signup handler granted a second one. That made the App Store
+reviewer premium on install, so they could not reach the paywall at all — "we were unable to
+locate the in-app purchases" is the rejection that follows — and it meant the real StoreKit
+introductory offer was never started by anyone, so no subscription was ever created. The 7 days
+now live on the App Store products as an introductory offer, with a payment method attached.
+Premium is reached by purchase or restore only, synced from the RevenueCat `premium`
+entitlement in the launch check. The `p.premiumTrial` line in `DB.get()` remains so profiles
+carrying a trial from the old behaviour keep it until it expires; it grants nothing new. Do not
+reintroduce a client-side grant to "let people try it" — the free tier is the try.
+
 **Google sign-in is per-platform and only the web client ID exists.** `GOOGLE_ENABLED` is
 computed from *this* platform's client ID, so the button is hidden on iOS rather than shown and
 broken. Do not "fix" it by ORing the three ids together — that is what once threw from
