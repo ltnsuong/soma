@@ -258,6 +258,18 @@ than one person scanning at a time, this feature degrades to canned text.
 respectively. Without them the app builds for web and crashes on a device. `npx expo-doctor`
 catches this; run it before any native build.
 
+**`/health` is liveness; `/health/db` is the truth.** Supabase pauses a free-tier
+project after 7 days idle, and on 2026-10-14 it did: the data layer was down for days while
+`mysoma.site`, the API root and `/health` all answered 200 and every endpoint that touched data
+failed with `fetch failed`. `backend/keepalive.js` now probes the database every six hours, so
+the project is never idle — having no users is what causes a pause, not what prevents one — and
+`/health/db` reports whether that probe actually succeeded, with "no probe yet" counted as
+unhealthy. Do **not** move that reporting onto `/health`: `railway.json` points Railway's own
+healthcheck there, so a failing `/health` fails the deploy and restarts the container, taking
+down the endpoints that still work at the exact moment the database is away. Monitor
+`/health/db`; a check that asserts a response arrived rather than what it contains is what hid
+this outage and the `index.ts`-served-as-text one before it.
+
 **After every web deploy, check the legal pages are still served.** They 404'd
 silently once between deploys, and App Store Connect rejects a submission whose privacy
 policy URL does not resolve:

@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import crypto from 'crypto'
 import { pickNudge, NUDGE_VOICE } from './nudges.js'
+import { databaseHealth, PING_INTERVAL_MS, PING_BOOT_DELAY_MS } from './keepalive.js'
 import { deriveDatingProfile } from './derive.js'
 import { verifyAppleToken, appleAudiences } from './apple-auth.js'
 import { createLimiter, checkAiRequest, checkFaceAttempt, retryAfterSeconds, clientIp } from './ratelimit.js'
@@ -2669,7 +2670,43 @@ app.post('/reports', auth, async (req, res) => {
   }
 })
 
+// Liveness. railway.json points Railway's own healthcheck here, so this must
+// answer 200 whenever the process is up — a 503 here fails the deploy and
+// restarts the container, which during a database outage would take down the
+// endpoints that still work. The database's own answer is at /health/db.
 app.get(['/', '/health'], (req, res) => res.json({ status: 'ok', service: 'soma-backend' }))
+
+// Keep the database warm, and record whether it answered.
+//
+// Supabase pauses a free-tier project after 7 days idle, which it did on
+// 2026-10-14: the data layer went down for days while every check we had still
+// returned 200. This query costs nothing and means the project is never idle.
+const dbProbe = { lastOkAt: null, lastError: null }
+
+async function probeDatabase() {
+  try {
+    const { error } = await supabase.from('users').select('id').limit(1)
+    if (error) throw new Error(error.message)
+    const wasDown = dbProbe.lastOkAt === null && dbProbe.lastError !== null
+    dbProbe.lastOkAt = Date.now()
+    dbProbe.lastError = null
+    if (wasDown) console.log('[keepalive] database reachable again')
+  } catch (err) {
+    dbProbe.lastError = err.message
+    console.error('[keepalive] database probe failed:', err.message)
+  }
+}
+
+setInterval(probeDatabase, PING_INTERVAL_MS).unref?.()
+setTimeout(probeDatabase, PING_BOOT_DELAY_MS).unref?.()
+
+// Readiness: did the data layer actually answer? This is the check that would
+// have caught the outage, because it asserts on content rather than on a
+// response arriving at all.
+app.get('/health/db', (req, res) => {
+  const { status, body } = databaseHealth(dbProbe, Date.now())
+  res.status(status).json(body)
+})
 
 // START
 const PORT = process.env.PORT || 3000
