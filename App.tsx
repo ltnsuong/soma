@@ -21,6 +21,7 @@ import { DOMAINS, type DomainKey } from './src/shared/domains'
 import { BEATS, OPENING, coveredDomains, isDone, isEcho, nextBeat, parseBeatLine, type Beat, type FactKey, type Progress } from './src/features/onboarding/script'
 import { isEngineFailure, isPermanentFailure } from './src/shared/speech'
 import { grantsPremium, type PurchaseOutcome } from './src/shared/purchaseGate'
+import { micFailureMessage, micFailureLog, type MicStage } from './src/shared/micError'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
 import QRCode from 'react-native-qrcode-svg'
@@ -4332,8 +4333,13 @@ function listenNative(
   onInterim?: (t: string) => void,
 ): () => void {
   let stopped = false
+  // Which step we are on, so a failure can name itself. Every one of these used
+  // to fail into `catch(() => onEnd())`, which logged nothing and showed
+  // nothing: the mic button stopped pulsing and that was the whole symptom.
+  let stage: MicStage = 'permission'
 
   const run = async () => {
+    stage = 'permission'
     const perm = await AudioModule.requestRecordingPermissionsAsync()
     if (!perm.granted) { alert('SOMA needs the microphone to hear you.'); onEnd(); return }
     // iOS defaults allowsRecording to FALSE, so the audio session is not in a
@@ -4341,13 +4347,20 @@ function listenNative(
     // no error, no audio. This was the mic "not working" on a real iPhone;
     // the simulator never showed it. playsInSilentMode matters too, or Soma's
     // spoken replies are silent whenever the ring switch is off.
+    stage = 'audio-session'
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
+    stage = 'prepare'
     await recorder.prepareToRecordAsync()
+    stage = 'record'
     recorder.record()
     onInterim?.('Listening…')
   }
 
-  run().catch(() => onEnd())
+  run().catch((e) => {
+    console.error(micFailureLog(stage, e))
+    alert(micFailureMessage(stage, e))
+    onEnd()
+  })
 
   return () => {
     if (stopped) return
@@ -4430,7 +4443,16 @@ function listen(
 ): () => void {
   // On a phone there is no Web Speech and no MediaRecorder — record with
   // expo-audio and transcribe through the same backend route.
-  if (Platform.OS !== 'web' && nativeRecorder) {
+  if (Platform.OS !== 'web') {
+    // On a phone this is the only path. Falling through to the web one told an
+    // iPhone user "Voice input is not supported in this browser", which is both
+    // untrue and unactionable — there is no browser.
+    if (!nativeRecorder) {
+      console.error(micFailureLog('unavailable', 'useAudioRecorder has not reached setNativeRecorder yet'))
+      alert(micFailureMessage('unavailable', 'recorder not registered'))
+      onEnd()
+      return () => {}
+    }
     return listenNative(nativeRecorder, onResult, onEnd, onInterim)
   }
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
