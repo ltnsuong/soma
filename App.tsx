@@ -23,7 +23,7 @@ import { isEngineFailure, isPermanentFailure } from './src/shared/speech'
 import { grantsPremium, type PurchaseOutcome } from './src/shared/purchaseGate'
 import { micFailureMessage, micFailureLog, type MicStage } from './src/shared/micError'
 import { File } from 'expo-file-system'
-import { observeLevel, shouldAutoStop, emptySilenceState } from './src/shared/silence'
+import { observeLevel, shouldAutoStop, emptySilenceState, stopReason } from './src/shared/silence'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
 import QRCode from 'react-native-qrcode-svg'
@@ -4422,7 +4422,10 @@ function listenNative(
       let metering: number | undefined
       try { metering = recorder.getStatus?.()?.metering } catch { metering = undefined }
       state = observeLevel(state, metering, SILENCE_TICK_MS)
-      if (shouldAutoStop(state)) stopListening()
+      if (shouldAutoStop(state)) {
+        console.log(`[voice] stopped by itself after ${state.durationMs}ms — ${stopReason(state)}`)
+        stopListening()
+      }
     }, SILENCE_TICK_MS)
   }
 
