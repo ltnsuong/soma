@@ -4376,7 +4376,14 @@ function listenNative(
       try {
         await recorder.stop()
         const uri = recorder.uri
-        if (!uri) { onEnd(); return }
+        // The last silent exit in this path. A recorder that stops without
+        // producing a file looks identical to one that worked and heard
+        // nothing: the box stays empty and no error is raised anywhere.
+        if (!uri) {
+          console.error(micFailureLog('record', 'recorder.stop() produced no file'))
+          alert(micFailureMessage('record', 'no recording file was produced'))
+          return
+        }
         onInterim?.('Transcribing…')
         // The file is on disk, so fetch() is the shortest route to its bytes.
         const blob = await (await fetch(uri)).blob()
