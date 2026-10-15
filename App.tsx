@@ -4055,7 +4055,14 @@ function fallbackCopy(text: string, onDone: () => void) {
 
 // Speech → text via Whisper on the backend. Works anywhere MediaRecorder does,
 // including Firefox and the Telegram WebView where Web Speech is unavailable.
-async function transcribe(blob: Blob): Promise<string> {
+// `contentType` overrides the blob's own, which is how the native path has to
+// call this. The backend picks the filename extension it gives Whisper straight
+// from this header, and a blob read from a file:// URI on React Native carries
+// no type — so an iOS recording, which is MPEG4/AAC, was being labelled
+// audio/webm and sent as audio.webm. Whisper refuses it, the client turns that
+// into an empty string, and the mic appears to do nothing on a phone while
+// working perfectly on the web, where the browser never takes this path.
+async function transcribe(blob: Blob, contentType?: string): Promise<string> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 45000)
   try {
@@ -4063,7 +4070,7 @@ async function transcribe(blob: Blob): Promise<string> {
     const res = await fetch(`${BACKEND_URL}/ai/transcribe?lang=${encodeURIComponent(lang)}`, {
       method: 'POST',
       headers: {
-        'Content-Type': blob.type || 'audio/webm',
+        'Content-Type': contentType || blob.type || 'audio/webm',
         ...(auth.getToken() ? { Authorization: `Bearer ${auth.getToken()}` } : {}),
       },
       body: blob,
@@ -4373,10 +4380,25 @@ function listenNative(
         onInterim?.('Transcribing…')
         // The file is on disk, so fetch() is the shortest route to its bytes.
         const blob = await (await fetch(uri)).blob()
-        const text = await transcribe(blob)
+        // An empty read is its own failure and used to look like silence: the
+        // upload went out with no audio, Whisper returned nothing, and the
+        // answer box stayed blank with no error anywhere.
+        if (!blob.size) {
+          console.error(micFailureLog('record', `recording at ${uri} read back as 0 bytes`))
+          alert(micFailureMessage('record', 'the recording was empty'))
+          return
+        }
+        // RecordingPresets.HIGH_QUALITY writes .m4a on iOS and Android, so say
+        // so rather than trusting a blob type that React Native does not set.
+        const text = await transcribe(blob, 'audio/mp4')
         if (text) onResult(text)
+        else {
+          console.error(micFailureLog('record', `transcription returned nothing for ${blob.size} bytes`))
+          alert('SOMA heard you but could not turn it into text. Please try again.')
+        }
       } catch (e) {
-        console.warn('[voice] native capture failed:', e instanceof Error ? e.message : e)
+        console.error(micFailureLog('record', e))
+        alert(micFailureMessage('record', e))
       } finally {
         // Leave the recording category. Staying in it makes iOS route playback
         // quietly, so Soma's reply would be near-inaudible after every answer.
