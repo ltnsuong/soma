@@ -22,6 +22,7 @@ import { BEATS, OPENING, coveredDomains, isDone, isEcho, nextBeat, parseBeatLine
 import { isEngineFailure, isPermanentFailure } from './src/shared/speech'
 import { grantsPremium, type PurchaseOutcome } from './src/shared/purchaseGate'
 import { micFailureMessage, micFailureLog, type MicStage } from './src/shared/micError'
+import { File } from 'expo-file-system'
 import { observeLevel, shouldAutoStop, emptySilenceState } from './src/shared/silence'
 import { ProfileOverview } from './src/features/onboarding/ProfileOverview'
 import { scoreFit, overlap, shows, BIO_BRIEF, type ConnectionType, type Side } from './src/features/connections/scoring'
@@ -4056,6 +4057,47 @@ function fallbackCopy(text: string, onDone: () => void) {
 
 // Speech → text via Whisper on the backend. Works anywhere MediaRecorder does,
 // including Firefox and the Telegram WebView where Web Speech is unavailable.
+/**
+ * Upload a recording straight from disk, for the native path.
+ *
+ * The browser hands `transcribe()` a Blob and that works. On a phone the same
+ * route — fetch the file:// URI, call .blob(), post the Blob — produced a
+ * non-empty blob and no text: SOMA heard you, the bytes were there, and
+ * nothing came back. React Native's fetch does not reliably put a Blob body on
+ * the wire, so the server was receiving an upload with no audio in it.
+ *
+ * expo-file-system streams the file itself, which is what the endpoint's
+ * express.raw() wants, and it reports the status and body for any response
+ * including non-2xx — so a refusal can finally say what it was instead of
+ * collapsing into an empty string.
+ */
+async function transcribeFile(uri: string): Promise<{ text: string; detail: string }> {
+  try {
+    const lang = currentLangCode()
+    const token = auth.getToken()
+    const res = await new File(uri).upload(
+      `${BACKEND_URL}/ai/transcribe?lang=${encodeURIComponent(lang)}`,
+      {
+        httpMethod: 'POST',
+        // RecordingPresets.HIGH_QUALITY writes .m4a — MPEG4/AAC — on iOS and
+        // Android. The server picks the filename it gives Whisper from this.
+        headers: {
+          'Content-Type': 'audio/mp4',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      },
+    )
+    if (res.status < 200 || res.status >= 300) {
+      lastAiFailure = res.status === 429 ? 'busy' : 'down'
+      return { text: '', detail: `HTTP ${res.status}: ${String(res.body).slice(0, 120)}` }
+    }
+    const text = (JSON.parse(res.body)?.text ?? '').trim()
+    return { text, detail: text ? 'ok' : 'the server returned no words' }
+  } catch (e) {
+    return { text: '', detail: `upload failed: ${e instanceof Error ? e.message : String(e)}` }
+  }
+}
+
 // `contentType` overrides the blob's own, which is how the native path has to
 // call this. The backend picks the filename extension it gives Whisper straight
 // from this header, and a blob read from a file:// URI on React Native carries
@@ -4409,23 +4451,11 @@ function listenNative(
           return
         }
         onInterim?.('Transcribing…')
-        // The file is on disk, so fetch() is the shortest route to its bytes.
-        const blob = await (await fetch(uri)).blob()
-        // An empty read is its own failure and used to look like silence: the
-        // upload went out with no audio, Whisper returned nothing, and the
-        // answer box stayed blank with no error anywhere.
-        if (!blob.size) {
-          console.error(micFailureLog('record', `recording at ${uri} read back as 0 bytes`))
-          alert(micFailureMessage('record', 'the recording was empty'))
-          return
-        }
-        // RecordingPresets.HIGH_QUALITY writes .m4a on iOS and Android, so say
-        // so rather than trusting a blob type that React Native does not set.
-        const text = await transcribe(blob, 'audio/mp4')
+        const { text, detail } = await transcribeFile(uri)
         if (text) onResult(text)
         else {
-          console.error(micFailureLog('record', `transcription returned nothing for ${blob.size} bytes`))
-          alert('SOMA heard you but could not turn it into text. Please try again.')
+          console.error(micFailureLog('record', `transcription produced no text — ${detail}`))
+          alert(`SOMA heard you but could not turn it into text. (${detail})`)
         }
       } catch (e) {
         console.error(micFailureLog('record', e))
