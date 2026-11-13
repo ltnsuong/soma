@@ -48,3 +48,10 @@ backend/.env
 
 # packaged web build for manual hosting upload
 soma-site.zip
+
+# local media and personal docs — never commit
+*.mov
+*.MP4
+*.mp4
+analytical_note*.pdf
+YC_W2027_APPLICATION.md
